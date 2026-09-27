@@ -60,4 +60,16 @@ public class User {
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Notification> notifications = new ArrayList<>();
+
+    public void addRole(Role role) {
+        if (this.userRoles == null) {
+            this.userRoles = new ArrayList<>();
+        }
+        UserRole userRole = UserRole.builder()
+                .user(this)
+                .role(role)
+                .build();
+        this.userRoles.add(userRole);
+    }
 }
+
