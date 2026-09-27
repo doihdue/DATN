@@ -1,0 +1,51 @@
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+}
+
+.app-footer {
+  background: #ffffff;
+  border-top: 1px solid var(--border-color);
+  padding: 1.5rem;
+  margin-top: auto;
+}
+
+.footer-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer-brand {
+  font-size: 1.1rem;
+  color: var(--primary-900);
+}
+
+.text-primary {
+  color: var(--primary-600);
+}
+
+.footer-copy {
+  font-size: 0.825rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.student-info {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary-800);
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-full);
+}

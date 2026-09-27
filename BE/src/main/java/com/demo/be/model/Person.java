@@ -20,15 +20,18 @@ public class Person {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @org.hibernate.annotations.Nationalized
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
+    @org.hibernate.annotations.Nationalized
     @Column(name = "gender", length = 20)
     private String gender;
 
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
+    @org.hibernate.annotations.Nationalized
     @Column(name = "address", length = 500)
     private String address;
 
