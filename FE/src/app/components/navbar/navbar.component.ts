@@ -27,33 +27,41 @@ import { AuthService } from '../../services/auth.service';
             <i class="bi bi-house-door"></i> Trang chủ
           </a>
           <a routerLink="/queue" routerLinkActive="active" class="nav-item">
-            <i class="bi bi-display"></i> Bảng gọi số
+            <i class="bi bi-display"></i> Bảng gọi số TV
           </a>
+          <a routerLink="/queue/tracking" routerLinkActive="active" class="nav-item">
+            <i class="bi bi-ticket-perforated"></i> Tra cứu phiếu
+          </a>
+
           @if (authService.isAuthenticated()) {
-            @if (authService.hasRole('PATIENT')) {
-              <a routerLink="/booking" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-calendar-plus"></i> Đặt lịch khám
+            @if (authService.hasRole('ADMIN')) {
+              <a routerLink="/admin/specialties" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-diagram-3"></i> Chuyên khoa
               </a>
-              <a routerLink="/my-tickets" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-ticket-perforated"></i> Phiếu khám của tôi
+              <a routerLink="/admin/schedules" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar3"></i> Lịch làm việc
+              </a>
+              <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-sliders"></i> Điều phối hàng đợi
+              </a>
+              <a routerLink="/doctor/examination" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
               </a>
             }
-            @if (authService.hasRole('DOCTOR')) {
+            @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
               <a routerLink="/doctor/schedule" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-calendar-week"></i> Ca trực của tôi
               </a>
               <a routerLink="/doctor/calling" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-megaphone"></i> Gọi khám
               </a>
-            }
-            @if (authService.hasRole('STAFF')) {
-              <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-person-check"></i> Tiếp đón & Cấp số
+              <a routerLink="/doctor/examination" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
               </a>
             }
-            @if (authService.hasRole('ADMIN')) {
-              <a routerLink="/admin" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-gear"></i> Quản trị
+            @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+              <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-sliders"></i> Điều phối hàng đợi
               </a>
             }
           }

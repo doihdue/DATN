@@ -1,0 +1,663 @@
+<div class="exam-workspace-page">
+  <!-- Top Action Bar -->
+  <header class="exam-top-bar">
+    <div class="top-bar-left">
+      <a routerLink="/doctor/calling" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Quay lại Bàn Điều Phối
+      </a>
+      <div class="exam-title-badge">
+        <span class="live-dot"></span> BÀN KHÁM BỆNH BÁC SĨ
+      </div>
+    </div>
+
+    <div class="top-bar-right">
+      <button class="btn btn-outline btn-history" (click)="showHistoryDrawer.set(true)">
+        <i class="bi bi-clock-history"></i> Xem Tiền Sử Bệnh
+        @if (patientHistory()?.records?.length) {
+          <span class="history-count">({{ patientHistory()!.records.length }})</span>
+        }
+      </button>
+
+      <button class="btn btn-success btn-finish-exam" [disabled]="submitting()" (click)="saveExamination()">
+        @if (submitting()) {
+          <span class="spinner-sm"></span> Đang Lưu Hồ Sơ...
+        } @else {
+          <i class="bi bi-check2-circle"></i> Hoàn Tất Ca Khám & Kê Đơn
+        }
+      </button>
+    </div>
+  </header>
+
+  <!-- Notification Banner -->
+  @if (alertMessage()) {
+    <div class="alert-banner" [ngClass]="alertType() === 'success' ? 'alert-success' : 'alert-danger'">
+      <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+      <span>{{ alertMessage() }}</span>
+      <button class="btn-close-alert" (click)="alertMessage.set(null)">×</button>
+    </div>
+  }
+
+  <!-- Patient Summary Card -->
+  <section class="patient-banner-card">
+    <div class="patient-main-info">
+      <div class="patient-avatar-box">
+        <i class="bi bi-person-heart"></i>
+      </div>
+      <div class="patient-meta">
+        <div class="patient-name-row">
+          <h2 class="patient-name">{{ currentTicket()?.patientName || patientHistory()?.patientName || 'Bệnh nhân' }}</h2>
+          @if (currentTicket()?.ticketNumber) {
+            <span class="ticket-badge">Số khám: #{{ currentTicket()?.ticketNumber }}</span>
+          }
+          @if (currentTicket()?.isEmergency) {
+            <span class="emergency-badge"><i class="bi bi-lightning-fill"></i> ƯU TIÊN CẤP CỨU</span>
+          }
+        </div>
+        <div class="patient-details-row">
+          <span><i class="bi bi-gender-ambiguous"></i> Giới tính: <strong>{{ patientHistory()?.gender || 'Chưa rõ' }}</strong></span>
+          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ patientHistory()?.dateOfBirth || currentTicket()?.patientYearOfBirth || 'Đang cập nhật' }}</strong></span>
+          <span><i class="bi bi-telephone"></i> SĐT: <strong>{{ currentTicket()?.patientPhone || patientHistory()?.phoneNumber || 'Chưa có' }}</strong></span>
+          <span><i class="bi bi-droplet-half"></i> Nhóm máu: <strong class="text-danger">{{ patientHistory()?.bloodGroup || 'Chưa xác định' }}</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Allergy Warning Tag -->
+    <div class="patient-allergy-box" [class.has-allergy]="patientHistory()?.allergies">
+      <div class="allergy-title">
+        <i class="bi bi-shield-exclamation"></i> Tiền sử dị ứng thuốc:
+      </div>
+      <div class="allergy-content">
+        {{ patientHistory()?.allergies || 'Chưa ghi nhận dị ứng thuốc' }}
+      </div>
+    </div>
+  </section>
+
+  <!-- Vital Signs Quick Entry Bar -->
+  <section class="vital-signs-bar">
+    <div class="vital-box-label">
+      <i class="bi bi-activity"></i>
+      <span>Chỉ số sinh tồn</span>
+    </div>
+
+    <div class="vitals-grid">
+      <!-- Blood Pressure -->
+      <div class="vital-item">
+        <label>Huyết áp (mmHg)</label>
+        <div class="vital-input-group">
+          <input type="text" [(ngModel)]="bloodPressure" placeholder="120/80" class="form-control-sm" />
+          <span class="unit">mmHg</span>
+        </div>
+      </div>
+
+      <!-- Heart Rate -->
+      <div class="vital-item">
+        <label>Mạch / Nhịp tim</label>
+        <div class="vital-input-group">
+          <input type="number" [(ngModel)]="heartRate" placeholder="75" class="form-control-sm" />
+          <span class="unit">lần/phút</span>
+        </div>
+      </div>
+
+      <!-- Temperature -->
+      <div class="vital-item">
+        <label>Thân nhiệt</label>
+        <div class="vital-input-group">
+          <input type="number" step="0.1" [(ngModel)]="temperature" placeholder="36.8" class="form-control-sm" />
+          <span class="unit">°C</span>
+        </div>
+      </div>
+
+      <!-- Weight -->
+      <div class="vital-item">
+        <label>Cân nặng</label>
+        <div class="vital-input-group">
+          <input type="number" step="0.5" [(ngModel)]="weight" placeholder="65" class="form-control-sm" />
+          <span class="unit">kg</span>
+        </div>
+      </div>
+
+      <!-- Height -->
+      <div class="vital-item">
+        <label>Chiều cao</label>
+        <div class="vital-input-group">
+          <input type="number" [(ngModel)]="height" placeholder="170" class="form-control-sm" />
+          <span class="unit">cm</span>
+        </div>
+      </div>
+
+      <!-- Auto BMI -->
+      <div class="vital-item bmi-item">
+        <label>Chỉ số BMI</label>
+        <div class="bmi-badge-box">
+          @if (bmi()) {
+            <span class="bmi-val">{{ bmi()!.val }}</span>
+            <span class="bmi-status" [ngClass]="bmi()!.badgeClass">{{ bmi()!.classification }}</span>
+          } @else {
+            <span class="bmi-placeholder">--</span>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Split Layout: Examination & Prescription -->
+  <main class="exam-grid">
+    <!-- Left Column: Lập hồ sơ bệnh án & Hẹn tái khám -->
+    <div class="exam-col-left">
+      <!-- Section 1: Khám lâm sàng & Chẩn đoán -->
+      <div class="card exam-section-card">
+        <div class="card-header">
+          <h3 class="section-title"><i class="bi bi-clipboard2-pulse"></i> 1. Lập Hồ Sơ Bệnh Án</h3>
+          <span class="sub-tag">Bắt buộc</span>
+        </div>
+
+        <div class="card-body">
+          <!-- Triệu chứng -->
+          <div class="form-group mb-3">
+            <label class="form-label required">Triệu chứng lâm sàng & Lý do khám:</label>
+            <textarea
+              [(ngModel)]="symptoms"
+              rows="3"
+              class="form-control"
+              placeholder="VD: Bệnh nhân đau rát họng 3 ngày nay, nuốt khó, sốt nhẹ 38 độ về chiều, ho khan có đờm trắng..."
+            ></textarea>
+          </div>
+
+          <!-- Chẩn đoán nhanh suggestions -->
+          <div class="quick-diagnoses-box mb-3">
+            <span class="quick-title"><i class="bi bi-lightning-charge"></i> Gợi ý bệnh thường gặp:</span>
+            <div class="quick-tags">
+              @for (diag of commonDiagnoses; track diag.title) {
+                <button type="button" class="btn-quick-tag" (click)="applyQuickDiagnosis(diag)">
+                  + {{ diag.title }} ({{ diag.icd }})
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Chẩn đoán sơ bộ & Xác định -->
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Chẩn đoán sơ bộ:</label>
+              <input
+                type="text"
+                [(ngModel)]="preliminaryDiagnosis"
+                class="form-control"
+                placeholder="VD: Theo dõi viêm họng cấp"
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label required">Chẩn đoán xác định:</label>
+              <input
+                type="text"
+                [(ngModel)]="finalDiagnosis"
+                class="form-control"
+                placeholder="VD: Viêm họng cấp (J02) - Cúm A"
+              />
+            </div>
+          </div>
+
+          <!-- Mã ICD-10 & Ghi chú -->
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Mã ICD-10 (nếu có):</label>
+              <input
+                type="text"
+                [(ngModel)]="icd10Code"
+                class="form-control"
+                placeholder="VD: J02.9"
+              />
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Lời dặn của Bác sĩ / Lối sống:</label>
+              <input
+                type="text"
+                [(ngModel)]="notes"
+                class="form-control"
+                placeholder="VD: Uống nhiều nước ấm, súc họng nước muối 3 lần/ngày, kiêng đồ lạnh..."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Hẹn ngày tái khám (Extend Use Case) -->
+      <div class="card exam-section-card revisit-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-2">
+            <input
+              type="checkbox"
+              id="revisitCheck"
+              [(ngModel)]="hasRevisit"
+              class="form-check-input"
+            />
+            <label for="revisitCheck" class="section-title mb-0 cursor-pointer">
+              <i class="bi bi-calendar-event"></i> 2. Hẹn Ngày Tái Khám
+            </label>
+          </div>
+          <span class="extend-pill">«extend»</span>
+        </div>
+
+        @if (hasRevisit) {
+          <div class="card-body pt-2">
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-md-5">
+                <label class="form-label">Chọn ngày tái khám:</label>
+                <input
+                  type="date"
+                  [(ngModel)]="revisitDate"
+                  class="form-control"
+                />
+              </div>
+              <div class="col-md-7">
+                <label class="form-label">Chọn khoảng thời gian nhanh:</label>
+                <div class="quick-days-btn-group">
+                  <button type="button" class="btn-day" (click)="setQuickRevisit(3)">+3 ngày</button>
+                  <button type="button" class="btn-day" (click)="setQuickRevisit(5)">+5 ngày</button>
+                  <button type="button" class="btn-day" (click)="setQuickRevisit(7)">+7 ngày</button>
+                  <button type="button" class="btn-day" (click)="setQuickRevisit(14)">+14 ngày</button>
+                  <button type="button" class="btn-day" (click)="setQuickRevisit(30)">+1 tháng</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Yêu cầu / Ghi chú khi tái khám:</label>
+              <input
+                type="text"
+                [(ngModel)]="revisitNotes"
+                class="form-control"
+                placeholder="VD: Mang theo đơn thuốc này khi tái khám hoặc đến ngay nếu sốt lại..."
+              />
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Right Column: Kê đơn thuốc & Tìm kiếm thuốc (Extend + Include) -->
+    <div class="exam-col-right">
+      <div class="card exam-section-card prescription-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-2">
+            <input
+              type="checkbox"
+              id="prescriptionCheck"
+              [(ngModel)]="hasPrescription"
+              class="form-check-input"
+            />
+            <label for="prescriptionCheck" class="section-title mb-0 cursor-pointer">
+              <i class="bi bi-capsule"></i> 3. Kê Đơn Thuốc Điện Tử
+            </label>
+          </div>
+          <span class="extend-pill">«extend»</span>
+        </div>
+
+        @if (hasPrescription) {
+          <div class="card-body">
+            <!-- Search & Select Medicine Box (Include Use Case) -->
+            <div class="medicine-search-wrapper mb-3">
+              <label class="form-label font-weight-bold">
+                <i class="bi bi-search"></i> Tìm kiếm & chọn thuốc («include»):
+              </label>
+              <div class="search-input-box position-relative">
+                <input
+                  type="text"
+                  [(ngModel)]="medicineSearchKeyword"
+                  (input)="onSearchMedicineInput()"
+                  (focus)="showMedicineDropdown.set(true)"
+                  placeholder="Gõ tên thuốc hoặc hoạt chất (VD: Paracetamol, Augmentin, Nexium, Cefixim...)"
+                  class="form-control search-med-input"
+                />
+                <i class="bi bi-search search-icon"></i>
+
+                <!-- Autocomplete Dropdown List -->
+                @if (showMedicineDropdown() && filteredMedicines().length > 0) {
+                  <div class="medicine-dropdown-menu">
+                    @for (med of filteredMedicines(); track med.id) {
+                      <div class="med-dropdown-item" (click)="selectMedicine(med)">
+                        <div class="med-item-main">
+                          <span class="med-name">{{ med.name }}</span>
+                          <span class="med-unit">({{ med.dosageForm }} - {{ med.unit }})</span>
+                        </div>
+                        <div class="med-item-sub">
+                          <span class="med-ingredient">Hoạt chất: {{ med.activeIngredient }}</span>
+                          @if (med.defaultUsageInstructions) {
+                            <span class="med-usage">{{ med.defaultUsageInstructions }}</span>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Prescribed Medicines Table -->
+            <div class="prescribed-table-wrapper">
+              <table class="table prescribed-table">
+                <thead>
+                  <tr>
+                    <th style="width: 30px;">#</th>
+                    <th style="width: 25%;">Thuốc & Hoạt chất</th>
+                    <th style="width: 12%;">Số lượng</th>
+                    <th style="width: 20%;">Liều dùng</th>
+                    <th style="width: 12%;">Đường dùng</th>
+                    <th style="width: 10%;">Số ngày</th>
+                    <th style="width: 20%;">Hướng dẫn</th>
+                    <th style="width: 30px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (prescribedItems.length === 0) {
+                    <tr>
+                      <td colspan="8" class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-3 d-block mb-1"></i>
+                        Chưa có loại thuốc nào được thêm. Hãy gõ tên thuốc vào ô tìm kiếm ở trên để kê đơn.
+                      </td>
+                    </tr>
+                  }
+                  @for (item of prescribedItems; track item.medicineId; let idx = $index) {
+                    <tr [class.row-warning]="item._allergyWarning">
+                      <td class="text-center">{{ idx + 1 }}</td>
+                      <td>
+                        <strong class="med-table-name">{{ item._medicineName }}</strong>
+                        <div class="med-table-sub">{{ item._activeIngredient }} ({{ item._unit }})</div>
+                        @if (item._allergyWarning) {
+                          <span class="badge-allergy">Cảnh báo dị ứng!</span>
+                        }
+                      </td>
+                      <td>
+                        <div class="input-with-unit">
+                          <input
+                            type="number"
+                            min="1"
+                            [(ngModel)]="item.quantity"
+                            class="form-control form-control-sm"
+                          />
+                          <span class="unit-label">{{ item._unit }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          [(ngModel)]="item.dosage"
+                          placeholder="VD: 1 viên/lần, 2 lần/ngày"
+                          class="form-control form-control-sm"
+                        />
+                      </td>
+                      <td>
+                        <select [(ngModel)]="item.route" class="form-select form-select-sm">
+                          <option value="Đường uống">Đường uống</option>
+                          <option value="Bôi ngoài da">Bôi ngoài da</option>
+                          <option value="Nhỏ mắt/mũi">Nhỏ mắt/mũi</option>
+                          <option value="Ngậm dưới lưỡi">Ngậm dưới lưỡi</option>
+                          <option value="Tiêm">Tiêm</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="1"
+                          [(ngModel)]="item.daysSupply"
+                          class="form-control form-control-sm"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          [(ngModel)]="item.instructions"
+                          placeholder="Sáng 1, tối 1 sau ăn"
+                          class="form-control form-control-sm"
+                        />
+                      </td>
+                      <td class="text-center">
+                        <button
+                          type="button"
+                          class="btn-remove-med"
+                          (click)="removeMedicine(idx)"
+                          title="Xóa thuốc"
+                        >
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Doctor Advice on Prescription -->
+            <div class="form-group mt-3">
+              <label class="form-label">Lời dặn dùng thuốc của Bác sĩ:</label>
+              <textarea
+                [(ngModel)]="prescriptionAdvice"
+                rows="2"
+                class="form-control"
+                placeholder="VD: Uống thuốc đúng giờ, sau ăn no. Tuyệt đối không tự ý dừng kháng sinh khi chưa đủ liều..."
+              ></textarea>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </main>
+
+  <!-- DRAWER: Xem tiền sử bệnh (Include Use Case) -->
+  @if (showHistoryDrawer()) {
+    <div class="drawer-backdrop" (click)="showHistoryDrawer.set(false)"></div>
+    <div class="history-drawer">
+      <div class="drawer-header">
+        <div class="drawer-title">
+          <i class="bi bi-clock-history text-primary"></i> Tiền Sử Bệnh Án
+          <span class="patient-history-badge">{{ patientHistory()?.patientName }}</span>
+        </div>
+        <button class="btn-close-drawer" (click)="showHistoryDrawer.set(false)">×</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Patient Summary Box -->
+        <div class="history-summary-box mb-3">
+          <div><strong>Nhóm máu:</strong> {{ patientHistory()?.bloodGroup || 'Chưa rõ' }}</div>
+          <div><strong>Tiền sử dị ứng:</strong> <span class="text-danger font-weight-bold">{{ patientHistory()?.allergies || 'Không có dị ứng' }}</span></div>
+          <div><strong>Bệnh lý mạn tính:</strong> {{ patientHistory()?.medicalHistorySummary || 'Chưa ghi nhận' }}</div>
+          <div><strong>Tổng số lần khám:</strong> <span class="badge bg-primary">{{ patientHistory()?.totalExaminations || 0 }} lần</span></div>
+        </div>
+
+        <h4 class="timeline-title">Lịch Sử Các Lần Khám Trước Đây</h4>
+
+        @if (!patientHistory() || patientHistory()!.records.length === 0) {
+          <div class="empty-history">
+            <i class="bi bi-folder2-open"></i>
+            <p>Bệnh nhân chưa có lịch sử khám bệnh trước đây.</p>
+          </div>
+        } @else {
+          <div class="medical-timeline">
+            @for (rec of patientHistory()!.records; track rec.id) {
+              <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                  <div class="timeline-card-header">
+                    <span class="timeline-date"><i class="bi bi-calendar3"></i> {{ rec.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+                    <span class="timeline-doc"><i class="bi bi-person-badge"></i> {{ rec.doctorName || 'Bác sĩ' }}</span>
+                  </div>
+                  <div class="timeline-diagnosis">
+                    <strong>Chẩn đoán:</strong> {{ rec.finalDiagnosis }}
+                    @if (rec.icd10Code) {
+                      <span class="icd-tag">{{ rec.icd10Code }}</span>
+                    }
+                  </div>
+                  <div class="timeline-symptoms">
+                    <strong>Triệu chứng:</strong> {{ rec.symptoms }}
+                  </div>
+                  @if (rec.prescription && rec.prescription.items.length > 0) {
+                    <div class="timeline-pres">
+                      <strong>Đơn thuốc đã kê ({{ rec.prescription.items.length }} loại):</strong>
+                      <ul class="timeline-med-list">
+                        @for (it of rec.prescription.items; track it.id) {
+                          <li>{{ it.medicineName }} - {{ it.quantity }} {{ it.unit }} ({{ it.instructions }})</li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                  @if (rec.revisitDate) {
+                    <div class="timeline-revisit text-info">
+                      <i class="bi bi-arrow-repeat"></i> Hẹn tái khám ngày: {{ rec.revisitDate | date:'dd/MM/yyyy' }}
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: In Đơn Thuốc & Phiếu Kết Quả Khám Bệnh -->
+  @if (showPrintModal() && completedRecord()) {
+    <div class="modal-backdrop">
+      <div class="print-modal-container">
+        <div class="modal-actions-bar no-print">
+          <div class="modal-left">
+            <span class="text-success font-weight-bold"><i class="bi bi-check-circle-fill"></i> Đã lưu hồ sơ thành công!</span>
+          </div>
+          <div class="modal-right">
+            <button class="btn btn-primary btn-print" (click)="printDocument()">
+              <i class="bi bi-printer"></i> In Phiếu & Đơn Thuốc
+            </button>
+            <button class="btn btn-outline" (click)="finishAndReturnToQueue()">
+              <i class="bi bi-arrow-right"></i> Tiếp Tục Gọi Số Tiếp Theo
+            </button>
+          </div>
+        </div>
+
+        <!-- Printable Document (A4 hospital standard format) -->
+        <div class="hospital-document-sheet" id="printableArea">
+          <!-- Hospital Header -->
+          <div class="doc-header">
+            <div class="doc-clinic-info">
+              <h3 class="clinic-brand">PHÒNG KHÁM ĐA KHOA QUỐC TẾ MEDQUEUE</h3>
+              <p>Địa chỉ: Km10, Đường Nguyễn Trãi, Q. Hà Đông, Hà Nội</p>
+              <p>Hotline cấp cứu & Đặt hẹn: 1900 6868 | Website: medqueue.vn</p>
+            </div>
+            <div class="doc-title-box">
+              <h2 class="doc-main-title">PHIẾU KHÁM BỆNH & ĐƠN THUỐC</h2>
+              <div class="doc-number">Mã hồ sơ: <strong>#REC-{{ completedRecord()!.id }}</strong></div>
+              <div class="doc-date">Ngày: {{ completedRecord()!.createdAt | date:'dd/MM/yyyy HH:mm' }}</div>
+            </div>
+          </div>
+
+          <hr class="doc-divider" />
+
+          <!-- Patient Information -->
+          <div class="doc-patient-info">
+            <div class="row">
+              <div class="col-7">
+                <p>Họ và tên: <strong class="uppercase text-primary">{{ completedRecord()!.patientName }}</strong></p>
+                <p>Ngày sinh: {{ completedRecord()!.patientDob | date:'dd/MM/yyyy' }} | Giới tính: {{ completedRecord()!.patientGender }}</p>
+                <p>Điện thoại: {{ completedRecord()!.patientPhone || 'Chưa cập nhật' }}</p>
+              </div>
+              <div class="col-5">
+                <p>Số phiếu khám: <strong>#{{ completedRecord()!.ticketNumber || 'N/A' }}</strong></p>
+                <p>Bác sĩ khám: <strong>{{ completedRecord()!.doctorTitle }} {{ completedRecord()!.doctorName }}</strong></p>
+                <p>Chuyên khoa: {{ completedRecord()!.specialtyName || 'Khám bệnh tổng quát' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vital Signs Table -->
+          <div class="doc-vital-table">
+            <table>
+              <tr>
+                <td>Huyết áp: <strong>{{ completedRecord()!.bloodPressure || 'N/A' }} mmHg</strong></td>
+                <td>Mạch: <strong>{{ completedRecord()!.heartRate || 'N/A' }} bpm</strong></td>
+                <td>Nhiệt độ: <strong>{{ completedRecord()!.temperature || 'N/A' }} °C</strong></td>
+                <td>Cân nặng: <strong>{{ completedRecord()!.weight || 'N/A' }} kg</strong></td>
+                <td>Chiều cao: <strong>{{ completedRecord()!.height || 'N/A' }} cm</strong></td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Clinical Diagnosis -->
+          <div class="doc-clinical-block">
+            <p><strong>Triệu chứng lâm sàng:</strong> {{ completedRecord()!.symptoms }}</p>
+            <p class="diagnosis-highlight">
+              <strong>Chẩn đoán xác định:</strong> <span class="final-diag-text">{{ completedRecord()!.finalDiagnosis }}</span>
+              @if (completedRecord()!.icd10Code) {
+                <span class="icd-pill">Mã ICD-10: {{ completedRecord()!.icd10Code }}</span>
+              }
+            </p>
+            @if (completedRecord()!.notes) {
+              <p><strong>Lời dặn của bác sĩ:</strong> {{ completedRecord()!.notes }}</p>
+            }
+          </div>
+
+          <!-- Prescription Section -->
+          @if (completedRecord()!.prescription && completedRecord()!.prescription!.items.length > 0) {
+            <div class="doc-prescription-block">
+              <h4 class="pres-title">CHỈ ĐỊNH DÙNG THUỐC</h4>
+              <table class="doc-med-table">
+                <thead>
+                  <tr>
+                    <th style="width: 5%;">STT</th>
+                    <th style="width: 45%;">Tên thuốc & Hàm lượng</th>
+                    <th style="width: 15%;">Số lượng</th>
+                    <th style="width: 35%;">Cách dùng & Liều lượng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (it of completedRecord()!.prescription!.items; track it.id; let idx = $index) {
+                    <tr>
+                      <td class="text-center">{{ idx + 1 }}</td>
+                      <td>
+                        <strong>{{ it.medicineName }}</strong>
+                        <div class="text-muted small">Hoạt chất: {{ it.activeIngredient }}</div>
+                      </td>
+                      <td class="text-center"><strong>{{ it.quantity }}</strong> {{ it.unit }}</td>
+                      <td>
+                        <div>{{ it.instructions }}</div>
+                        <div class="text-muted small">({{ it.dosage }} - {{ it.route }})</div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <div class="doc-pres-advice">
+                <strong>Lời dặn bác sĩ về thuốc:</strong> {{ completedRecord()!.prescription!.doctorAdvice }}
+              </div>
+            </div>
+          }
+
+          <!-- Revisit Appointment -->
+          @if (completedRecord()!.revisitDate) {
+            <div class="doc-revisit-block">
+              <p class="revisit-text">
+                <i class="bi bi-calendar-check"></i> Hẹn ngày tái khám:
+                <strong class="text-primary">{{ completedRecord()!.revisitDate | date:'dd/MM/yyyy' }}</strong>
+                @if (completedRecord()!.revisitNotes) {
+                  <span>({{ completedRecord()!.revisitNotes }})</span>
+                }
+              </p>
+            </div>
+          }
+
+          <!-- Signatures -->
+          <div class="doc-footer-signatures">
+            <div class="patient-sig">
+              <p>BỆNH NHÂN / NGƯỜI NHÀ</p>
+              <span class="sig-note">(Ký và ghi rõ họ tên)</span>
+            </div>
+            <div class="doctor-sig">
+              <p>Ngày ..... tháng ..... năm 2026</p>
+              <p class="doc-sig-title">BÁC SĨ KHÁM BỆNH</p>
+              <div class="doc-sig-space"></div>
+              <p class="doc-sig-name"><strong>{{ completedRecord()!.doctorTitle }} {{ completedRecord()!.doctorName }}</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
