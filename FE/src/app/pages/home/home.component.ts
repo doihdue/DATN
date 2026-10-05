@@ -158,64 +158,71 @@ interface QueueRoom {
 
               <div class="action-card glass-card">
                 <div class="action-icon icon-green"><i class="bi bi-ticket-perforated"></i></div>
-                <h3 class="action-title">Lấy Phiếu Số Thứ Tự</h3>
-                <p class="action-desc">Nhận phiếu số thứ tự trực tuyến hoặc check-in phiếu khám tại phòng khám.</p>
-                <button class="btn btn-outline btn-sm">Xem phiếu của tôi <i class="bi bi-arrow-right"></i></button>
+                <h3 class="action-title">Lấy Phiếu & Tra Cứu Hàng Đợi</h3>
+                <p class="action-desc">Nhận phiếu số thứ tự trực tuyến hoặc tra cứu vị trí khám của bạn theo thời gian thực.</p>
+                <a routerLink="/queue/tracking" class="btn btn-outline btn-sm">Tra cứu phiếu của tôi <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card glass-card">
-                <div class="action-icon icon-purple"><i class="bi bi-chat-dots-fill"></i></div>
-                <h3 class="action-title">Chat Tư Vấn Y Tế AI</h3>
-                <p class="action-desc">Mô tả triệu chứng để trợ lý AI gợi ý chuyên khoa khám bệnh chính xác.</p>
-                <button class="btn btn-outline btn-sm">Bắt đầu trò chuyện <i class="bi bi-arrow-right"></i></button>
+                <div class="action-icon icon-purple"><i class="bi bi-display"></i></div>
+                <h3 class="action-title">Bảng Gọi Số TV Sảnh Chờ</h3>
+                <p class="action-desc">Xem trực tiếp bảng gọi số điện tử và trạng thái các phòng khám tại sảnh.</p>
+                <a routerLink="/queue" class="btn btn-outline btn-sm">Xem bảng TV <i class="bi bi-arrow-right"></i></a>
               </div>
             }
 
             @if (authService.hasRole('DOCTOR')) {
               <div class="action-card glass-card">
                 <div class="action-icon icon-blue"><i class="bi bi-megaphone-fill"></i></div>
-                <h3 class="action-title">Bàn Khám Bác Sĩ</h3>
+                <h3 class="action-title">Bàn Khám & Gọi Số Bác Sĩ</h3>
                 <p class="action-desc">Xem danh sách bệnh nhân đang đợi và thực hiện bấm chuông gọi số tiếp theo.</p>
-                <button class="btn btn-primary btn-sm">Vào phòng khám <i class="bi bi-arrow-right"></i></button>
+                <a routerLink="/doctor/calling" class="btn btn-primary btn-sm">Vào phòng gọi khám <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card glass-card">
-                <div class="action-icon icon-green"><i class="bi bi-file-earmark-medical-fill"></i></div>
-                <h3 class="action-title">Hồ Sơ & Kê Đơn</h3>
-                <p class="action-desc">Ghi nhận chẩn đoán bệnh án, kết quả sinh hiệu và kê đơn thuốc điện tử.</p>
-                <button class="btn btn-outline btn-sm">Quản lý hồ sơ <i class="bi bi-arrow-right"></i></button>
+                <div class="action-icon icon-green"><i class="bi bi-calendar-week-fill"></i></div>
+                <h3 class="action-title">Lịch Trực & Ca Khám</h3>
+                <p class="action-desc">Theo dõi các ca trực được phân công theo ngày và số lượt khám đã tiếp nhận.</p>
+                <a routerLink="/doctor/schedule" class="btn btn-outline btn-sm">Xem lịch trực <i class="bi bi-arrow-right"></i></a>
               </div>
             }
 
             @if (authService.hasRole('STAFF')) {
               <div class="action-card glass-card">
                 <div class="action-icon icon-amber"><i class="bi bi-person-check-fill"></i></div>
-                <h3 class="action-title">Quầy Tiếp Đón Bệnh Nhân</h3>
-                <p class="action-desc">Tiếp đón bệnh nhân, kiểm tra lịch hẹn đã đặt và cấp số thứ tự vào phòng khám.</p>
-                <button class="btn btn-primary btn-sm">Mở quầy tiếp đón <i class="bi bi-arrow-right"></i></button>
+                <h3 class="action-title">Quầy Điều Phối & Tiếp Đón</h3>
+                <p class="action-desc">Tiếp đón bệnh nhân, cấp số thứ tự vào phòng khám và xử lý ưu tiên cấp cứu.</p>
+                <a routerLink="/staff/queue" class="btn btn-primary btn-sm">Mở bàn điều phối <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card glass-card">
                 <div class="action-icon icon-blue"><i class="bi bi-display"></i></div>
                 <h3 class="action-title">Màn Hình Hàng Đợi Lớn</h3>
                 <p class="action-desc">Mở chế độ toàn màn hình cho tivi hiển thị bảng gọi số tại sảnh chờ.</p>
-                <button class="btn btn-outline btn-sm">Mở chế độ TV Kiosk <i class="bi bi-arrow-right"></i></button>
+                <a routerLink="/queue" class="btn btn-outline btn-sm">Mở chế độ TV Kiosk <i class="bi bi-arrow-right"></i></a>
               </div>
             }
 
             @if (authService.hasRole('ADMIN')) {
               <div class="action-card glass-card">
-                <div class="action-icon icon-purple"><i class="bi bi-people-fill"></i></div>
-                <h3 class="action-title">Quản Lý Người Dùng & Bác Sĩ</h3>
-                <p class="action-desc">Tạo tài khoản Bác sĩ, Nhân viên, phân bổ chuyên khoa và phân quyền.</p>
-                <button class="btn btn-primary btn-sm">Quản lý tài khoản <i class="bi bi-arrow-right"></i></button>
+                <div class="action-icon icon-purple"><i class="bi bi-diagram-3-fill"></i></div>
+                <h3 class="action-title">Quản Lý Chuyên Khoa</h3>
+                <p class="action-desc">Cấu hình danh mục chuyên khoa phòng khám, quản lý và phân bổ bác sĩ.</p>
+                <a routerLink="/admin/specialties" class="btn btn-primary btn-sm">Quản lý chuyên khoa <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card glass-card">
                 <div class="action-icon icon-blue"><i class="bi bi-calendar-week-fill"></i></div>
                 <h3 class="action-title">Cấu Hình Lịch Trực & Phòng</h3>
-                <p class="action-desc">Phân ca làm việc, gán phòng khám và thiết lập giới hạn số bệnh nhân mỗi ca.</p>
-                <button class="btn btn-outline btn-sm">Cấu hình ca trực <i class="bi bi-arrow-right"></i></button>
+                <p class="action-desc">Phân ca làm việc, kiểm tra xung đột trùng giờ và thiết lập giới hạn bệnh nhân.</p>
+                <a routerLink="/admin/schedules" class="btn btn-outline btn-sm">Cấu hình lịch làm việc <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card glass-card">
+                <div class="action-icon icon-amber"><i class="bi bi-sliders"></i></div>
+                <h3 class="action-title">Bàn Điều Phối Hàng Đợi</h3>
+                <p class="action-desc">Theo dõi điều phối hàng đợi thời gian thực, can thiệp gọi số và cấp cứu.</p>
+                <a routerLink="/staff/queue" class="btn btn-outline btn-sm">Mở điều phối <i class="bi bi-arrow-right"></i></a>
               </div>
             }
           </div>

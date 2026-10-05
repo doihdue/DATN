@@ -23,6 +23,9 @@ public class Patient extends Person {
     @Column(name = "medical_history_summary", columnDefinition = "NVARCHAR(MAX)")
     private String medicalHistorySummary;
 
+    @Column(name = "allergies", length = 500)
+    private String allergies;
+
     @Column(name = "emergency_contact_name", length = 255)
     private String emergencyContactName;
 
@@ -44,4 +47,11 @@ public class Patient extends Person {
     @Builder.Default
     @OneToMany(mappedBy = "patient")
     private List<MedicalRecord> medicalRecords = new ArrayList<>();
+
+    public String getPhoneNumber() {
+        if (getUser() != null && getUser().getPhoneNumber() != null) {
+            return getUser().getPhoneNumber();
+        }
+        return emergencyContactPhone;
+    }
 }

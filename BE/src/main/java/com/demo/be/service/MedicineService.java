@@ -1,0 +1,21 @@
+package com.demo.be.service;
+
+import com.demo.be.dto.request.MedicineRequest;
+import com.demo.be.dto.response.MedicineResponse;
+
+import java.util.List;
+
+public interface MedicineService {
+
+    List<MedicineResponse> getAllMedicines();
+
+    List<MedicineResponse> searchMedicines(String keyword);
+
+    MedicineResponse getMedicineById(Long id);
+
+    MedicineResponse createMedicine(MedicineRequest request);
+
+    MedicineResponse updateMedicine(Long id, MedicineRequest request);
+
+    void deleteMedicine(Long id);
+}

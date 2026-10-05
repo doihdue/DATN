@@ -28,6 +28,9 @@ public class PrescriptionItem {
     @Column(name = "days_supply")
     private Integer daysSupply;
 
+    @Column(name = "instructions", length = 500)
+    private String instructions;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medicine_id", nullable = false)
     private Medicine medicine;
