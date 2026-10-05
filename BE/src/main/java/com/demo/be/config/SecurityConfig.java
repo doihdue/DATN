@@ -47,7 +47,14 @@ public class SecurityConfig {
                                 "/api/test/public",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/api/specialties/**",
+                                "/api/work-schedules/**",
+                                "/api/examination-rooms/**",
+                                "/api/queue/display-board",
+                                "/api/queue/my-ticket/**",
+                                "/api/queue/check-in",
+                                "/ws-queue/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/doctor/**").hasRole("DOCTOR")

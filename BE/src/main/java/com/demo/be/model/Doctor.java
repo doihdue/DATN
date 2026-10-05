@@ -44,4 +44,8 @@ public class Doctor extends Employee {
     @Builder.Default
     @OneToMany(mappedBy = "doctor")
     private List<QueueTicket> queueTickets = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "doctor")
+    private List<MedicalRecord> medicalRecords = new ArrayList<>();
 }
