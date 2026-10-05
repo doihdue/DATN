@@ -29,4 +29,6 @@ public interface QueueService {
     List<ClinicDisplayBoardResponse> getClinicDisplayBoard();
 
     MyTicketStatusResponse getMyTicketStatus(String ticketNumber);
+
+    QueueTicketResponse getTicketById(Long ticketId);
 }

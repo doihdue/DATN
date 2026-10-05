@@ -335,22 +335,21 @@ import { ClinicDisplayBoard } from '../../models/queue.model';
     }
 
     .box-ticket-number {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 3rem;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, monospace;
+      font-size: 3.25rem;
       font-weight: 900;
       line-height: 1;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       margin-bottom: 0.4rem;
+      font-variant-numeric: tabular-nums;
     }
 
     .neon-yellow {
       color: #fbbf24;
-      text-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
     }
 
     .neon-green {
       color: #34d399;
-      text-shadow: 0 0 20px rgba(52, 211, 153, 0.6);
     }
 
     .box-patient-name {

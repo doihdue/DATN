@@ -28,12 +28,21 @@
     </div>
   </header>
 
-  <!-- Notification Banner -->
+  <!-- Floating Toast Notification (Top-Right Rectangular Box) -->
   @if (alertMessage()) {
-    <div class="alert-banner" [ngClass]="alertType() === 'success' ? 'alert-success' : 'alert-danger'">
-      <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-      <span>{{ alertMessage() }}</span>
-      <button class="btn-close-alert" (click)="alertMessage.set(null)">×</button>
+    <div class="toast-floating-container">
+      <div class="toast-card" [ngClass]="alertType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
+        <div class="toast-icon">
+          <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+        </div>
+        <div class="toast-content">
+          <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo lỗi' }}</div>
+          <div class="toast-message">{{ alertMessage() }}</div>
+        </div>
+        <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo" aria-label="Đóng">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
     </div>
   }
 
@@ -55,7 +64,7 @@
         </div>
         <div class="patient-details-row">
           <span><i class="bi bi-gender-ambiguous"></i> Giới tính: <strong>{{ patientHistory()?.gender || 'Chưa rõ' }}</strong></span>
-          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ patientHistory()?.dateOfBirth || currentTicket()?.patientYearOfBirth || 'Đang cập nhật' }}</strong></span>
+          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ patientHistory()?.dateOfBirth || (currentTicket()?.patientYearOfBirth ? ('Năm ' + currentTicket()?.patientYearOfBirth) : 'Đang cập nhật') }}</strong></span>
           <span><i class="bi bi-telephone"></i> SĐT: <strong>{{ currentTicket()?.patientPhone || patientHistory()?.phoneNumber || 'Chưa có' }}</strong></span>
           <span><i class="bi bi-droplet-half"></i> Nhóm máu: <strong class="text-danger">{{ patientHistory()?.bloodGroup || 'Chưa xác định' }}</strong></span>
         </div>
@@ -141,143 +150,172 @@
     </div>
   </section>
 
-  <!-- Main Split Layout: Examination & Prescription -->
-  <main class="exam-grid">
-    <!-- Left Column: Lập hồ sơ bệnh án & Hẹn tái khám -->
-    <div class="exam-col-left">
-      <!-- Section 1: Khám lâm sàng & Chẩn đoán -->
-      <div class="card exam-section-card">
-        <div class="card-header">
-          <h3 class="section-title"><i class="bi bi-clipboard2-pulse"></i> 1. Lập Hồ Sơ Bệnh Án</h3>
-          <span class="sub-tag">Bắt buộc</span>
-        </div>
-
-        <div class="card-body">
-          <!-- Triệu chứng -->
-          <div class="form-group mb-3">
-            <label class="form-label required">Triệu chứng lâm sàng & Lý do khám:</label>
-            <textarea
-              [(ngModel)]="symptoms"
-              rows="3"
-              class="form-control"
-              placeholder="VD: Bệnh nhân đau rát họng 3 ngày nay, nuốt khó, sốt nhẹ 38 độ về chiều, ho khan có đờm trắng..."
-            ></textarea>
+  <!-- Main Clinical Workspace Content -->
+  <main class="exam-workspace-content">
+    <!-- Row 1: Khám lâm sàng & Lập hồ sơ bệnh án (Left) + Hẹn ngày tái khám (Right) -->
+    <div class="exam-row-top">
+      <div class="exam-col-records">
+        <!-- Section 1: Khám lâm sàng & Chẩn đoán -->
+        <div class="card exam-section-card">
+          <div class="card-header">
+            <h3 class="section-title"><i class="bi bi-clipboard2-pulse"></i> 1. Lập Hồ Sơ Bệnh Án</h3>
+            <span class="sub-tag">Bắt buộc</span>
           </div>
 
-          <!-- Chẩn đoán nhanh suggestions -->
-          <div class="quick-diagnoses-box mb-3">
-            <span class="quick-title"><i class="bi bi-lightning-charge"></i> Gợi ý bệnh thường gặp:</span>
-            <div class="quick-tags">
-              @for (diag of commonDiagnoses; track diag.title) {
-                <button type="button" class="btn-quick-tag" (click)="applyQuickDiagnosis(diag)">
-                  + {{ diag.title }} ({{ diag.icd }})
-                </button>
+          <div class="card-body">
+            <!-- Triệu chứng -->
+            <div class="form-group mb-3">
+              <label class="form-label required" for="symptomsField">Triệu chứng lâm sàng &amp; Lý do khám:</label>
+              <textarea
+                id="symptomsField"
+                [(ngModel)]="symptoms"
+                (input)="clearFieldError('symptoms')"
+                rows="3"
+                class="form-control"
+                [class.is-invalid]="validationErrors['symptoms']"
+                placeholder="VD: Bệnh nhân đau rát họng 3 ngày nay, nuốt khó, sốt nhẹ 38 độ về chiều, ho khan có đờm trắng..."
+              ></textarea>
+              @if (validationErrors['symptoms']) {
+                <div class="field-error-text">
+                  <i class="bi bi-exclamation-circle-fill"></i> Vui lòng nhập triệu chứng lâm sàng của bệnh nhân!
+                </div>
               }
             </div>
-          </div>
 
-          <!-- Chẩn đoán sơ bộ & Xác định -->
-          <div class="row g-2 mb-3">
-            <div class="col-md-6">
-              <label class="form-label">Chẩn đoán sơ bộ:</label>
-              <input
-                type="text"
-                [(ngModel)]="preliminaryDiagnosis"
-                class="form-control"
-                placeholder="VD: Theo dõi viêm họng cấp"
-              />
+            <!-- Chẩn đoán nhanh suggestions -->
+            <div class="quick-diagnoses-box mb-3">
+              <span class="quick-title"><i class="bi bi-lightning-charge"></i> Gợi ý bệnh thường gặp:</span>
+              <div class="quick-tags">
+                @for (diag of commonDiagnoses; track diag.title) {
+                  <button type="button" class="btn-quick-tag" (click)="applyQuickDiagnosis(diag)">
+                    + {{ diag.title }} ({{ diag.icd }})
+                  </button>
+                }
+              </div>
             </div>
-            <div class="col-md-6">
-              <label class="form-label required">Chẩn đoán xác định:</label>
-              <input
-                type="text"
-                [(ngModel)]="finalDiagnosis"
-                class="form-control"
-                placeholder="VD: Viêm họng cấp (J02) - Cúm A"
-              />
-            </div>
-          </div>
 
-          <!-- Mã ICD-10 & Ghi chú -->
-          <div class="row g-2 mb-3">
-            <div class="col-md-4">
-              <label class="form-label">Mã ICD-10 (nếu có):</label>
-              <input
-                type="text"
-                [(ngModel)]="icd10Code"
-                class="form-control"
-                placeholder="VD: J02.9"
-              />
+            <!-- Chẩn đoán sơ bộ & Xác định -->
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Chẩn đoán sơ bộ:</label>
+                <input
+                  type="text"
+                  [(ngModel)]="preliminaryDiagnosis"
+                  class="form-control"
+                  placeholder="VD: Theo dõi viêm họng cấp"
+                />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label required" for="finalDiagnosisField">Chẩn đoán xác định:</label>
+                <input
+                  id="finalDiagnosisField"
+                  type="text"
+                  [(ngModel)]="finalDiagnosis"
+                  (input)="clearFieldError('finalDiagnosis')"
+                  class="form-control"
+                  [class.is-invalid]="validationErrors['finalDiagnosis']"
+                  placeholder="VD: Viêm họng cấp (J02) - Cúm A"
+                />
+                @if (validationErrors['finalDiagnosis']) {
+                  <div class="field-error-text">
+                    <i class="bi bi-exclamation-circle-fill"></i> Vui lòng nhập chẩn đoán xác định bệnh!
+                  </div>
+                }
+              </div>
             </div>
-            <div class="col-md-8">
-              <label class="form-label">Lời dặn của Bác sĩ / Lối sống:</label>
-              <input
-                type="text"
-                [(ngModel)]="notes"
-                class="form-control"
-                placeholder="VD: Uống nhiều nước ấm, súc họng nước muối 3 lần/ngày, kiêng đồ lạnh..."
-              />
+
+            <!-- Mã ICD-10 & Ghi chú -->
+            <div class="row g-2 mb-3">
+              <div class="col-md-4">
+                <label class="form-label">Mã ICD-10 (nếu có):</label>
+                <input
+                  type="text"
+                  [(ngModel)]="icd10Code"
+                  class="form-control"
+                  placeholder="VD: J02.9"
+                />
+              </div>
+              <div class="col-md-8">
+                <label class="form-label">Lời dặn của Bác sĩ / Lối sống:</label>
+                <input
+                  type="text"
+                  [(ngModel)]="notes"
+                  class="form-control"
+                  placeholder="VD: Uống nhiều nước ấm, súc họng nước muối 3 lần/ngày, kiêng đồ lạnh..."
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Section 2: Hẹn ngày tái khám (Extend Use Case) -->
-      <div class="card exam-section-card revisit-card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <div class="d-flex align-items-center gap-2">
-            <input
-              type="checkbox"
-              id="revisitCheck"
-              [(ngModel)]="hasRevisit"
-              class="form-check-input"
-            />
-            <label for="revisitCheck" class="section-title mb-0 cursor-pointer">
-              <i class="bi bi-calendar-event"></i> 2. Hẹn Ngày Tái Khám
-            </label>
+      <div class="exam-col-revisit">
+        <div class="card exam-section-card revisit-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <input
+                type="checkbox"
+                id="revisitCheck"
+                [(ngModel)]="hasRevisit"
+                class="form-check-input"
+              />
+              <label for="revisitCheck" class="section-title mb-0 cursor-pointer">
+                <i class="bi bi-calendar-event"></i> 2. Hẹn Ngày Tái Khám
+              </label>
+            </div>
+            <span class="extend-pill">«extend»</span>
           </div>
-          <span class="extend-pill">«extend»</span>
-        </div>
 
-        @if (hasRevisit) {
-          <div class="card-body pt-2">
-            <div class="row g-2 align-items-center mb-2">
-              <div class="col-md-5">
-                <label class="form-label">Chọn ngày tái khám:</label>
-                <input
-                  type="date"
-                  [(ngModel)]="revisitDate"
-                  class="form-control"
-                />
-              </div>
-              <div class="col-md-7">
+          @if (hasRevisit) {
+            <div class="card-body pt-2">
+              <div class="mb-3">
                 <label class="form-label">Chọn khoảng thời gian nhanh:</label>
-                <div class="quick-days-btn-group">
+                <div class="quick-days-btn-group mb-2">
                   <button type="button" class="btn-day" (click)="setQuickRevisit(3)">+3 ngày</button>
                   <button type="button" class="btn-day" (click)="setQuickRevisit(5)">+5 ngày</button>
                   <button type="button" class="btn-day" (click)="setQuickRevisit(7)">+7 ngày</button>
                   <button type="button" class="btn-day" (click)="setQuickRevisit(14)">+14 ngày</button>
                   <button type="button" class="btn-day" (click)="setQuickRevisit(30)">+1 tháng</button>
                 </div>
+                <label class="form-label" for="revisitDateField">Hoặc chọn ngày cụ thể:</label>
+                <input
+                  id="revisitDateField"
+                  type="date"
+                  [(ngModel)]="revisitDate"
+                  (change)="clearFieldError('revisitDate')"
+                  class="form-control"
+                  [class.is-invalid]="validationErrors['revisitDate']"
+                />
+                @if (validationErrors['revisitDate']) {
+                  <div class="field-error-text">
+                    <i class="bi bi-exclamation-circle-fill"></i> Vui lòng chọn ngày hẹn tái khám!
+                  </div>
+                }
+              </div>
+
+              <div class="form-group mb-0">
+                <label class="form-label">Yêu cầu / Ghi chú khi tái khám:</label>
+                <textarea
+                  [(ngModel)]="revisitNotes"
+                  rows="2"
+                  class="form-control"
+                  placeholder="VD: Mang theo đơn thuốc này khi tái khám hoặc đến ngay nếu sốt lại..."
+                ></textarea>
               </div>
             </div>
-
-            <div class="form-group">
-              <label class="form-label">Yêu cầu / Ghi chú khi tái khám:</label>
-              <input
-                type="text"
-                [(ngModel)]="revisitNotes"
-                class="form-control"
-                placeholder="VD: Mang theo đơn thuốc này khi tái khám hoặc đến ngay nếu sốt lại..."
-              />
+          } @else {
+            <div class="card-body text-center py-4 text-muted">
+              <i class="bi bi-calendar-check fs-2 d-block mb-2 text-secondary"></i>
+              <p class="mb-0 small">Tích chọn ô trên nếu cần hẹn lịch tái khám cho bệnh nhân</p>
             </div>
-          </div>
-        }
+          }
+        </div>
       </div>
     </div>
 
-    <!-- Right Column: Kê đơn thuốc & Tìm kiếm thuốc (Extend + Include) -->
-    <div class="exam-col-right">
+    <!-- Row 2: Kê đơn thuốc điện tử (100% Full Width) -->
+    <div class="exam-row-prescription">
       <div class="card exam-section-card prescription-card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center gap-2">
@@ -299,16 +337,18 @@
             <!-- Search & Select Medicine Box (Include Use Case) -->
             <div class="medicine-search-wrapper mb-3">
               <label class="form-label font-weight-bold">
-                <i class="bi bi-search"></i> Tìm kiếm & chọn thuốc («include»):
+                <i class="bi bi-search"></i> Tìm kiếm &amp; chọn thuốc («include»):
               </label>
-              <div class="search-input-box position-relative">
+              <div class="search-input-box position-relative" [class.is-invalid-wrapper]="validationErrors['prescribedItems']">
                 <input
+                  id="medicineSearchInput"
                   type="text"
                   [(ngModel)]="medicineSearchKeyword"
-                  (input)="onSearchMedicineInput()"
+                  (input)="onSearchMedicineInput(); clearFieldError('prescribedItems')"
                   (focus)="showMedicineDropdown.set(true)"
                   placeholder="Gõ tên thuốc hoặc hoạt chất (VD: Paracetamol, Augmentin, Nexium, Cefixim...)"
                   class="form-control search-med-input"
+                  [class.is-invalid]="validationErrors['prescribedItems']"
                 />
                 <i class="bi bi-search search-icon"></i>
 
@@ -332,6 +372,11 @@
                   </div>
                 }
               </div>
+              @if (validationErrors['prescribedItems']) {
+                <div class="field-error-text">
+                  <i class="bi bi-exclamation-circle-fill"></i> Bạn đã bật kê đơn thuốc điện tử nhưng chưa chọn loại thuốc nào!
+                </div>
+              }
             </div>
 
             <!-- Prescribed Medicines Table -->
@@ -339,14 +384,14 @@
               <table class="table prescribed-table">
                 <thead>
                   <tr>
-                    <th style="width: 30px;">#</th>
-                    <th style="width: 25%;">Thuốc & Hoạt chất</th>
-                    <th style="width: 12%;">Số lượng</th>
-                    <th style="width: 20%;">Liều dùng</th>
-                    <th style="width: 12%;">Đường dùng</th>
-                    <th style="width: 10%;">Số ngày</th>
-                    <th style="width: 20%;">Hướng dẫn</th>
-                    <th style="width: 30px;"></th>
+                    <th class="col-idx">#</th>
+                    <th class="col-name">Thuốc &amp; Hoạt chất</th>
+                    <th class="col-qty">Số lượng</th>
+                    <th class="col-dosage">Liều dùng</th>
+                    <th class="col-route">Đường dùng</th>
+                    <th class="col-days">Số ngày</th>
+                    <th class="col-instructions">Hướng dẫn cách dùng</th>
+                    <th class="col-action"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -360,34 +405,46 @@
                   }
                   @for (item of prescribedItems; track item.medicineId; let idx = $index) {
                     <tr [class.row-warning]="item._allergyWarning">
-                      <td class="text-center">{{ idx + 1 }}</td>
-                      <td>
+                      <td class="col-idx">{{ idx + 1 }}</td>
+                      <td class="col-name">
                         <strong class="med-table-name">{{ item._medicineName }}</strong>
                         <div class="med-table-sub">{{ item._activeIngredient }} ({{ item._unit }})</div>
                         @if (item._allergyWarning) {
                           <span class="badge-allergy">Cảnh báo dị ứng!</span>
                         }
                       </td>
-                      <td>
-                        <div class="input-with-unit">
+                      <td class="col-qty">
+                        <div class="input-with-unit" [class.is-invalid]="validationErrors['item_qty_' + idx]">
                           <input
+                            [id]="'item_qty_' + idx"
                             type="number"
                             min="1"
                             [(ngModel)]="item.quantity"
-                            class="form-control form-control-sm"
+                            (input)="clearFieldError('item_qty_' + idx)"
+                            class="form-control form-control-sm qty-input"
+                            [class.is-invalid]="validationErrors['item_qty_' + idx]"
                           />
                           <span class="unit-label">{{ item._unit }}</span>
                         </div>
+                        @if (validationErrors['item_qty_' + idx]) {
+                          <div class="field-error-text-sm">Nhập SL > 0</div>
+                        }
                       </td>
-                      <td>
+                      <td class="col-dosage">
                         <input
+                          [id]="'item_dosage_' + idx"
                           type="text"
                           [(ngModel)]="item.dosage"
+                          (input)="clearFieldError('item_dosage_' + idx)"
                           placeholder="VD: 1 viên/lần, 2 lần/ngày"
                           class="form-control form-control-sm"
+                          [class.is-invalid]="validationErrors['item_dosage_' + idx]"
                         />
+                        @if (validationErrors['item_dosage_' + idx]) {
+                          <div class="field-error-text-sm">Nhập liều dùng</div>
+                        }
                       </td>
-                      <td>
+                      <td class="col-route">
                         <select [(ngModel)]="item.route" class="form-select form-select-sm">
                           <option value="Đường uống">Đường uống</option>
                           <option value="Bôi ngoài da">Bôi ngoài da</option>
@@ -396,23 +453,24 @@
                           <option value="Tiêm">Tiêm</option>
                         </select>
                       </td>
-                      <td>
+                      <td class="col-days">
                         <input
                           type="number"
                           min="1"
                           [(ngModel)]="item.daysSupply"
-                          class="form-control form-control-sm"
+                          placeholder="Ngày"
+                          class="form-control form-control-sm days-input"
                         />
                       </td>
-                      <td>
+                      <td class="col-instructions">
                         <input
                           type="text"
                           [(ngModel)]="item.instructions"
-                          placeholder="Sáng 1, tối 1 sau ăn"
+                          placeholder="VD: Sáng 1, tối 1 sau ăn..."
                           class="form-control form-control-sm"
                         />
                       </td>
-                      <td class="text-center">
+                      <td class="col-action">
                         <button
                           type="button"
                           class="btn-remove-med"
@@ -435,7 +493,7 @@
                 [(ngModel)]="prescriptionAdvice"
                 rows="2"
                 class="form-control"
-                placeholder="VD: Uống thuốc đúng giờ, sau ăn no. Tuyệt đối không tự ý dừng kháng sinh khi chưa đủ liều..."
+                placeholder="VD: Uống thuốc đúng theo hướng dẫn, uống đủ liều và tái khám đúng hẹn..."
               ></textarea>
             </div>
           </div>
