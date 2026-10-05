@@ -50,12 +50,21 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
         </div>
       </div>
 
-      <!-- Feedback Alerts -->
+      <!-- Feedback Alerts (Top-Right Floating Toast) -->
       @if (alertMessage()) {
-        <div class="alert" [ngClass]="alertType() === 'success' ? 'alert-success' : 'alert-danger'">
-          <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-          <span>{{ alertMessage() }}</span>
-          <button type="button" class="alert-close" (click)="alertMessage.set(null)">×</button>
+        <div class="toast-floating-container">
+          <div class="toast-card" [ngClass]="alertType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
+            <div class="toast-icon">
+              <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+            </div>
+            <div class="toast-content">
+              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo' }}</div>
+              <div class="toast-message">{{ alertMessage() }}</div>
+            </div>
+            <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo" aria-label="Đóng">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       }
 
@@ -735,7 +744,10 @@ export class SpecialtiesComponent implements OnInit {
   }
 
   saveSpecialty(): void {
-    if (!this.formData.name.trim()) return;
+    if (!this.formData.name || !this.formData.name.trim()) {
+      this.showAlert('Vui lòng nhập tên chuyên khoa!', 'danger');
+      return;
+    }
 
     this.submitting.set(true);
     if (this.isEditing() && this.editingId) {

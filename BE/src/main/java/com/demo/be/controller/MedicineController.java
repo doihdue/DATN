@@ -37,7 +37,7 @@ public class MedicineController {
 
     // 3. Thêm mới thuốc vào kho danh mục
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<MedicineResponse>> createMedicine(@Valid @RequestBody MedicineRequest request) {
         MedicineResponse res = medicineService.createMedicine(request);
         return ResponseEntity.status(HttpStatus.CREATED)

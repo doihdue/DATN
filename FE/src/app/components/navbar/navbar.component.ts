@@ -10,18 +10,18 @@ import { AuthService } from '../../services/auth.service';
   template: `
     <header class="navbar-header">
       <div class="navbar-container">
-        <!-- Logo -->
+        <!-- Hospital Brand -->
         <a routerLink="/" class="navbar-brand">
           <div class="brand-icon">
-            <i class="bi bi-hospital-fill"></i>
+            <i class="bi bi-hospital"></i>
           </div>
           <div class="brand-text">
             <span class="brand-name">MedQueue</span>
-            <span class="brand-tagline">Đặt Khám & Hàng Đợi Điện Tử</span>
+            <span class="brand-tagline">Tiếp Đón & Hàng Đợi Y Tế</span>
           </div>
         </a>
 
-        <!-- Navigation Links -->
+        <!-- Main Navigation Links -->
         <nav class="nav-links">
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
             <i class="bi bi-house-door"></i> Trang chủ
@@ -41,14 +41,8 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/admin/schedules" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-calendar3"></i> Lịch làm việc
               </a>
-              <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-sliders"></i> Điều phối hàng đợi
-              </a>
-              <a routerLink="/doctor/examination" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
-              </a>
             }
-            @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
+            @if (authService.hasRole('DOCTOR')) {
               <a routerLink="/doctor/schedule" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-calendar-week"></i> Ca trực của tôi
               </a>
@@ -59,7 +53,7 @@ import { AuthService } from '../../services/auth.service';
                 <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
               </a>
             }
-            @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+            @if (authService.hasRole('STAFF')) {
               <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-sliders"></i> Điều phối hàng đợi
               </a>
@@ -72,7 +66,7 @@ import { AuthService } from '../../services/auth.service';
           @if (authService.isAuthenticated()) {
             <div class="user-profile">
               <div class="user-avatar">
-                <i class="bi bi-person-circle"></i>
+                <i class="bi bi-person-fill"></i>
               </div>
               <div class="user-details">
                 <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
@@ -84,7 +78,7 @@ import { AuthService } from '../../services/auth.service';
                   }
                 </div>
               </div>
-              <button (click)="logout()" class="btn btn-outline btn-sm logout-btn" title="Đăng xuất">
+              <button (click)="logout()" class="btn-logout" title="Đăng xuất khỏi hệ thống">
                 <i class="bi bi-box-arrow-right"></i>
               </button>
             </div>
@@ -94,7 +88,7 @@ import { AuthService } from '../../services/auth.service';
                 <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
               </a>
               <a routerLink="/register" class="btn btn-primary btn-sm">
-                <i class="bi bi-person-plus"></i> Đăng ký
+                <i class="bi bi-person-plus"></i> Đăng ký khám
               </a>
             </div>
           }
@@ -107,16 +101,14 @@ import { AuthService } from '../../services/auth.service';
       position: sticky;
       top: 0;
       z-index: 1000;
-      background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: #ffffff;
       border-bottom: 1px solid var(--border-color);
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
-      padding: 0.75rem 1.5rem;
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05);
+      padding: 0.65rem 1.5rem;
     }
 
     .navbar-container {
-      max-width: 1300px;
+      max-width: 1360px;
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -132,16 +124,16 @@ import { AuthService } from '../../services/auth.service';
     }
 
     .brand-icon {
-      width: 42px;
-      height: 42px;
-      background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-800) 100%);
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-600) 100%);
       color: #ffffff;
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.35rem;
-      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.35);
+      font-size: 1.3rem;
+      box-shadow: 0 2px 5px rgba(2, 132, 199, 0.25);
     }
 
     .brand-text {
@@ -150,10 +142,10 @@ import { AuthService } from '../../services/auth.service';
     }
 
     .brand-name {
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 800;
-      letter-spacing: -0.02em;
-      color: var(--primary-800);
+      letter-spacing: -0.01em;
+      color: var(--primary-900);
       line-height: 1.1;
     }
 
@@ -168,30 +160,30 @@ import { AuthService } from '../../services/auth.service';
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.35rem;
     }
 
     .nav-item {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      padding: 0.5rem 0.85rem;
-      font-size: 0.9rem;
+      padding: 0.45rem 0.8rem;
+      font-size: 0.885rem;
       font-weight: 600;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       border-radius: var(--radius-sm);
       text-decoration: none;
-      transition: all 0.2s;
+      transition: all 0.15s ease;
     }
 
     .nav-item:hover {
       color: var(--primary-700);
-      background: var(--primary-50);
+      background-color: var(--bg-subtle);
     }
 
     .nav-item.active {
       color: var(--primary-700);
-      background: var(--primary-100);
+      background-color: var(--primary-50);
       font-weight: 700;
     }
 
@@ -203,37 +195,46 @@ import { AuthService } from '../../services/auth.service';
     .auth-buttons {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
     }
 
     .user-profile {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.35rem 0.6rem;
-      background: #f8fafc;
+      gap: 0.65rem;
+      padding: 0.3rem 0.65rem;
+      background-color: var(--bg-main);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-full);
     }
 
     .user-avatar {
-      font-size: 1.75rem;
-      color: var(--primary-600);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background-color: var(--primary-100);
+      color: var(--primary-700);
       display: flex;
       align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
     }
 
     .user-details {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      gap: 0.1rem;
     }
 
     .user-name {
-      font-size: 0.85rem;
+      font-size: 0.825rem;
       font-weight: 700;
       color: var(--text-main);
       line-height: 1.2;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .user-badges {
@@ -241,19 +242,26 @@ import { AuthService } from '../../services/auth.service';
       gap: 0.25rem;
     }
 
-    .logout-btn {
-      padding: 0.4rem 0.6rem;
-      border-radius: var(--radius-full);
-      color: var(--rose-600);
+    .btn-logout {
+      background: none;
+      border: none;
+      padding: 0.35rem 0.5rem;
+      border-radius: 50%;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
     }
 
-    .logout-btn:hover {
-      background: #ffe4e6;
-      border-color: #fca5a5;
-      color: var(--rose-600);
+    .btn-logout:hover {
+      background-color: var(--danger-bg);
+      color: var(--danger-solid);
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 992px) {
       .nav-links {
         display: none;
       }

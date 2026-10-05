@@ -48,7 +48,7 @@ public class WorkScheduleController {
     }
 
     @PostMapping("/admin/work-schedules")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<WorkScheduleResponse>> createSchedule(
             @Valid @RequestBody WorkScheduleRequest request
     ) {
@@ -58,7 +58,7 @@ public class WorkScheduleController {
     }
 
     @PutMapping("/admin/work-schedules/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<WorkScheduleResponse>> updateSchedule(
             @PathVariable Long id,
             @Valid @RequestBody WorkScheduleRequest request
@@ -68,7 +68,7 @@ public class WorkScheduleController {
     }
 
     @PatchMapping("/admin/work-schedules/{id}/cancel")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<WorkScheduleResponse>> cancelSchedule(
             @PathVariable Long id,
             @RequestParam(defaultValue = "Bác sĩ có lịch đột xuất") String reason

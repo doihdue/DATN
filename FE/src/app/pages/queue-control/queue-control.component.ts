@@ -1,11 +1,11 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { QueueService } from '../../services/queue.service';
 import { ScheduleService } from '../../services/schedule.service';
+import { AuthService } from '../../services/auth.service';
 import { CheckInRequest, QueueTicket, RoomQueueOverview } from '../../models/queue.model';
 import { ExaminationRoom } from '../../models/schedule.model';
-
 import { RouterLink } from '@angular/router';
 
 @Component({
@@ -14,27 +14,29 @@ import { RouterLink } from '@angular/router';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="queue-control-page">
-      <!-- Top Bar -->
+      <!-- Top Control Header -->
       <div class="control-header">
         <div class="header-left">
           <div class="header-badge">
-            <span class="live-pulse"></span> Điều Phối Hàng Đợi Thời Gian Thực
+            <span class="live-dot"></span> {{ isDoctor() ? 'Bàn Gọi Khám & Điều Phối Bác Sĩ' : 'Hệ Thống Điều Phối Tiếp Đón Khám Bệnh' }}
           </div>
-          <h1 class="page-title">Bàn Điều Phối & Tiếp Đón Khám Bệnh</h1>
+          <h1 class="page-title">{{ isDoctor() ? 'Bàn Gọi Khám Phòng Khám' : 'Bàn Điều Phối & Tiếp Đón Hàng Đợi' }}</h1>
           <p class="page-subtitle">
-            Gọi số, chuyển phòng, điều phối lượt khám và phân luồng bệnh nhân ưu tiên
+            {{ isDoctor() ? 'Gọi số khám, mời bệnh nhân vào phòng và bắt đầu ca khám bệnh' : 'Tiếp nhận người bệnh, cấp số thứ tự vào phòng khám và điều phối ưu tiên' }}
           </p>
         </div>
-        <div class="header-right">
-          <button class="btn btn-primary" (click)="openCheckInModal()">
-            <i class="bi bi-person-plus-fill"></i> Tiếp Đón & Cấp Số Mới
-          </button>
-        </div>
+        @if (!isDoctor()) {
+          <div class="header-right">
+            <button class="btn btn-primary" (click)="openCheckInModal()">
+              <i class="bi bi-person-plus-fill"></i> Tiếp Đón &amp; Cấp Số Mới
+            </button>
+          </div>
+        }
       </div>
 
-      <!-- Room Selector Bar -->
+      <!-- Room Selector Strip -->
       <div class="room-selector-bar">
-        <label class="selector-label"><i class="bi bi-hospital"></i> Chọn Phòng Khám Điều Phối:</label>
+        <span class="selector-label"><i class="bi bi-hospital"></i> Chọn Phòng Khám:</span>
         <div class="room-pills">
           @for (room of rooms(); track room.id) {
             <button
@@ -49,12 +51,21 @@ import { RouterLink } from '@angular/router';
         </div>
       </div>
 
-      <!-- Feedback Alerts -->
+      <!-- Alerts (Top-Right Floating Toast) -->
       @if (alertMessage()) {
-        <div class="alert" [ngClass]="alertType() === 'success' ? 'alert-success' : 'alert-danger'">
-          <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-          <span>{{ alertMessage() }}</span>
-          <button type="button" class="alert-close" (click)="alertMessage.set(null)">×</button>
+        <div class="toast-floating-container">
+          <div class="toast-card" [ngClass]="alertType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
+            <div class="toast-icon">
+              <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+            </div>
+            <div class="toast-content">
+              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo' }}</div>
+              <div class="toast-message">{{ alertMessage() }}</div>
+            </div>
+            <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo" aria-label="Đóng">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       }
 
@@ -66,17 +77,18 @@ import { RouterLink } from '@angular/router';
       } @else if (overview()) {
         <!-- Main Console Layout -->
         <div class="console-grid">
-          <!-- Left Column: Active Call / Examining Stage -->
-          <div class="active-stage-card">
+          <!-- Left Column: Primary Calling & Examining Operations -->
+          <div class="active-stage-card medical-card">
+            <!-- Stage Header Info -->
             <div class="stage-header">
               <div class="doctor-badge">
-                <i class="bi bi-person-badge"></i>
+                <i class="bi bi-person-badge-fill text-primary"></i>
                 <span>Bác sĩ phụ trách: <strong>{{ overview()?.doctorName || 'Đang cập nhật' }}</strong></span>
                 <span class="specialty-sub">({{ overview()?.specialtyName }})</span>
               </div>
               <div class="queue-quick-stats">
-                <span class="stat-tag"><i class="bi bi-people-fill"></i> Đang chờ: <strong>{{ overview()?.totalWaitingCount }}</strong></span>
-                <span class="stat-tag"><i class="bi bi-clock-history"></i> Ước tính: <strong>{{ overview()?.estimatedWaitMinutes }} phút</strong></span>
+                <span class="stat-tag"><i class="bi bi-people-fill"></i> Đang chờ: <strong class="num">{{ overview()?.totalWaitingCount }}</strong></span>
+                <span class="stat-tag"><i class="bi bi-clock-history"></i> Ước tính: <strong class="num">{{ overview()?.estimatedWaitMinutes }} phút</strong></span>
               </div>
             </div>
 
@@ -93,9 +105,9 @@ import { RouterLink } from '@angular/router';
                     <span class="call-title">GỌI SỐ TIẾP THEO</span>
                     <span class="call-subtitle">
                       @if (overview()!.waitingTickets.length > 0) {
-                        Số kế tiếp: {{ overview()!.waitingTickets[0].ticketNumber }} ({{ overview()!.waitingTickets[0].patientName }})
+                        Số kế tiếp: {{ overview()!.waitingTickets[0].ticketNumber }} — {{ overview()!.waitingTickets[0].patientName }}
                       } @else {
-                        Không có bệnh nhân chờ
+                        Hiện không có bệnh nhân nào trong hàng chờ
                       }
                     </span>
                   </div>
@@ -116,12 +128,12 @@ import { RouterLink } from '@angular/router';
                 <div class="panel-body">
                   @if (overview()?.currentCalledTicket) {
                     <div class="ticket-highlight">
-                      <div class="ticket-num">{{ overview()!.currentCalledTicket!.ticketNumber }}</div>
+                      <div class="ticket-num num">{{ overview()!.currentCalledTicket!.ticketNumber }}</div>
                       <div class="patient-name">{{ overview()!.currentCalledTicket!.patientName }}</div>
                       <div class="patient-info-sub">
                         <span>SĐT: {{ overview()!.currentCalledTicket!.patientPhone }}</span>
                         @if (overview()!.currentCalledTicket!.patientYearOfBirth) {
-                          <span>• Năm sinh: {{ overview()!.currentCalledTicket!.patientYearOfBirth }}</span>
+                          <span> • Năm sinh: {{ overview()!.currentCalledTicket!.patientYearOfBirth }}</span>
                         }
                       </div>
                       <div class="panel-actions">
@@ -153,24 +165,29 @@ import { RouterLink } from '@angular/router';
                 <div class="panel-body">
                   @if (overview()?.currentExaminingTicket) {
                     <div class="ticket-highlight">
-                      <div class="ticket-num text-success">{{ overview()!.currentExaminingTicket!.ticketNumber }}</div>
+                      <div class="ticket-num text-success num">{{ overview()!.currentExaminingTicket!.ticketNumber }}</div>
                       <div class="patient-name">{{ overview()!.currentExaminingTicket!.patientName }}</div>
                       <div class="patient-info-sub">
                         <span>Bắt đầu lúc: {{ overview()!.currentExaminingTicket!.startTime }}</span>
                       </div>
                       <div class="panel-actions">
-                        <a [routerLink]="['/doctor/examination', overview()!.currentExaminingTicket!.id]" class="btn btn-warning btn-sm" style="font-weight: 700;">
-                          <i class="bi bi-file-earmark-medical-fill"></i> Mở Bàn Khám & Kê Đơn
-                        </a>
-                        <button class="btn btn-outline-primary btn-sm" (click)="completeExam(overview()!.currentExaminingTicket!.id)">
-                          <i class="bi bi-check-circle-fill"></i> Khám Xong (Nhanh)
+                        @if (isDoctor()) {
+                          <a [routerLink]="['/doctor/examination', overview()!.currentExaminingTicket!.id]" 
+                             [state]="{ ticket: overview()!.currentExaminingTicket }"
+                             (click)="onOpenExamination(overview()!.currentExaminingTicket!)" 
+                             class="btn btn-primary btn-sm">
+                            <i class="bi bi-file-earmark-medical-fill"></i> Bàn Khám &amp; Kê Đơn
+                          </a>
+                        }
+                        <button class="btn btn-outline btn-sm" (click)="completeExam(overview()!.currentExaminingTicket!.id)">
+                          <i class="bi bi-check-circle-fill text-success"></i> Xong Nhanh
                         </button>
                       </div>
                     </div>
                   } @else {
                     <div class="panel-empty">
-                      <i class="bi bi-person-dash"></i>
-                      <p>Phòng đang trống</p>
+                      <i class="bi bi-door-open"></i>
+                      <p>Phòng khám đang trống</p>
                     </div>
                   }
                 </div>
@@ -179,8 +196,8 @@ import { RouterLink } from '@angular/router';
           </div>
 
           <!-- Right Column: Queue Waiting & Skipped Lists -->
-          <div class="queue-list-card">
-            <!-- Tabs -->
+          <div class="queue-list-card medical-card">
+            <!-- Tabs Bar -->
             <div class="queue-tabs">
               <button
                 class="tab-btn"
@@ -188,7 +205,7 @@ import { RouterLink } from '@angular/router';
                 (click)="activeTab = 'WAITING'"
               >
                 <i class="bi bi-hourglass-split"></i> Đang Chờ
-                <span class="tab-count">{{ overview()?.waitingTickets?.length || 0 }}</span>
+                <span class="tab-count num">{{ overview()?.waitingTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
@@ -196,7 +213,7 @@ import { RouterLink } from '@angular/router';
                 (click)="activeTab = 'SKIPPED'"
               >
                 <i class="bi bi-arrow-repeat"></i> Bị Nhỡ Lượt
-                <span class="tab-count count-skipped">{{ overview()?.skippedTickets?.length || 0 }}</span>
+                <span class="tab-count count-skipped num">{{ overview()?.skippedTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
@@ -204,7 +221,7 @@ import { RouterLink } from '@angular/router';
                 (click)="activeTab = 'COMPLETED'"
               >
                 <i class="bi bi-check2-all"></i> Đã Khám
-                <span class="tab-count count-completed">{{ overview()?.completedTickets?.length || 0 }}</span>
+                <span class="tab-count count-completed num">{{ overview()?.completedTickets?.length || 0 }}</span>
               </button>
             </div>
 
@@ -214,14 +231,14 @@ import { RouterLink } from '@angular/router';
                 @if (overview()!.waitingTickets.length === 0) {
                   <div class="empty-list-state">
                     <i class="bi bi-check-circle text-success"></i>
-                    <p>Hiện không có bệnh nhân nào đang chờ!</p>
+                    <p>Hiện không có bệnh nhân nào đang chờ</p>
                   </div>
                 } @else {
                   @for (t of overview()!.waitingTickets; track t.id; let idx = $index) {
                     <div class="ticket-row-card" [class.emergency-row]="t.isEmergency">
                       <div class="row-order">
-                        <span class="order-idx">#{{ idx + 1 }}</span>
-                        <span class="row-ticket-num">{{ t.ticketNumber }}</span>
+                        <span class="order-idx num">#{{ idx + 1 }}</span>
+                        <span class="row-ticket-num num">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
@@ -239,12 +256,12 @@ import { RouterLink } from '@angular/router';
                         <div class="row-patient-meta">
                           <span>SĐT: {{ t.patientPhone }}</span>
                           <span>• Giờ lấy số: {{ t.checkInTime }}</span>
-                          <span>• Điểm: <strong>{{ t.priorityScore }}</strong></span>
+                          <span>• Điểm: <strong class="num">{{ t.priorityScore }}</strong></span>
                         </div>
                       </div>
                       <div class="row-actions">
                         @if (!t.isEmergency) {
-                          <button class="btn btn-sm btn-outline-danger" (click)="setEmergency(t.id)" title="Đặt ưu tiên cấp cứu">
+                          <button class="btn btn-sm btn-outline-danger" (click)="setEmergency(t.id)" title="Gắn cờ ưu tiên cấp cứu">
                             <i class="bi bi-lightning-fill"></i> Khẩn cấp
                           </button>
                         }
@@ -261,13 +278,13 @@ import { RouterLink } from '@angular/router';
                 @if (overview()!.skippedTickets.length === 0) {
                   <div class="empty-list-state">
                     <i class="bi bi-person-check text-muted"></i>
-                    <p>Không có lượt nào bị nhỡ</p>
+                    <p>Không có lượt khám nào bị nhỡ</p>
                   </div>
                 } @else {
                   @for (t of overview()!.skippedTickets; track t.id) {
                     <div class="ticket-row-card skipped-row">
                       <div class="row-order">
-                        <span class="row-ticket-num text-danger">{{ t.ticketNumber }}</span>
+                        <span class="row-ticket-num text-danger num">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
@@ -279,8 +296,8 @@ import { RouterLink } from '@angular/router';
                         </div>
                       </div>
                       <div class="row-actions">
-                        <button class="btn btn-sm btn-outline-primary" (click)="recallTicket(t.id)">
-                          <i class="bi bi-arrow-counterclockwise"></i> Gọi lại ngay
+                        <button class="btn btn-sm btn-outline" (click)="recallTicket(t.id)">
+                          <i class="bi bi-arrow-counterclockwise"></i> Gọi lại
                         </button>
                       </div>
                     </div>
@@ -301,7 +318,7 @@ import { RouterLink } from '@angular/router';
                   @for (t of overview()!.completedTickets; track t.id) {
                     <div class="ticket-row-card completed-row">
                       <div class="row-order">
-                        <span class="row-ticket-num text-muted">{{ t.ticketNumber }}</span>
+                        <span class="row-ticket-num text-muted num">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
@@ -309,11 +326,11 @@ import { RouterLink } from '@angular/router';
                         </div>
                         <div class="row-patient-meta">
                           <span>Bắt đầu: {{ t.startTime }}</span>
-                          <span>• Xong: {{ t.endTime }}</span>
+                          <span> • Xong: {{ t.endTime }}</span>
                         </div>
                       </div>
                       <div class="row-status">
-                        <span class="badge badge-success"><i class="bi bi-check2"></i> Đã hoàn thành</span>
+                        <span class="badge badge-success"><i class="bi bi-check2"></i> Đã hoàn tất</span>
                       </div>
                     </div>
                   }
@@ -330,7 +347,7 @@ import { RouterLink } from '@angular/router';
           <div class="modal-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">
-                <i class="bi bi-ticket-perforated-fill text-primary"></i> Tiếp Đón & Cấp Số Thứ Tự
+                <i class="bi bi-ticket-perforated-fill text-primary"></i> Tiếp Đón &amp; Cấp Số Khám
               </h2>
               <button class="modal-close-btn" (click)="closeCheckInModal()">×</button>
             </div>
@@ -367,7 +384,7 @@ import { RouterLink } from '@angular/router';
                     max="2026"
                     class="form-control"
                   />
-                  <small class="form-hint">Dùng để tự động ưu tiên người già & trẻ em</small>
+                  <small class="form-hint">Dùng để ưu tiên tự động cho người già &amp; trẻ nhỏ</small>
                 </div>
               </div>
 
@@ -383,15 +400,14 @@ import { RouterLink } from '@angular/router';
               <div class="checkbox-group">
                 <label class="checkbox-label">
                   <input type="checkbox" [(ngModel)]="checkInForm.isEmergency" />
-                  <span class="checkbox-custom"></span>
                   <span class="checkbox-text text-danger font-bold">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Trường hợp khẩn cấp / Cấp cứu (Ưu tiên gọi trước)
+                    <i class="bi bi-exclamation-triangle-fill"></i> Trường hợp khẩn cấp / Cấp cứu (Ưu tiên gọi đầu tiên)
                   </span>
                 </label>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Ghi chú triệu chứng / Lý do khám</label>
+                <label class="form-label">Ghi chú triệu chứng ban đầu</label>
                 <textarea
                   [(ngModel)]="checkInForm.notes"
                   rows="2"
@@ -408,9 +424,9 @@ import { RouterLink } from '@angular/router';
                 (click)="submitCheckIn()"
               >
                 @if (submittingCheckIn()) {
-                  <span class="spinner-sm"></span> Đang sinh số...
+                  <span class="spinner-sm"></span> Đang tạo số...
                 } @else {
-                  <i class="bi bi-printer-fill"></i> In Phiếu & Cấp Số Ngay
+                  <i class="bi bi-printer"></i> In Phiếu &amp; Cấp Số
                 }
               </button>
             </div>
@@ -421,8 +437,8 @@ import { RouterLink } from '@angular/router';
   `,
   styles: [`
     .queue-control-page {
-      padding: 1.5rem 0 3rem;
-      max-width: 1350px;
+      padding: 1.5rem 1.5rem 3.5rem;
+      max-width: 1360px;
       margin: 0 auto;
     }
 
@@ -430,7 +446,7 @@ import { RouterLink } from '@angular/router';
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
       flex-wrap: wrap;
       gap: 1rem;
     }
@@ -438,63 +454,56 @@ import { RouterLink } from '@angular/router';
     .header-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.25rem 0.75rem;
-      background: #eff6ff;
-      color: var(--primary-700);
-      font-size: 0.8rem;
+      gap: 0.4rem;
+      padding: 0.2rem 0.65rem;
+      background-color: var(--primary-50);
+      color: var(--primary-800);
+      font-size: 0.775rem;
       font-weight: 700;
       border-radius: var(--radius-full);
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.35rem;
       border: 1px solid var(--primary-200);
     }
 
-    .live-pulse {
-      width: 8px;
-      height: 8px;
-      background: #10b981;
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--success-solid);
       border-radius: 50%;
-      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-      animation: pulse 1.6s infinite;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
     .page-title {
-      font-size: 2rem;
+      font-size: 1.75rem;
       font-weight: 800;
       color: var(--text-main);
-      margin: 0 0 0.3rem;
-      letter-spacing: -0.02em;
+      margin: 0 0 0.25rem;
+      letter-spacing: -0.01em;
     }
 
     .page-subtitle {
       color: var(--text-muted);
       margin: 0;
-      font-size: 0.95rem;
+      font-size: 0.925rem;
     }
 
+    /* Room Selector Bar */
     .room-selector-bar {
-      background: #ffffff;
-      border-radius: var(--radius-lg);
+      background-color: #ffffff;
+      border-radius: var(--radius-md);
       border: 1px solid var(--border-color);
-      padding: 0.85rem 1.25rem;
+      padding: 0.75rem 1.25rem;
       display: flex;
       align-items: center;
       gap: 1rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 4px 15px -3px rgba(15, 23, 42, 0.04);
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow-xs);
       flex-wrap: wrap;
     }
 
     .selector-label {
-      font-size: 0.9rem;
+      font-size: 0.875rem;
       font-weight: 700;
-      color: var(--text-main);
+      color: var(--text-secondary);
       display: flex;
       align-items: center;
       gap: 0.4rem;
@@ -503,38 +512,40 @@ import { RouterLink } from '@angular/router';
 
     .room-pills {
       display: flex;
-      gap: 0.6rem;
+      gap: 0.5rem;
       flex-wrap: wrap;
     }
 
     .room-pill-btn {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.45rem;
       padding: 0.4rem 0.85rem;
-      border-radius: var(--radius-md);
-      background: #f8fafc;
+      border-radius: var(--radius-sm);
+      background-color: var(--bg-subtle);
       border: 1px solid var(--border-color);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.15s ease;
+      color: var(--text-secondary);
     }
 
     .room-pill-btn:hover {
-      background: var(--primary-50);
+      background-color: var(--primary-50);
       border-color: var(--primary-300);
+      color: var(--primary-800);
     }
 
     .room-pill-btn.active {
-      background: var(--primary-600);
+      background-color: var(--primary-600);
       color: #ffffff;
       border-color: var(--primary-600);
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+      box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);
     }
 
     .pill-number {
       font-family: monospace;
       font-weight: 800;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
     }
 
     .pill-name {
@@ -545,8 +556,8 @@ import { RouterLink } from '@angular/router';
     /* Console Grid */
     .console-grid {
       display: grid;
-      grid-template-columns: 1.15fr 1fr;
-      gap: 1.5rem;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.25rem;
     }
 
     @media (max-width: 1024px) {
@@ -557,22 +568,18 @@ import { RouterLink } from '@angular/router';
 
     /* Active Stage Card */
     .active-stage-card {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      border: 1px solid var(--border-color);
-      padding: 1.5rem;
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 1.35rem;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
 
     .stage-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid var(--border-color);
       flex-wrap: wrap;
       gap: 0.75rem;
     }
@@ -580,57 +587,62 @@ import { RouterLink } from '@angular/router';
     .doctor-badge {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.45rem;
       color: var(--text-main);
-      font-size: 0.95rem;
+      font-size: 0.925rem;
     }
 
     .specialty-sub {
       color: var(--text-muted);
-      font-size: 0.85rem;
+      font-size: 0.825rem;
     }
 
     .queue-quick-stats {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.5rem;
     }
 
     .stat-tag {
-      background: #f1f5f9;
-      padding: 0.35rem 0.65rem;
-      border-radius: var(--radius-sm);
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      background-color: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      padding: 0.3rem 0.6rem;
+      border-radius: var(--radius-xs);
+      font-size: 0.775rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
     }
 
     .stat-tag strong {
       color: var(--text-main);
     }
 
-    /* Big Call Button */
+    /* Call Button */
     .call-action-box {
       width: 100%;
     }
 
     .btn-call-next {
       width: 100%;
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      background-color: var(--primary-600);
       color: #ffffff;
       border: none;
-      border-radius: var(--radius-lg);
-      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius-md);
+      padding: 1.15rem 1.5rem;
       cursor: pointer;
-      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.4);
-      transition: all 0.25s ease;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+      transition: all 0.15s ease;
     }
 
     .btn-call-next:hover:not(:disabled) {
-      transform: translateY(-3px);
-      box-shadow: 0 15px 30px -5px rgba(2, 132, 199, 0.55);
+      background-color: var(--primary-700);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
     }
 
     .btn-call-next:disabled {
-      opacity: 0.5;
+      background-color: #cbd5e1;
+      color: #64748b;
       cursor: not-allowed;
       box-shadow: none;
     }
@@ -639,19 +651,11 @@ import { RouterLink } from '@angular/router';
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 1.25rem;
+      gap: 1rem;
     }
 
     .call-icon {
-      font-size: 2.5rem;
-      animation: ringing 2s infinite ease-in-out;
-    }
-
-    @keyframes ringing {
-      0%, 100% { transform: rotate(0); }
-      10%, 30% { transform: rotate(-10deg); }
-      20%, 40% { transform: rotate(10deg); }
-      50% { transform: rotate(0); }
+      font-size: 2rem;
     }
 
     .call-text {
@@ -661,14 +665,14 @@ import { RouterLink } from '@angular/router';
     }
 
     .call-title {
-      font-size: 1.35rem;
-      font-weight: 900;
-      letter-spacing: 0.05em;
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
     }
 
     .call-subtitle {
       font-size: 0.85rem;
-      opacity: 0.9;
+      opacity: 0.95;
     }
 
     /* Panels Row */
@@ -685,25 +689,26 @@ import { RouterLink } from '@angular/router';
     }
 
     .ticket-status-panel {
-      border-radius: var(--radius-lg);
+      border-radius: var(--radius-md);
       border: 1px solid var(--border-color);
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      background-color: #ffffff;
     }
 
     .panel-called {
-      background: #eff6ff;
-      border-color: #bfdbfe;
+      background-color: #f0f9ff;
+      border-color: #bae6fd;
     }
 
     .panel-examining {
-      background: #ecfdf5;
-      border-color: #a7f3d0;
+      background-color: #f0fdf4;
+      border-color: #bbf7d0;
     }
 
     .panel-header {
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 0.95rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -711,16 +716,16 @@ import { RouterLink } from '@angular/router';
     }
 
     .panel-title {
-      font-size: 0.85rem;
+      font-size: 0.825rem;
       font-weight: 700;
-      color: var(--text-main);
+      color: var(--text-secondary);
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.35rem;
     }
 
     .panel-body {
-      padding: 1.25rem 1rem;
+      padding: 1.15rem 0.95rem;
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -732,65 +737,63 @@ import { RouterLink } from '@angular/router';
     }
 
     .ticket-num {
-      font-size: 2.2rem;
+      font-size: 2.15rem;
       font-weight: 900;
       color: var(--primary-800);
-      letter-spacing: -0.02em;
+      letter-spacing: 0.02em;
       line-height: 1;
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.35rem;
     }
 
     .patient-name {
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       color: var(--text-main);
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.2rem;
     }
 
     .patient-info-sub {
-      font-size: 0.8rem;
+      font-size: 0.785rem;
       color: var(--text-muted);
-      margin-bottom: 1rem;
+      margin-bottom: 0.85rem;
     }
 
     .panel-actions {
       display: flex;
       gap: 0.5rem;
       justify-content: center;
+      flex-wrap: wrap;
     }
 
     .panel-empty {
       text-align: center;
       color: var(--text-muted);
-      padding: 1.5rem 0;
+      padding: 1.25rem 0;
     }
 
     .panel-empty i {
-      font-size: 2rem;
-      margin-bottom: 0.4rem;
+      font-size: 1.85rem;
+      margin-bottom: 0.35rem;
       display: block;
+      color: var(--text-light);
     }
 
     .panel-empty p {
       margin: 0;
-      font-size: 0.85rem;
+      font-size: 0.825rem;
     }
 
     /* Right Column: Queue List Card */
     .queue-list-card {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      border: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
       max-height: 650px;
     }
 
     .queue-tabs {
       display: flex;
-      background: #f8fafc;
+      background-color: var(--bg-main);
       border-bottom: 1px solid var(--border-color);
       padding: 0.35rem 0.5rem 0;
     }
@@ -799,91 +802,92 @@ import { RouterLink } from '@angular/router';
       flex: 1;
       background: transparent;
       border: none;
-      padding: 0.75rem 0.5rem;
-      font-size: 0.85rem;
+      padding: 0.65rem 0.5rem;
+      font-size: 0.825rem;
       font-weight: 600;
       color: var(--text-muted);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4rem;
+      gap: 0.35rem;
       border-bottom: 2px solid transparent;
-      transition: all 0.2s;
+      transition: all 0.15s ease;
     }
 
     .tab-btn.active {
       color: var(--primary-700);
       font-weight: 700;
       border-bottom-color: var(--primary-600);
-      background: #ffffff;
-      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      background-color: #ffffff;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     }
 
     .tab-count {
-      background: #e2e8f0;
+      background-color: #e2e8f0;
       color: var(--text-main);
-      padding: 0.15rem 0.45rem;
+      padding: 0.1rem 0.45rem;
       border-radius: var(--radius-full);
-      font-size: 0.75rem;
+      font-size: 0.725rem;
+      font-weight: 700;
     }
 
-    .count-skipped { background: #fee2e2; color: #dc2626; }
-    .count-completed { background: #dcfce7; color: #15803d; }
+    .count-skipped { background-color: var(--danger-bg); color: var(--danger-solid); }
+    .count-completed { background-color: var(--success-bg); color: var(--success-solid); }
 
     .tab-content-list {
-      padding: 1rem;
+      padding: 0.85rem;
       overflow-y: auto;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.5rem;
     }
 
     .ticket-row-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
-      background: #f8fafc;
+      gap: 0.65rem;
+      background-color: var(--bg-main);
       border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 0.75rem 1rem;
-      transition: all 0.2s;
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 0.85rem;
+      transition: all 0.15s ease;
     }
 
     .ticket-row-card:hover {
-      background: #ffffff;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
-      border-color: var(--primary-200);
+      background-color: #ffffff;
+      border-color: #cbd5e1;
+      box-shadow: var(--shadow-xs);
     }
 
     .emergency-row {
-      background: #fff1f2;
+      background-color: #fff1f2;
       border-color: #fecdd3;
     }
 
     .skipped-row {
-      background: #faf5ff;
-      border-color: #f3e8ff;
+      background-color: #fffbeb;
+      border-color: #fde68a;
     }
 
     .row-order {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.5rem;
     }
 
     .order-idx {
-      font-size: 0.85rem;
-      font-weight: 800;
+      font-size: 0.8rem;
+      font-weight: 700;
       color: var(--text-muted);
-      width: 24px;
+      width: 22px;
     }
 
     .row-ticket-num {
       font-family: monospace;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 800;
       color: var(--primary-700);
     }
@@ -895,8 +899,8 @@ import { RouterLink } from '@angular/router';
     .row-patient-name {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
-      font-size: 0.95rem;
+      gap: 0.35rem;
+      font-size: 0.9rem;
       color: var(--text-main);
       flex-wrap: wrap;
     }
@@ -904,132 +908,62 @@ import { RouterLink } from '@angular/router';
     .row-patient-meta {
       font-size: 0.75rem;
       color: var(--text-muted);
-      margin-top: 0.2rem;
+      margin-top: 0.15rem;
       display: flex;
-      gap: 0.4rem;
+      gap: 0.35rem;
     }
 
     .badge-emergency {
-      background: #ef4444;
+      background-color: var(--danger-solid);
       color: #ffffff;
-      font-size: 0.7rem;
+      font-size: 0.675rem;
       font-weight: 800;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
     }
 
     .badge-priority {
-      background: #fef08a;
+      background-color: #fef08a;
       color: #854d0e;
-      font-size: 0.7rem;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
+      font-size: 0.675rem;
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
     }
 
     .badge-booked {
-      background: #e0f2fe;
-      color: #0369a1;
-      font-size: 0.7rem;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
+      background-color: var(--primary-100);
+      color: var(--primary-800);
+      font-size: 0.675rem;
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
     }
 
     .badge-skipped {
-      background: #fee2e2;
-      color: #991b1b;
-      font-size: 0.75rem;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
+      background-color: var(--danger-bg);
+      color: var(--danger-solid);
+      font-size: 0.7rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
     }
 
     .empty-list-state {
       text-align: center;
-      padding: 3rem 1rem;
+      padding: 2.5rem 1rem;
       color: var(--text-muted);
     }
 
     .empty-list-state i {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
+      font-size: 2.2rem;
+      margin-bottom: 0.4rem;
       display: block;
-    }
-
-    /* Modal Check-In */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1050;
-      padding: 1rem;
-    }
-
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      width: 100%;
-      max-width: 540px;
-      overflow: hidden;
-      animation: modalFadeIn 0.2s ease-out;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .modal-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .modal-close-btn {
-      background: none;
-      border: none;
-      font-size: 1.75rem;
-      line-height: 1;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-
-    .modal-footer {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
     }
 
     .checkbox-group {
       margin-bottom: 1rem;
-      padding: 0.75rem;
-      background: #fff1f2;
+      padding: 0.65rem 0.85rem;
+      background-color: #fff1f2;
       border: 1px solid #fecdd3;
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-sm);
     }
 
     .checkbox-label {
@@ -1037,30 +971,25 @@ import { RouterLink } from '@angular/router';
       align-items: center;
       gap: 0.5rem;
       cursor: pointer;
+      font-size: 0.875rem;
     }
 
     .font-bold { font-weight: 700; }
-    .text-danger { color: #dc2626; }
-    .text-success { color: #16a34a; }
+    .text-danger { color: var(--danger-solid); }
+    .text-success { color: var(--success-solid); }
+    .text-primary { color: var(--primary-600); }
 
-    .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .form-row { display: flex; gap: 0.85rem; margin-bottom: 0.85rem; }
     .flex-1 { flex: 1; }
-    .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
-    .form-label { font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem; }
-    .form-label.required::after { content: ' *'; color: var(--rose-600); }
-    .form-control { padding: 0.65rem 0.85rem; font-size: 0.95rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
-    .form-control:focus { outline: none; border-color: var(--primary-600); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
-    .form-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
-
-    .alert { padding: 0.85rem 1.25rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
-    .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-    .alert-danger { background: #fff1f2; color: #9f1239; border: 1px solid #fecdd3; }
-    .alert-close { margin-left: auto; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: inherit; }
   `]
 })
 export class QueueControlComponent implements OnInit, OnDestroy {
   private readonly queueService = inject(QueueService);
   private readonly scheduleService = inject(ScheduleService);
+  readonly authService = inject(AuthService);
+
+  readonly isDoctor = computed(() => this.authService.hasRole('DOCTOR'));
+  readonly isStaff = computed(() => this.authService.hasRole('STAFF'));
 
   readonly rooms = signal<ExaminationRoom[]>([]);
   readonly selectedRoomId = signal<number>(1);
@@ -1088,7 +1017,6 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadRooms();
-    // Bắt đầu chu kỳ polling cập nhật thời gian thực mỗi 3 giây
     this.pollingTimer = setInterval(() => {
       if (this.selectedRoomId()) {
         this.fetchOverview(false);
@@ -1164,6 +1092,12 @@ export class QueueControlComponent implements OnInit, OnDestroy {
     });
   }
 
+  onOpenExamination(ticket: QueueTicket): void {
+    try {
+      sessionStorage.setItem('currentExaminingTicket', JSON.stringify(ticket));
+    } catch {}
+  }
+
   completeExam(ticketId: number): void {
     this.queueService.completeExamination(ticketId).subscribe({
       next: () => {
@@ -1223,11 +1157,38 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   }
 
   isCheckInValid(): boolean {
-    return !!(this.checkInForm.patientName?.trim() && this.checkInForm.patientPhone?.trim());
+    return !!(this.checkInForm.patientName?.trim() && this.checkInForm.patientPhone?.trim() && this.checkInForm.examinationRoomId);
   }
 
   submitCheckIn(): void {
-    if (!this.isCheckInValid()) return;
+    if (!this.checkInForm.patientName?.trim()) {
+      this.showAlert('Vui lòng nhập họ và tên người bệnh!', 'danger');
+      return;
+    }
+
+    if (!this.checkInForm.patientPhone?.trim()) {
+      this.showAlert('Vui lòng nhập số điện thoại người bệnh!', 'danger');
+      return;
+    }
+
+    const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/;
+    if (!phoneRegex.test(this.checkInForm.patientPhone.trim())) {
+      this.showAlert('Số điện thoại không hợp lệ (cần 10 chữ số, VD: 0912345678)!', 'danger');
+      return;
+    }
+
+    if (!this.checkInForm.examinationRoomId) {
+      this.showAlert('Vui lòng chọn phòng khám tiếp nhận!', 'danger');
+      return;
+    }
+
+    if (this.checkInForm.patientYearOfBirth) {
+      const currentYear = new Date().getFullYear();
+      if (this.checkInForm.patientYearOfBirth < 1900 || this.checkInForm.patientYearOfBirth > currentYear) {
+        this.showAlert(`Năm sinh không hợp lệ (từ 1900 đến ${currentYear})!`, 'danger');
+        return;
+      }
+    }
 
     this.submittingCheckIn.set(true);
     this.queueService.checkIn(this.checkInForm).subscribe({

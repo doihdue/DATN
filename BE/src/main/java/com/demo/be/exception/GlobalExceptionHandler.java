@@ -40,10 +40,15 @@ public class GlobalExceptionHandler {
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             errors.put(error.getField(), error.getDefaultMessage());
         }
+        String detailedMessage = errors.values().stream()
+                .filter(msg -> msg != null && !msg.isBlank())
+                .reduce((m1, m2) -> m1 + "; " + m2)
+                .orElse("Dữ liệu đầu vào không hợp lệ");
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.<Map<String, String>>builder()
                         .success(false)
-                        .message("Dữ liệu đầu vào không hợp lệ")
+                        .message(detailedMessage)
                         .data(errors)
                         .build());
     }
