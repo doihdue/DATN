@@ -23,7 +23,7 @@ public class MedicalRecordController {
 
     // 1. Bác sĩ lập hồ sơ bệnh án & Kê đơn thuốc & Hẹn ngày tái khám
     @PostMapping
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<MedicalRecordResponse>> createMedicalRecord(
             @Valid @RequestBody CreateMedicalRecordRequest request) {
         MedicalRecordResponse res = medicalRecordService.createMedicalRecord(request);
@@ -49,7 +49,6 @@ public class MedicalRecordController {
 
     // 4. Bác sĩ xem tiền sử bệnh của bệnh nhân (Lịch sử các lần khám trước)
     @GetMapping("/patient/{patientId}/history")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'STAFF', 'ADMIN', 'PATIENT')")
     public ResponseEntity<ApiResponse<PatientMedicalHistoryResponse>> getPatientHistory(@PathVariable Long patientId) {
         PatientMedicalHistoryResponse history = medicalRecordService.getPatientMedicalHistory(patientId);
         return ResponseEntity.ok(ApiResponse.success(history, "Lấy tiền sử bệnh của bệnh nhân thành công"));
@@ -57,7 +56,7 @@ public class MedicalRecordController {
 
     // 5. Lấy danh sách bệnh án do bác sĩ đã khám
     @GetMapping("/doctor/{doctorId}")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<List<MedicalRecordResponse>>> getRecordsByDoctor(@PathVariable Long doctorId) {
         List<MedicalRecordResponse> list = medicalRecordService.getRecordsByDoctorId(doctorId);
         return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách bệnh án của bác sĩ thành công"));

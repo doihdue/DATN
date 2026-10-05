@@ -1,8 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScheduleService } from '../../services/schedule.service';
 import { SpecialtyService } from '../../services/specialty.service';
+import { AuthService } from '../../services/auth.service';
 import { ExaminationRoom, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
 
@@ -16,18 +17,23 @@ import { Specialty } from '../../models/specialty.model';
       <div class="page-header">
         <div class="header-left">
           <div class="header-badge">
-            <i class="bi bi-calendar-check-fill"></i> Tầng Kế Hoạch & Xếp Lịch
+            <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
+            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : 'Lịch Trực Ca Bác Sĩ' }}
           </div>
-          <h1 class="page-title">Quản Lý Lịch Làm Việc Bác Sĩ</h1>
+          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc Bác Sĩ' : 'Danh Sách Ca Làm Việc & Trực Khám' }}</h1>
           <p class="page-subtitle">
-            Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám
+            {{ isAdmin() 
+              ? 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' 
+              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân đã tiếp nhận' }}
           </p>
         </div>
-        <div class="header-actions">
-          <button class="btn btn-primary" (click)="openAddModal()">
-            <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực Mới
-          </button>
-        </div>
+        @if (isAdmin()) {
+          <div class="header-actions">
+            <button class="btn btn-primary" (click)="openAddModal()">
+              <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực Mới
+            </button>
+          </div>
+        }
       </div>
 
       <!-- Filters Bar -->
@@ -84,12 +90,21 @@ import { Specialty } from '../../models/specialty.model';
         </div>
       </div>
 
-      <!-- Feedback Alerts -->
+      <!-- Feedback Alerts (Top-Right Floating Toast) -->
       @if (alertMessage()) {
-        <div class="alert" [ngClass]="alertType() === 'success' ? 'alert-success' : 'alert-danger'">
-          <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-          <span>{{ alertMessage() }}</span>
-          <button type="button" class="alert-close" (click)="alertMessage.set(null)">×</button>
+        <div class="toast-floating-container">
+          <div class="toast-card" [ngClass]="alertType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
+            <div class="toast-icon">
+              <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+            </div>
+            <div class="toast-content">
+              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo' }}</div>
+              <div class="toast-message">{{ alertMessage() }}</div>
+            </div>
+            <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo" aria-label="Đóng">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       }
 
@@ -116,7 +131,9 @@ import { Specialty } from '../../models/specialty.model';
                 <th>Phòng khám</th>
                 <th>Lượng bệnh nhân (Đã đặt / Tối đa)</th>
                 <th>Trạng thái</th>
-                <th class="text-right">Thao tác</th>
+                @if (isAdmin()) {
+                  <th class="text-right">Thao tác</th>
+                }
               </tr>
             </thead>
             <tbody>
@@ -165,18 +182,20 @@ import { Specialty } from '../../models/specialty.model';
                       {{ getStatusDisplayName(item.status) }}
                     </span>
                   </td>
-                  <td class="text-right">
-                    <div class="row-actions">
-                      @if (item.status !== 'CANCELLED') {
-                        <button class="btn btn-sm btn-outline-warning" (click)="cancelSchedule(item)" title="Hủy ca trực">
-                          <i class="bi bi-x-circle"></i> Hủy
+                  @if (isAdmin()) {
+                    <td class="text-right">
+                      <div class="row-actions">
+                        @if (item.status !== 'CANCELLED') {
+                          <button class="btn btn-sm btn-outline-warning" (click)="cancelSchedule(item)" title="Hủy ca trực">
+                            <i class="bi bi-x-circle"></i> Hủy
+                          </button>
+                        }
+                        <button class="btn btn-sm btn-outline-danger" (click)="deleteSchedule(item)" title="Xóa ca">
+                          <i class="bi bi-trash3"></i>
                         </button>
-                      }
-                      <button class="btn btn-sm btn-outline-danger" (click)="deleteSchedule(item)" title="Xóa ca">
-                        <i class="bi bi-trash3"></i>
-                      </button>
-                    </div>
-                  </td>
+                      </div>
+                    </td>
+                  }
                 </tr>
               }
             </tbody>
@@ -688,6 +707,10 @@ import { Specialty } from '../../models/specialty.model';
 export class SchedulesComponent implements OnInit {
   private readonly scheduleService = inject(ScheduleService);
   private readonly specialtyService = inject(SpecialtyService);
+  readonly authService = inject(AuthService);
+
+  readonly isAdmin = computed(() => this.authService.hasRole('ADMIN'));
+  readonly isDoctor = computed(() => this.authService.hasRole('DOCTOR'));
 
   readonly schedules = signal<WorkSchedule[]>([]);
   readonly rooms = signal<ExaminationRoom[]>([]);
@@ -831,7 +854,40 @@ export class SchedulesComponent implements OnInit {
   }
 
   saveSchedule(): void {
-    if (!this.isFormValid()) return;
+    if (!this.formData.doctorId) {
+      this.showAlert('Vui lòng chọn bác sĩ phụ trách ca trực!', 'danger');
+      return;
+    }
+
+    if (!this.formData.examinationRoomId) {
+      this.showAlert('Vui lòng chọn phòng khám!', 'danger');
+      return;
+    }
+
+    if (!this.formData.workDate) {
+      this.showAlert('Vui lòng chọn ngày làm việc!', 'danger');
+      return;
+    }
+
+    if (!this.formData.startTime) {
+      this.showAlert('Vui lòng chọn giờ bắt đầu ca trực!', 'danger');
+      return;
+    }
+
+    if (!this.formData.endTime) {
+      this.showAlert('Vui lòng chọn giờ kết thúc ca trực!', 'danger');
+      return;
+    }
+
+    if (this.formData.startTime >= this.formData.endTime) {
+      this.showAlert('Giờ kết thúc ca trực phải sau giờ bắt đầu!', 'danger');
+      return;
+    }
+
+    if (!this.formData.maxPatients || this.formData.maxPatients <= 0) {
+      this.showAlert('Số lượng bệnh nhân tiếp nhận tối đa phải lớn hơn 0!', 'danger');
+      return;
+    }
 
     this.submitting.set(true);
     this.scheduleService.createSchedule(this.formData).subscribe({

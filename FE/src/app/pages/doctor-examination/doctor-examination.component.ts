@@ -109,6 +109,29 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   completedRecord = signal<MedicalRecordResponse | null>(null);
   showPrintModal = signal<boolean>(false);
 
+  // Quản lý trạng thái lỗi validation của các trường nhập liệu
+  validationErrors: Record<string, boolean> = {};
+
+  clearFieldError(fieldName: string): void {
+    if (this.validationErrors[fieldName]) {
+      this.validationErrors[fieldName] = false;
+    }
+  }
+
+  isFieldInvalid(fieldName: string): boolean {
+    return !!this.validationErrors[fieldName];
+  }
+
+  focusAndScrollToField(elementId: string): void {
+    setTimeout(() => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+      }
+    }, 80);
+  }
+
   // Chẩn đoán nhanh mẫu
   readonly commonDiagnoses = [
     { title: 'Viêm họng cấp', icd: 'J02.9', notes: 'Súc họng nước muối, giữ ấm cổ' },
@@ -120,12 +143,37 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit(): void {
-    // Đọc ticketId từ URL (nếu có)
+    if (!this.authService.hasRole('DOCTOR')) {
+      this.router.navigate(['/']);
+      return;
+    }
+
+    // 0. Đọc ngay từ router state hoặc sessionStorage (nếu vừa chuyển từ màn điều phối)
+    const stateTicket = history.state?.ticket;
+    if (stateTicket) {
+      this.currentTicket.set(stateTicket);
+      if (stateTicket.id) this.ticketId.set(stateTicket.id);
+      if (stateTicket.patientId) this.loadPatientHistory(stateTicket.patientId);
+    } else {
+      try {
+        const saved = sessionStorage.getItem('currentExaminingTicket');
+        if (saved) {
+          const t = JSON.parse(saved);
+          this.currentTicket.set(t);
+          if (t.id) this.ticketId.set(t.id);
+          if (t.patientId) this.loadPatientHistory(t.patientId);
+        }
+      } catch {}
+    }
+
+    // Đọc ticketId từ URL (nếu có) để gọi API lấy dữ liệu mới nhất
     this.route.paramMap.subscribe(params => {
       const idParam = params.get('ticketId');
       if (idParam) {
         this.ticketId.set(+idParam);
         this.loadTicketInfo(+idParam);
+      } else if (!this.currentTicket()) {
+        this.loadActiveExaminingTicket();
       }
     });
 
@@ -137,11 +185,11 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   loadTicketInfo(id: number): void {
     this.loading.set(true);
-    // Tra cứu vé từ API tra cứu phiếu
-    this.queueService.getMyTicketStatus(id.toString()).subscribe({
+    // 1. Gọi API lấy chính xác vé khám theo Ticket ID
+    this.queueService.getTicketById(id).subscribe({
       next: res => {
         if (res.data) {
-          const t: any = res.data;
+          const t: QueueTicket = res.data;
           this.currentTicket.set(t);
           if (t.patientId) {
             this.loadPatientHistory(t.patientId);
@@ -150,9 +198,76 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       },
       error: () => {
-        // Fallback: nếu gọi theo số phiếu thất bại, thử lấy theo overview phòng
-        this.loading.set(false);
+        // Fallback nếu gọi ID thất bại: lấy số vé đang khám từ display board
+        this.fallbackToDisplayBoard();
       }
+    });
+  }
+
+  loadActiveExaminingTicket(): void {
+    this.loading.set(true);
+    // Tra cứu danh sách ca khám hiện tại của phòng 1
+    this.queueService.getRoomQueue(1).subscribe({
+      next: res => {
+        if (res.data) {
+          const overview = res.data;
+          const activeTicket = overview.currentExaminingTicket || overview.currentCalledTicket || (overview.waitingTickets && overview.waitingTickets[0]);
+          if (activeTicket) {
+            this.ticketId.set(activeTicket.id);
+            this.currentTicket.set(activeTicket);
+            if (activeTicket.patientId) {
+              this.loadPatientHistory(activeTicket.patientId);
+            }
+            this.loading.set(false);
+            return;
+          }
+        }
+        this.fallbackToDisplayBoard();
+      },
+      error: () => this.fallbackToDisplayBoard()
+    });
+  }
+
+  fallbackToDisplayBoard(): void {
+    this.queueService.getDisplayBoard().subscribe({
+      next: boardRes => {
+        if (boardRes.data && boardRes.data.length > 0) {
+          const room1 = boardRes.data.find(r => r.roomId === 1) || boardRes.data[0];
+          const ticketNum = room1?.currentExaminingTicketNumber || room1?.currentCalledTicketNumber;
+          if (ticketNum && ticketNum !== '--') {
+            this.queueService.getMyTicketStatus(ticketNum).subscribe({
+              next: statusRes => {
+                if (statusRes.data) {
+                  const s = statusRes.data;
+                  this.currentTicket.set({
+                    id: this.ticketId() || 1,
+                    ticketNumber: s.ticketNumber,
+                    ticketDate: s.ticketDate,
+                    patientName: s.patientName,
+                    patientPhone: '',
+                    isEmergency: false,
+                    hasAppointment: false,
+                    priorityScore: s.priorityScore,
+                    status: s.status as any,
+                    checkInTime: s.checkInTime || '',
+                    estimatedWaitingMinutes: s.estimatedWaitingMinutes,
+                    examinationRoomId: s.roomId || 1,
+                    roomNumber: s.roomNumber || '',
+                    roomName: s.roomName || '',
+                    doctorName: s.doctorName,
+                    specialtyName: s.specialtyName
+                  });
+                }
+                this.loading.set(false);
+              },
+              error: () => this.loading.set(false)
+            });
+            return;
+          }
+        }
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
     });
   }
 
@@ -236,6 +351,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
     this.medicineSearchKeyword = '';
     this.showMedicineDropdown.set(false);
+    this.clearFieldError('prescribedItems');
 
     if (hasAllergy) {
       this.showAlert(`⚠️ CẢNH BÁO: Bệnh nhân có tiền sử dị ứng liên quan tới thuốc "${med.name}"!`, 'danger');
@@ -250,6 +366,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   applyQuickDiagnosis(diag: { title: string; icd: string; notes: string }): void {
     this.finalDiagnosis = diag.title;
     this.icd10Code = diag.icd;
+    this.clearFieldError('finalDiagnosis');
     if (!this.notes) {
       this.notes = diag.notes;
     }
@@ -261,6 +378,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     d.setDate(d.getDate() + days);
     this.revisitDate = d.toISOString().split('T')[0];
     this.hasRevisit = true;
+    this.clearFieldError('revisitDate');
     if (!this.revisitNotes) {
       this.revisitNotes = `Tái khám sau ${days} ngày để đánh giá đáp ứng điều trị.`;
     }
@@ -268,12 +386,64 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   // Gửi hồ sơ khám bệnh về BE
   saveExamination(): void {
-    if (!this.symptoms.trim()) {
-      this.showAlert('Vui lòng nhập triệu chứng lâm sàng của bệnh nhân!', 'danger');
-      return;
+    this.validationErrors = {};
+    const missingFields: string[] = [];
+    let firstInvalidElementId: string | null = null;
+
+    // 1. Kiểm tra Triệu chứng lâm sàng
+    if (!this.symptoms || !this.symptoms.trim()) {
+      this.validationErrors['symptoms'] = true;
+      missingFields.push('Triệu chứng lâm sàng');
+      if (!firstInvalidElementId) firstInvalidElementId = 'symptomsField';
     }
-    if (!this.finalDiagnosis.trim()) {
-      this.showAlert('Vui lòng nhập chẩn đoán xác định bệnh!', 'danger');
+
+    // 2. Kiểm tra Chẩn đoán xác định bệnh
+    if (!this.finalDiagnosis || !this.finalDiagnosis.trim()) {
+      this.validationErrors['finalDiagnosis'] = true;
+      missingFields.push('Chẩn đoán xác định bệnh');
+      if (!firstInvalidElementId) firstInvalidElementId = 'finalDiagnosisField';
+    }
+
+    // 3. Kiểm tra Ngày hẹn tái khám (nếu bật hẹn tái khám)
+    if (this.hasRevisit && !this.revisitDate) {
+      this.validationErrors['revisitDate'] = true;
+      missingFields.push('Ngày hẹn tái khám');
+      if (!firstInvalidElementId) firstInvalidElementId = 'revisitDateField';
+    }
+
+    // 4. Kiểm tra Đơn thuốc (nếu bật kê đơn thuốc điện tử)
+    if (this.hasPrescription) {
+      if (this.prescribedItems.length === 0) {
+        this.validationErrors['prescribedItems'] = true;
+        missingFields.push('Thuốc kê đơn');
+        if (!firstInvalidElementId) firstInvalidElementId = 'medicineSearchInput';
+      } else {
+        for (let i = 0; i < this.prescribedItems.length; i++) {
+          const item = this.prescribedItems[i];
+          if (!item.quantity || item.quantity <= 0) {
+            this.validationErrors[`item_qty_${i}`] = true;
+            missingFields.push(`Số lượng (${item._medicineName})`);
+            if (!firstInvalidElementId) firstInvalidElementId = `item_qty_${i}`;
+          }
+          if (!item.dosage || !item.dosage.trim()) {
+            this.validationErrors[`item_dosage_${i}`] = true;
+            missingFields.push(`Liều dùng (${item._medicineName})`);
+            if (!firstInvalidElementId) firstInvalidElementId = `item_dosage_${i}`;
+          }
+        }
+      }
+    }
+
+    // Nếu có bất kỳ lỗi nào, thông báo và dừng lại (tất cả các ô lỗi đều đã được bôi đỏ cùng lúc)
+    if (missingFields.length > 0) {
+      if (missingFields.length === 1) {
+        this.showAlert(`Vui lòng hoàn thiện: ${missingFields[0]}!`, 'danger');
+      } else {
+        this.showAlert(`Có ${missingFields.length} thông tin bắt buộc chưa hợp lệ! Vui lòng điền các ô được bôi đỏ.`, 'danger');
+      }
+      if (firstInvalidElementId) {
+        this.focusAndScrollToField(firstInvalidElementId);
+      }
       return;
     }
 

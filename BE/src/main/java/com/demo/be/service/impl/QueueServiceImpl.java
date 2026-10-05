@@ -68,6 +68,32 @@ public class QueueServiceImpl implements QueueService {
         if (request.getPatientId() != null) {
             patient = patientRepository.findById(request.getPatientId()).orElse(null);
         }
+        if (patient == null && request.getPatientName() != null && !request.getPatientName().trim().isEmpty()) {
+            List<Patient> allPatients = patientRepository.findAll();
+            for (Patient p : allPatients) {
+                if (p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(request.getPatientName().trim())) {
+                    patient = p;
+                    break;
+                }
+                if (request.getPatientPhone() != null && request.getPatientPhone().trim().equals(p.getPhoneNumber())) {
+                    patient = p;
+                    break;
+                }
+            }
+            if (patient == null) {
+                LocalDate dob = request.getPatientYearOfBirth() != null
+                        ? LocalDate.of(request.getPatientYearOfBirth(), 1, 1)
+                        : null;
+                patient = Patient.builder()
+                        .fullName(request.getPatientName().trim())
+                        .gender("Chưa rõ")
+                        .dateOfBirth(dob)
+                        .emergencyContactPhone(request.getPatientPhone())
+                        .bloodGroup(null)
+                        .build();
+                patient = patientRepository.save(patient);
+            }
+        }
 
         // Sinh số thứ tự vé khám theo định dạng [Mã phòng]-[Số thứ tự trong ngày]
         // Ví dụ: P.101 -> P101-001, P101-002
@@ -231,6 +257,46 @@ public class QueueServiceImpl implements QueueService {
 
         broadcastQueueEvent("TICKET_EMERGENCY", saved, "Ưu tiên cấp cứu số " + saved.getTicketNumber());
         return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public QueueTicketResponse getTicketById(Long ticketId) {
+        QueueTicket ticket = queueTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+
+        // Tự động liên kết hoặc tạo hồ sơ bệnh nhân nếu vé chưa có patient
+        if (ticket.getPatient() == null && ticket.getPatientName() != null && !ticket.getPatientName().trim().isEmpty()) {
+            Patient matchedPatient = null;
+            List<Patient> allPatients = patientRepository.findAll();
+            for (Patient p : allPatients) {
+                if (p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(ticket.getPatientName().trim())) {
+                    matchedPatient = p;
+                    break;
+                }
+                if (ticket.getPatientPhone() != null && ticket.getPatientPhone().trim().equals(p.getPhoneNumber())) {
+                    matchedPatient = p;
+                    break;
+                }
+            }
+            if (matchedPatient == null) {
+                LocalDate dob = ticket.getPatientYearOfBirth() != null
+                        ? LocalDate.of(ticket.getPatientYearOfBirth(), 1, 1)
+                        : null;
+                matchedPatient = Patient.builder()
+                        .fullName(ticket.getPatientName().trim())
+                        .gender("Chưa rõ")
+                        .dateOfBirth(dob)
+                        .emergencyContactPhone(ticket.getPatientPhone())
+                        .bloodGroup(null)
+                        .build();
+                matchedPatient = patientRepository.save(matchedPatient);
+            }
+            ticket.setPatient(matchedPatient);
+            ticket = queueTicketRepository.save(ticket);
+        }
+
+        return mapToResponse(ticket);
     }
 
     @Override

@@ -29,6 +29,10 @@ export class QueueService {
     return this.http.get<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/my-ticket/${ticketNumber}`);
   }
 
+  getTicketById(ticketId: number): Observable<ApiResponse<QueueTicket>> {
+    return this.http.get<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}`);
+  }
+
   getRoomQueue(roomId: number): Observable<ApiResponse<RoomQueueOverview>> {
     return this.http.get<ApiResponse<RoomQueueOverview>>(`${this.baseUrl}/room/${roomId}`);
   }

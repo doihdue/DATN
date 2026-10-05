@@ -348,11 +348,12 @@ import { ExaminationRoom } from '../../models/schedule.model';
     }
 
     .banner-ticket-num {
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, monospace;
       font-size: 2.75rem;
       font-weight: 900;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.03em;
       line-height: 1;
+      font-variant-numeric: tabular-nums;
     }
 
     .queue-metrics-row {
@@ -375,6 +376,7 @@ import { ExaminationRoom } from '../../models/schedule.model';
       font-weight: 900;
       color: var(--text-main);
       line-height: 1.1;
+      font-variant-numeric: tabular-nums;
     }
 
     .metric-text {
@@ -390,7 +392,8 @@ import { ExaminationRoom } from '../../models/schedule.model';
 
     .called-callout {
       background: #fef3c7;
-      border: 2px dashed #f59e0b;
+      border: 1px solid #f59e0b;
+      border-radius: var(--radius-md);
       padding: 1.25rem 2rem;
       display: flex;
       align-items: center;
@@ -399,9 +402,8 @@ import { ExaminationRoom } from '../../models/schedule.model';
     }
 
     .called-callout i {
-      font-size: 2.5rem;
+      font-size: 2.25rem;
       color: #d97706;
-      animation: ringing 1.5s infinite;
     }
 
     .called-callout h3 {

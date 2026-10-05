@@ -14,47 +14,47 @@ import { AuthService } from '../../services/auth.service';
         <!-- Brand Section -->
         <div class="login-brand">
           <div class="brand-badge">
-            <i class="bi bi-shield-lock-fill"></i> Cổng Xác Thực Hệ Thống
+            <i class="bi bi-shield-check"></i> Cổng Xác Thực Hệ Thống
           </div>
           <h1 class="login-title">Đăng Nhập MedQueue</h1>
           <p class="login-subtitle">
-            Hệ thống đặt lịch khám bệnh trực tuyến & quản lý điều phối hàng đợi thông minh
+            Hệ thống đặt lịch khám bệnh trực tuyến &amp; điều phối hàng đợi y tế thông minh
           </p>
         </div>
 
-        <!-- Glassmorphism Card -->
-        <div class="glass-card login-card">
+        <!-- Clinical Card -->
+        <div class="medical-card login-card">
           <!-- Quick Accounts Picker for Easy Demo -->
           <div class="quick-demo-box">
             <span class="quick-demo-label">
-              <i class="bi bi-lightning-charge-fill"></i> Chọn nhanh tài khoản mẫu để test:
+              <i class="bi bi-person-badge"></i> Tài khoản mẫu dùng thử:
             </span>
             <div class="quick-chips">
-              <button type="button" class="chip" (click)="fillAccount('patient_nam', 'Patient@123456')">
+              <button type="button" class="chip-item" (click)="fillAccount('patient_nam', 'Patient@123456')">
                 <i class="bi bi-person-fill text-blue"></i> Bệnh nhân
               </button>
-              <button type="button" class="chip" (click)="fillAccount('doctor_hung', 'Doctor@123456')">
+              <button type="button" class="chip-item" (click)="fillAccount('doctor_hung', 'Doctor@123456')">
                 <i class="bi bi-heart-pulse-fill text-green"></i> Bác sĩ
               </button>
-              <button type="button" class="chip" (click)="fillAccount('staff_mai', 'Staff@123456')">
+              <button type="button" class="chip-item" (click)="fillAccount('staff_mai', 'Staff@123456')">
                 <i class="bi bi-person-badge-fill text-amber"></i> Lễ tân
               </button>
-              <button type="button" class="chip" (click)="fillAccount('admin', 'Admin@123456')">
-                <i class="bi bi-shield-check text-purple"></i> Admin
+              <button type="button" class="chip-item" (click)="fillAccount('admin', 'Admin@123456')">
+                <i class="bi bi-shield-lock-fill text-purple"></i> Admin
               </button>
             </div>
           </div>
 
           <!-- Alert message -->
           @if (errorMessage()) {
-            <div class="alert-error">
+            <div class="alert alert-danger">
               <i class="bi bi-exclamation-triangle-fill"></i>
               <span>{{ errorMessage() }}</span>
             </div>
           }
 
           @if (successMessage()) {
-            <div class="alert-success">
+            <div class="alert alert-success">
               <i class="bi bi-check-circle-fill"></i>
               <span>{{ successMessage() }}</span>
             </div>
@@ -63,7 +63,7 @@ import { AuthService } from '../../services/auth.service';
           <form (ngSubmit)="onSubmit()" class="login-form">
             <!-- Username or Email -->
             <div class="form-group">
-              <label class="form-label" for="username">Tên đăng nhập hoặc Email</label>
+              <label class="form-label required" for="username">Tên đăng nhập hoặc Email</label>
               <div class="input-wrapper">
                 <i class="bi bi-person input-icon"></i>
                 <input
@@ -72,7 +72,7 @@ import { AuthService } from '../../services/auth.service';
                   class="form-control"
                   [(ngModel)]="username"
                   name="username"
-                  placeholder="Nhập username hoặc email..."
+                  placeholder="Nhập tên tài khoản hoặc email..."
                   required
                 />
               </div>
@@ -81,7 +81,7 @@ import { AuthService } from '../../services/auth.service';
             <!-- Password -->
             <div class="form-group">
               <div class="label-row">
-                <label class="form-label" for="password">Mật khẩu</label>
+                <label class="form-label required" for="password">Mật khẩu</label>
                 <a href="javascript:void(0)" class="forgot-link">Quên mật khẩu?</a>
               </div>
               <div class="input-wrapper">
@@ -113,9 +113,9 @@ import { AuthService } from '../../services/auth.service';
               [disabled]="isLoading() || !username || !password"
             >
               @if (isLoading()) {
-                <span class="spinner"></span> Đang xác thực...
+                <span class="spinner-sm"></span> Đang xác thực...
               } @else {
-                <i class="bi bi-box-arrow-in-right"></i> Đăng nhập ngay
+                <i class="bi bi-box-arrow-in-right"></i> Đăng Nhập
               }
             </button>
           </form>
@@ -131,20 +131,20 @@ import { AuthService } from '../../services/auth.service';
   `,
   styles: [`
     .login-wrapper {
-      min-height: calc(100vh - 80px);
+      min-height: calc(100vh - 120px);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 2.5rem 1rem;
-      background: radial-gradient(circle at 10% 20%, rgba(224, 242, 254, 0.6) 0%, rgba(248, 250, 252, 0.95) 80%);
+      background-color: var(--bg-main);
     }
 
     .login-container {
       width: 100%;
-      max-width: 480px;
+      max-width: 460px;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
 
     .login-brand {
@@ -154,52 +154,57 @@ import { AuthService } from '../../services/auth.service';
     .brand-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      background: #e0f2fe;
+      gap: 0.35rem;
+      background-color: var(--primary-50);
       color: var(--primary-700);
-      font-size: 0.8rem;
+      font-size: 0.775rem;
       font-weight: 700;
-      padding: 0.35rem 0.85rem;
+      padding: 0.3rem 0.8rem;
       border-radius: var(--radius-full);
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.6rem;
+      border: 1px solid var(--primary-200);
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
 
     .login-title {
-      font-size: 2rem;
+      font-size: 1.85rem;
       font-weight: 800;
-      color: var(--primary-900);
-      letter-spacing: -0.03em;
-      margin-bottom: 0.5rem;
+      color: var(--primary-950);
+      letter-spacing: -0.01em;
+      margin-bottom: 0.35rem;
     }
 
     .login-subtitle {
-      font-size: 0.9rem;
+      font-size: 0.885rem;
       color: var(--text-muted);
-      line-height: 1.4;
-      max-width: 400px;
+      line-height: 1.45;
+      max-width: 380px;
       margin: 0 auto;
     }
 
     .login-card {
-      padding: 2.25rem 2rem;
+      padding: 2rem 2.25rem;
+      background-color: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
     }
 
     .quick-demo-box {
-      background: #f8fafc;
-      border: 1px dashed var(--primary-300);
-      border-radius: var(--radius-md);
-      padding: 0.85rem 1rem;
-      margin-bottom: 1.5rem;
+      background-color: var(--bg-subtle);
+      border: 1px dashed #cbd5e1;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 0.95rem;
+      margin-bottom: 1.25rem;
     }
 
     .quick-demo-label {
       display: block;
-      font-size: 0.8rem;
+      font-size: 0.775rem;
       font-weight: 700;
-      color: var(--primary-800);
-      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.45rem;
     }
 
     .quick-chips {
@@ -208,37 +213,48 @@ import { AuthService } from '../../services/auth.service';
       gap: 0.4rem;
     }
 
+    .chip-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background-color: #ffffff;
+      border: 1px solid var(--border-color);
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-xs);
+      font-size: 0.785rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip-item:hover {
+      background-color: var(--primary-50);
+      border-color: var(--primary-300);
+      color: var(--primary-700);
+    }
+
     .text-blue { color: #0284c7; }
     .text-green { color: #16a34a; }
     .text-amber { color: #d97706; }
     .text-purple { color: #9333ea; }
 
-    .alert-error {
-      background: #fee2e2;
-      border: 1px solid #fca5a5;
-      color: #991b1b;
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      font-weight: 600;
+    .input-wrapper {
+      position: relative;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
     }
 
-    .alert-success {
-      background: #dcfce7;
-      border: 1px solid #86efac;
-      color: #166534;
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
+    .input-icon {
+      position: absolute;
+      left: 0.85rem;
+      color: var(--text-light);
+      font-size: 1.05rem;
+      pointer-events: none;
+    }
+
+    .form-control {
+      padding-left: 2.5rem;
     }
 
     .label-row {
@@ -255,12 +271,14 @@ import { AuthService } from '../../services/auth.service';
 
     .toggle-pwd-btn {
       position: absolute;
-      right: 1rem;
+      right: 0.75rem;
       background: none;
       border: none;
       color: var(--text-light);
       cursor: pointer;
-      font-size: 1.1rem;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
     }
 
     .toggle-pwd-btn:hover {
@@ -269,38 +287,23 @@ import { AuthService } from '../../services/auth.service';
 
     .btn-submit {
       width: 100%;
-      padding: 0.875rem;
-      font-size: 1rem;
-      margin-top: 0.5rem;
-    }
-
-    .spinner {
-      width: 1rem;
-      height: 1rem;
-      border: 2px solid #ffffff;
-      border-bottom-color: transparent;
-      border-radius: 50%;
-      display: inline-block;
-      animation: rotation 1s linear infinite;
-    }
-
-    @keyframes rotation {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      padding: 0.75rem;
+      font-size: 0.95rem;
+      margin-top: 0.35rem;
     }
 
     .register-prompt {
       text-align: center;
-      font-size: 0.875rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
-      margin-top: 1.5rem;
-      padding-top: 1.25rem;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
       border-top: 1px solid var(--border-color);
     }
 
     .register-link {
-      font-weight: 700;
       color: var(--primary-600);
+      font-weight: 700;
       margin-left: 0.25rem;
     }
 
@@ -316,10 +319,11 @@ export class LoginComponent {
 
   username = '';
   password = '';
-  showPassword = signal(false);
-  isLoading = signal(false);
-  errorMessage = signal<string | null>(null);
-  successMessage = signal<string | null>(null);
+
+  readonly isLoading = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+  readonly successMessage = signal<string | null>(null);
+  readonly showPassword = signal(false);
 
   fillAccount(u: string, p: string): void {
     this.username = u;
@@ -334,18 +338,18 @@ export class LoginComponent {
     this.errorMessage.set(null);
 
     this.authService.login({ username: this.username, password: this.password }).subscribe({
-      next: (res) => {
+      next: res => {
         this.isLoading.set(false);
-        this.successMessage.set('Đăng nhập thành công! Đang chuyển hướng...');
-        const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
-        setTimeout(() => {
+        if (res.success) {
+          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
           this.router.navigateByUrl(returnUrl);
-        }, 600);
+        } else {
+          this.errorMessage.set(res.message || 'Đăng nhập không thành công');
+        }
       },
-      error: (err) => {
+      error: err => {
         this.isLoading.set(false);
-        const msg = err.error?.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.';
-        this.errorMessage.set(msg);
+        this.errorMessage.set(err.error?.message || 'Tài khoản hoặc mật khẩu không chính xác');
       }
     });
   }
