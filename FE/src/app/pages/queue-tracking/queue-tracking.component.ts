@@ -159,8 +159,8 @@ import { ExaminationRoom } from '../../models/schedule.model';
                 <input type="tel" [(ngModel)]="checkInForm.patientPhone" placeholder="0912345678" class="form-control" />
               </div>
               <div class="form-group flex-1">
-                <label class="form-label">Năm sinh</label>
-                <input type="number" [(ngModel)]="checkInForm.patientYearOfBirth" placeholder="1995" class="form-control" />
+                <label class="form-label">Ngày sinh (ngày/tháng/năm)</label>
+                <input type="date" [(ngModel)]="checkInForm.patientDob" [max]="todayString" class="form-control" />
               </div>
             </div>
 
@@ -501,9 +501,12 @@ export class QueueTrackingComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly rooms = signal<ExaminationRoom[]>([]);
 
+  readonly todayString = new Date().toISOString().split('T')[0];
+
   checkInForm: CheckInRequest = {
     patientName: '',
     patientPhone: '',
+    patientDob: '',
     patientYearOfBirth: undefined,
     examinationRoomId: 1,
     notes: ''
@@ -550,6 +553,11 @@ export class QueueTrackingComponent implements OnInit {
 
   submitOnlineCheckIn(): void {
     if (!this.checkInForm.patientName.trim() || !this.checkInForm.patientPhone.trim()) return;
+
+    if (this.checkInForm.patientDob) {
+      const dobDate = new Date(this.checkInForm.patientDob);
+      this.checkInForm.patientYearOfBirth = dobDate.getFullYear();
+    }
 
     this.submittingCheckIn.set(true);
     this.queueService.checkIn(this.checkInForm).subscribe({

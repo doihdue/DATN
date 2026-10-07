@@ -10,6 +10,8 @@ import lombok.*;
 @Builder
 public class MedicineRequest {
 
+    private String code;
+
     @NotBlank(message = "Tên thuốc không được để trống")
     private String name;
 
@@ -19,5 +21,19 @@ public class MedicineRequest {
 
     private String unit;
 
+    private Double price;
+
+    private String packaging;
+
+    private String routeOfAdministration;
+
+    private Integer stockQuantity;
+
+    private Boolean isActive;
+
+    private String contraindications;
+
     private String defaultUsageInstructions;
+
+    private Long categoryId;
 }

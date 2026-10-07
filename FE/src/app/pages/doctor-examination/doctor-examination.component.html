@@ -64,7 +64,7 @@
         </div>
         <div class="patient-details-row">
           <span><i class="bi bi-gender-ambiguous"></i> Giới tính: <strong>{{ patientHistory()?.gender || 'Chưa rõ' }}</strong></span>
-          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ patientHistory()?.dateOfBirth || (currentTicket()?.patientYearOfBirth ? ('Năm ' + currentTicket()?.patientYearOfBirth) : 'Đang cập nhật') }}</strong></span>
+          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ (patientHistory()?.dateOfBirth | date:'dd/MM/yyyy') || (currentTicket()?.patientDob | date:'dd/MM/yyyy') || (currentTicket()?.patientYearOfBirth ? ('Năm ' + currentTicket()?.patientYearOfBirth) : 'Đang cập nhật') }}</strong></span>
           <span><i class="bi bi-telephone"></i> SĐT: <strong>{{ currentTicket()?.patientPhone || patientHistory()?.phoneNumber || 'Chưa có' }}</strong></span>
           <span><i class="bi bi-droplet-half"></i> Nhóm máu: <strong class="text-danger">{{ patientHistory()?.bloodGroup || 'Chưa xác định' }}</strong></span>
         </div>
@@ -336,9 +336,39 @@
           <div class="card-body">
             <!-- Search & Select Medicine Box (Include Use Case) -->
             <div class="medicine-search-wrapper mb-3">
-              <label class="form-label font-weight-bold">
-                <i class="bi bi-search"></i> Tìm kiếm &amp; chọn thuốc («include»):
+              <label class="form-label font-weight-bold d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-search"></i> Tìm kiếm &amp; chọn thuốc («include»):</span>
+                @if (selectedMedicineCategoryId()) {
+                  <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 text-primary" (click)="selectCategoryFilter(null)">
+                    <i class="bi bi-x-circle"></i> Bỏ lọc nhóm
+                  </button>
+                }
               </label>
+
+              <!-- Category Pills Filter -->
+              @if (categoriesList().length > 0) {
+                <div class="category-pills-row">
+                  <button
+                    type="button"
+                    class="btn-pill"
+                    [class.active]="selectedMedicineCategoryId() === null"
+                    (click)="selectCategoryFilter(null)"
+                  >
+                    Tất cả ({{ medicinesList().length }})
+                  </button>
+                  @for (cat of categoriesList(); track cat.id) {
+                    <button
+                      type="button"
+                      class="btn-pill"
+                      [class.active]="selectedMedicineCategoryId() === cat.id"
+                      (click)="selectCategoryFilter(cat.id)"
+                    >
+                      {{ cat.name }}
+                    </button>
+                  }
+                </div>
+              }
+
               <div class="search-input-box position-relative" [class.is-invalid-wrapper]="validationErrors['prescribedItems']">
                 <input
                   id="medicineSearchInput"
@@ -360,11 +390,17 @@
                         <div class="med-item-main">
                           <span class="med-name">{{ med.name }}</span>
                           <span class="med-unit">({{ med.dosageForm }} - {{ med.unit }})</span>
+                          @if (med.categoryName) {
+                            <span class="badge bg-info-subtle text-info border border-info-subtle ms-2" style="font-size: 0.72rem; padding: 2px 6px;">{{ med.categoryName }}</span>
+                          }
+                          @if (med.price) {
+                            <span class="badge bg-success-subtle text-success border border-success-subtle ms-auto" style="font-size: 0.72rem; padding: 2px 6px;">{{ med.price | number:'1.0-0' }} đ</span>
+                          }
                         </div>
                         <div class="med-item-sub">
                           <span class="med-ingredient">Hoạt chất: {{ med.activeIngredient }}</span>
                           @if (med.defaultUsageInstructions) {
-                            <span class="med-usage">{{ med.defaultUsageInstructions }}</span>
+                            <span class="med-usage ms-2">• {{ med.defaultUsageInstructions }}</span>
                           }
                         </div>
                       </div>

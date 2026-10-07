@@ -8,6 +8,8 @@ import { QueueControlComponent } from './pages/queue-control/queue-control.compo
 import { QueueDisplayComponent } from './pages/queue-display/queue-display.component';
 import { QueueTrackingComponent } from './pages/queue-tracking/queue-tracking.component';
 import { DoctorExaminationComponent } from './pages/doctor-examination/doctor-examination.component';
+import { MedicinesComponent } from './pages/medicines/medicines.component';
+import { CheckInComponent } from './pages/check-in/check-in.component';
 import { roleGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -20,6 +22,14 @@ export const routes: Routes = [
     path: 'admin/specialties',
     component: SpecialtiesComponent,
     title: 'Quản lý Chuyên khoa - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+
+  // 1b. Quản lý Danh mục Thuốc & Dược phẩm - Dành riêng cho ADMIN
+  {
+    path: 'admin/medicines',
+    component: MedicinesComponent,
+    title: 'Quản lý Dược phẩm & Thuốc - MedQueue',
     canActivate: [roleGuard(['ADMIN'])]
   },
 
@@ -39,19 +49,20 @@ export const routes: Routes = [
     canActivate: [roleGuard(['DOCTOR'])]
   },
 
-  // 3. Điều phối Hàng đợi số (Queue Coordination)
-  // NHÂN VIÊN TIẾP ĐÓN điều phối hàng đợi & cấp số
+  // 3a. Tiếp Đón & Cấp Số Thứ Tự (Patient Reception & Check-in)
+  {
+    path: 'staff/check-in',
+    component: CheckInComponent,
+    title: 'Tiếp đón & Cấp số - MedQueue',
+    canActivate: [roleGuard(['STAFF', 'ADMIN'])]
+  },
+
+  // 3b. Điều phối Hàng đợi số (Queue Coordination & Load Balancing)
   {
     path: 'staff/queue',
     component: QueueControlComponent,
-    title: 'Bàn Điều phối Tiếp đón - MedQueue',
-    canActivate: [roleGuard(['STAFF'])]
-  },
-  {
-    path: 'staff/check-in',
-    component: QueueControlComponent,
-    title: 'Tiếp đón & Cấp số - MedQueue',
-    canActivate: [roleGuard(['STAFF'])]
+    title: 'Bàn Điều phối Hàng đợi - MedQueue',
+    canActivate: [roleGuard(['STAFF', 'ADMIN'])]
   },
   // BÁC SĨ gọi khám tại phòng khám
   {
