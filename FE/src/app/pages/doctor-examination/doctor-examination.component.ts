@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MedicalRecordService } from '../../services/medical-record.service';
+import { MedicineCategoryService } from '../../services/medicine-category.service';
 import { QueueService } from '../../services/queue.service';
 import { AuthService } from '../../services/auth.service';
 import {
@@ -12,12 +13,15 @@ import {
   MedicalRecordResponse,
   PatientMedicalHistoryResponse
 } from '../../models/medical-record.model';
+import { MedicineCategory } from '../../models/medicine-category.model';
 import { QueueTicket } from '../../models/queue.model';
 
 interface PrescribedItemUI extends PrescriptionItemRequest {
   _medicineName: string;
   _activeIngredient?: string;
   _unit: string;
+  _price?: number;
+  _categoryName?: string;
   _allergyWarning?: boolean;
 }
 
@@ -32,6 +36,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly medicalService = inject(MedicalRecordService);
+  private readonly categoryService = inject(MedicineCategoryService);
   private readonly queueService = inject(QueueService);
   readonly authService = inject(AuthService);
 
@@ -100,6 +105,8 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   // UC: Tìm kiếm & chọn thuốc (Include in Kê đơn)
   medicineSearchKeyword = '';
+  categoriesList = signal<MedicineCategory[]>([]);
+  selectedMedicineCategoryId = signal<number | null>(null);
   medicinesList = signal<Medicine[]>([]);
   filteredMedicines = signal<Medicine[]>([]);
   isSearchingMedicine = signal<boolean>(false);
@@ -177,7 +184,8 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Tải danh mục thuốc sẵn sàng cho tra cứu
+    // Tải danh mục thuốc & nhóm thuốc sẵn sàng cho tra cứu
+    this.loadCategories();
     this.loadMedicines();
   }
 
@@ -293,32 +301,63 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     this.selectedHistoryRecord.set(null);
   }
 
+  loadCategories(): void {
+    this.categoryService.getCategories(true).subscribe({
+      next: res => {
+        if (res.data) {
+          this.categoriesList.set(res.data);
+        }
+      }
+    });
+  }
+
   // UC: Tìm kiếm & chọn thuốc
   loadMedicines(): void {
     this.medicalService.getMedicines().subscribe({
       next: res => {
         if (res.data) {
           this.medicinesList.set(res.data);
-          this.filteredMedicines.set(res.data.slice(0, 10));
+          this.filterMedicinesList();
         }
       }
     });
   }
 
-  onSearchMedicineInput(): void {
+  filterMedicinesList(): void {
     const kw = this.medicineSearchKeyword.trim().toLowerCase();
-    if (!kw) {
+    const catId = this.selectedMedicineCategoryId();
+    let list = this.medicinesList();
+
+    if (catId) {
+      list = list.filter(m => m.categoryId === catId);
+    }
+
+    if (kw) {
+      list = list.filter(m =>
+        m.name.toLowerCase().includes(kw) ||
+        (m.code && m.code.toLowerCase().includes(kw)) ||
+        (m.activeIngredient && m.activeIngredient.toLowerCase().includes(kw))
+      );
+    }
+
+    this.filteredMedicines.set(list);
+  }
+
+  onSearchMedicineInput(): void {
+    const kw = this.medicineSearchKeyword.trim();
+    if (!kw && !this.selectedMedicineCategoryId()) {
       this.filteredMedicines.set(this.medicinesList().slice(0, 10));
       this.showMedicineDropdown.set(false);
       return;
     }
-
     this.showMedicineDropdown.set(true);
-    const matches = this.medicinesList().filter(m =>
-      m.name.toLowerCase().includes(kw) ||
-      (m.activeIngredient && m.activeIngredient.toLowerCase().includes(kw))
-    );
-    this.filteredMedicines.set(matches);
+    this.filterMedicinesList();
+  }
+
+  selectCategoryFilter(catId: number | null): void {
+    this.selectedMedicineCategoryId.set(catId);
+    this.showMedicineDropdown.set(true);
+    this.filterMedicinesList();
   }
 
   selectMedicine(med: Medicine): void {
@@ -341,10 +380,12 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       _medicineName: med.name,
       _activeIngredient: med.activeIngredient,
       _unit: med.unit || 'Viên',
+      _price: med.price,
+      _categoryName: med.categoryName,
       _allergyWarning: hasAllergy,
       quantity: 10,
       dosage: med.defaultUsageInstructions || '1 viên/lần, 2 lần/ngày',
-      route: 'Đường uống',
+      route: med.routeOfAdministration || 'Đường uống',
       daysSupply: 5,
       instructions: med.defaultUsageInstructions || 'Uống sau bữa ăn'
     });

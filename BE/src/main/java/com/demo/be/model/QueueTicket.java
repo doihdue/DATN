@@ -33,6 +33,9 @@ public class QueueTicket {
     @Column(name = "patient_year_of_birth")
     private Integer patientYearOfBirth;
 
+    @Column(name = "patient_dob")
+    private java.time.LocalDate patientDob;
+
     @Column(name = "is_emergency")
     @Builder.Default
     private Boolean isEmergency = false;

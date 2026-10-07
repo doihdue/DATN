@@ -52,4 +52,6 @@ public interface QueueTicketRepository extends JpaRepository<QueueTicket, Long> 
             @Param("priorityScore") Integer priorityScore,
             @Param("checkInTime") java.time.LocalTime checkInTime
     );
+
+    List<QueueTicket> findTop20ByTicketDateOrderByCheckInTimeDesc(LocalDate ticketDate);
 }

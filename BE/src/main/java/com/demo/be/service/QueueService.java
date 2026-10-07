@@ -1,10 +1,7 @@
 package com.demo.be.service;
 
 import com.demo.be.dto.request.CheckInRequest;
-import com.demo.be.dto.response.ClinicDisplayBoardResponse;
-import com.demo.be.dto.response.MyTicketStatusResponse;
-import com.demo.be.dto.response.QueueTicketResponse;
-import com.demo.be.dto.response.RoomQueueOverviewResponse;
+import com.demo.be.dto.response.*;
 
 import java.util.List;
 
@@ -23,6 +20,14 @@ public interface QueueService {
     QueueTicketResponse recallTicket(Long ticketId);
 
     QueueTicketResponse setEmergency(Long ticketId);
+
+    QueueTicketResponse transferTicket(Long ticketId, Long targetRoomId, String reason);
+
+    QueueTicketResponse cancelTicket(Long ticketId, String reason);
+
+    List<QueueTicketResponse> getRecentTicketsToday();
+
+    List<PatientLookupResponse> searchPatients(String keyword);
 
     RoomQueueOverviewResponse getRoomQueueOverview(Long roomId);
 

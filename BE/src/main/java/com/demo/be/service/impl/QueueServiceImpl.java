@@ -64,6 +64,15 @@ public class QueueServiceImpl implements QueueService {
             }
         }
 
+        LocalDate dob = request.getPatientDob();
+        if (dob == null && request.getPatientYearOfBirth() != null) {
+            dob = LocalDate.of(request.getPatientYearOfBirth(), 1, 1);
+        }
+        Integer yearOfBirth = request.getPatientYearOfBirth();
+        if (yearOfBirth == null && dob != null) {
+            yearOfBirth = dob.getYear();
+        }
+
         Patient patient = null;
         if (request.getPatientId() != null) {
             patient = patientRepository.findById(request.getPatientId()).orElse(null);
@@ -81,9 +90,6 @@ public class QueueServiceImpl implements QueueService {
                 }
             }
             if (patient == null) {
-                LocalDate dob = request.getPatientYearOfBirth() != null
-                        ? LocalDate.of(request.getPatientYearOfBirth(), 1, 1)
-                        : null;
                 patient = Patient.builder()
                         .fullName(request.getPatientName().trim())
                         .gender("Chưa rõ")
@@ -92,6 +98,16 @@ public class QueueServiceImpl implements QueueService {
                         .bloodGroup(null)
                         .build();
                 patient = patientRepository.save(patient);
+            } else if (patient.getDateOfBirth() == null && dob != null) {
+                patient.setDateOfBirth(dob);
+                patientRepository.save(patient);
+            }
+        }
+
+        if (dob == null && patient != null && patient.getDateOfBirth() != null) {
+            dob = patient.getDateOfBirth();
+            if (yearOfBirth == null) {
+                yearOfBirth = dob.getYear();
             }
         }
 
@@ -111,8 +127,8 @@ public class QueueServiceImpl implements QueueService {
         }
 
         int currentYear = today.getYear();
-        if (request.getPatientYearOfBirth() != null) {
-            int age = currentYear - request.getPatientYearOfBirth();
+        if (yearOfBirth != null) {
+            int age = currentYear - yearOfBirth;
             if (age >= 70 || age <= 6) {
                 priorityScore += 30; // Ưu tiên người cao tuổi & trẻ nhỏ
             }
@@ -138,7 +154,8 @@ public class QueueServiceImpl implements QueueService {
                 .patient(patient)
                 .patientName(request.getPatientName().trim())
                 .patientPhone(request.getPatientPhone().trim())
-                .patientYearOfBirth(request.getPatientYearOfBirth())
+                .patientDob(dob)
+                .patientYearOfBirth(yearOfBirth)
                 .isEmergency(isEmergency)
                 .hasAppointment(hasAppointment)
                 .priorityScore(priorityScore)
@@ -261,6 +278,103 @@ public class QueueServiceImpl implements QueueService {
 
     @Override
     @Transactional
+    public QueueTicketResponse transferTicket(Long ticketId, Long targetRoomId, String reason) {
+        QueueTicket ticket = queueTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+
+        if (!"WAITING".equals(ticket.getStatus()) && !"SKIPPED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Chỉ có thể chuyển phòng cho lượt khám đang chờ hoặc nhỡ lượt (trạng thái hiện tại: " + ticket.getStatus() + ")");
+        }
+
+        ExaminationRoom oldRoom = ticket.getExaminationRoom();
+        if (oldRoom != null && oldRoom.getId().equals(targetRoomId)) {
+            throw new BadRequestException("Lượt khám hiện đã thuộc phòng khám này!");
+        }
+
+        ExaminationRoom newRoom = examinationRoomRepository.findById(targetRoomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám đích", "id", targetRoomId));
+
+        // Tìm bác sĩ đang trực tại phòng đích hôm nay
+        LocalDate today = LocalDate.now();
+        List<WorkSchedule> schedules = workScheduleRepository.findByExaminationRoomIdAndWorkDate(newRoom.getId(), today);
+        Doctor newDoctor = schedules.isEmpty() ? null : schedules.get(0).getDoctor();
+
+        String oldRoomNum = oldRoom != null ? oldRoom.getRoomNumber() : "Chưa rõ";
+        String noteTransfer = String.format("[Chuyển từ %s -> %s: %s]", oldRoomNum, newRoom.getRoomNumber(),
+                (reason != null && !reason.trim().isEmpty()) ? reason.trim() : "Điều phối tải");
+
+        String newNotes = ticket.getNotes() != null ? ticket.getNotes() + " " + noteTransfer : noteTransfer;
+
+        ticket.setExaminationRoom(newRoom);
+        ticket.setDoctor(newDoctor);
+        ticket.setStatus("WAITING"); // Đưa vào hàng chờ phòng mới
+        ticket.setNotes(newNotes);
+
+        QueueTicket saved = queueTicketRepository.save(ticket);
+        log.info("-> Đã chuyển lượt {} từ phòng {} sang phòng {} (Bác sĩ: {})",
+                ticket.getTicketNumber(), oldRoomNum, newRoom.getRoomNumber(),
+                newDoctor != null ? newDoctor.getFullName() : "Chưa có");
+
+        broadcastQueueEvent("TICKET_TRANSFERRED", saved, "Chuyển số " + saved.getTicketNumber() + " sang phòng " + newRoom.getRoomNumber());
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public QueueTicketResponse cancelTicket(Long ticketId, String reason) {
+        QueueTicket ticket = queueTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+
+        if ("COMPLETED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Không thể hủy lượt khám đã hoàn thành!");
+        }
+
+        ticket.setStatus("CANCELLED");
+        String cancelNote = String.format("[Đã hủy: %s]", (reason != null && !reason.trim().isEmpty()) ? reason.trim() : "Người bệnh xin hủy");
+        ticket.setNotes(ticket.getNotes() != null ? ticket.getNotes() + " " + cancelNote : cancelNote);
+
+        QueueTicket saved = queueTicketRepository.save(ticket);
+        log.info("-> Đã hủy lượt khám: {} (Lý do: {})", ticket.getTicketNumber(), reason);
+
+        broadcastQueueEvent("TICKET_CANCELLED", saved, "Đã hủy lượt số " + saved.getTicketNumber());
+        return mapToResponse(saved);
+    }
+
+    @Override
+    public List<QueueTicketResponse> getRecentTicketsToday() {
+        LocalDate today = LocalDate.now();
+        return queueTicketRepository.findTop20ByTicketDateOrderByCheckInTimeDesc(today)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PatientLookupResponse> searchPatients(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return List.of();
+        }
+        String kw = keyword.trim();
+        List<Patient> patients = patientRepository.searchPatients(kw);
+        return patients.stream()
+                .map(p -> PatientLookupResponse.builder()
+                        .id(p.getId())
+                        .fullName(p.getFullName())
+                        .phoneNumber(p.getPhoneNumber())
+                        .dateOfBirth(p.getDateOfBirth())
+                        .gender(p.getGender())
+                        .nationalId(p.getNationalId())
+                        .address(p.getAddress())
+                        .bloodGroup(p.getBloodGroup())
+                        .allergies(p.getAllergies())
+                        .emergencyContactName(p.getEmergencyContactName())
+                        .emergencyContactPhone(p.getEmergencyContactPhone())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
     public QueueTicketResponse getTicketById(Long ticketId) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
@@ -280,9 +394,10 @@ public class QueueServiceImpl implements QueueService {
                 }
             }
             if (matchedPatient == null) {
-                LocalDate dob = ticket.getPatientYearOfBirth() != null
-                        ? LocalDate.of(ticket.getPatientYearOfBirth(), 1, 1)
-                        : null;
+                LocalDate dob = ticket.getPatientDob();
+                if (dob == null && ticket.getPatientYearOfBirth() != null) {
+                    dob = LocalDate.of(ticket.getPatientYearOfBirth(), 1, 1);
+                }
                 matchedPatient = Patient.builder()
                         .fullName(ticket.getPatientName().trim())
                         .gender("Chưa rõ")
@@ -514,7 +629,8 @@ public class QueueServiceImpl implements QueueService {
                 .ticketDate(ticket.getTicketDate())
                 .patientName(ticket.getPatientName())
                 .patientPhone(ticket.getPatientPhone())
-                .patientYearOfBirth(ticket.getPatientYearOfBirth())
+                .patientYearOfBirth(ticket.getPatientYearOfBirth() != null ? ticket.getPatientYearOfBirth() : (ticket.getPatientDob() != null ? ticket.getPatientDob().getYear() : null))
+                .patientDob(ticket.getPatientDob() != null ? ticket.getPatientDob() : (ticket.getPatient() != null ? ticket.getPatient().getDateOfBirth() : null))
                 .isEmergency(ticket.getIsEmergency())
                 .hasAppointment(ticket.getHasAppointment())
                 .priorityScore(ticket.getPriorityScore())

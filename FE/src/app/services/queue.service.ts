@@ -5,6 +5,7 @@ import {
   CheckInRequest,
   ClinicDisplayBoard,
   MyTicketStatus,
+  PatientLookup,
   QueueTicket,
   RoomQueueOverview
 } from '../models/queue.model';
@@ -60,4 +61,27 @@ export class QueueService {
   setEmergency(ticketId: number): Observable<ApiResponse<QueueTicket>> {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/emergency`, {});
   }
+
+  transferTicket(ticketId: number, targetRoomId: number, reason?: string): Observable<ApiResponse<QueueTicket>> {
+    const params: Record<string, string | number> = { targetRoomId };
+    if (reason && reason.trim()) params['reason'] = reason.trim();
+    return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/transfer`, null, { params });
+  }
+
+  cancelTicket(ticketId: number, reason?: string): Observable<ApiResponse<QueueTicket>> {
+    const params: Record<string, string> = {};
+    if (reason && reason.trim()) params['reason'] = reason.trim();
+    return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/cancel`, null, { params });
+  }
+
+  getRecentTicketsToday(): Observable<ApiResponse<QueueTicket[]>> {
+    return this.http.get<ApiResponse<QueueTicket[]>>(`${this.baseUrl}/recent-today`);
+  }
+
+  lookupPatient(keyword: string): Observable<ApiResponse<PatientLookup[]>> {
+    return this.http.get<ApiResponse<PatientLookup[]>>(`${this.baseUrl}/patient-lookup`, {
+      params: { keyword }
+    });
+  }
 }
+

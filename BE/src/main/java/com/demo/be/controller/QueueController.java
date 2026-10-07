@@ -103,4 +103,42 @@ public class QueueController {
         QueueTicketResponse ticket = queueService.setEmergency(ticketId);
         return ResponseEntity.ok(ApiResponse.success(ticket, "Đã kích hoạt ưu tiên khẩn cấp cho vé: " + ticket.getTicketNumber()));
     }
+
+    // 11. Chuyển phòng khám (Điều phối tải hàng đợi)
+    @PostMapping("/ticket/{ticketId}/transfer")
+    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<QueueTicketResponse>> transferTicket(
+            @PathVariable Long ticketId,
+            @RequestParam Long targetRoomId,
+            @RequestParam(required = false) String reason) {
+        QueueTicketResponse ticket = queueService.transferTicket(ticketId, targetRoomId, reason);
+        return ResponseEntity.ok(ApiResponse.success(ticket, "Chuyển phòng khám thành công sang phòng " + ticket.getRoomNumber()));
+    }
+
+    // 12. Hủy lượt khám (Bệnh nhân về hoặc xin hủy)
+    @PostMapping("/ticket/{ticketId}/cancel")
+    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<QueueTicketResponse>> cancelTicket(
+            @PathVariable Long ticketId,
+            @RequestParam(required = false) String reason) {
+        QueueTicketResponse ticket = queueService.cancelTicket(ticketId, reason);
+        return ResponseEntity.ok(ApiResponse.success(ticket, "Đã hủy lượt khám: " + ticket.getTicketNumber()));
+    }
+
+    // 13. Lịch sử các số đã cấp trong ngày (cho quầy tiếp đón)
+    @GetMapping("/recent-today")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<QueueTicketResponse>>> getRecentTicketsToday() {
+        List<QueueTicketResponse> tickets = queueService.getRecentTicketsToday();
+        return ResponseEntity.ok(ApiResponse.success(tickets, "Lấy danh sách vé đã cấp gần nhất thành công"));
+    }
+
+    // 14. Tìm kiếm hồ sơ bệnh nhân cũ (gợi ý/auto-complete khi tiếp đón)
+    @GetMapping("/patient-lookup")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN', 'DOCTOR')")
+    public ResponseEntity<ApiResponse<List<PatientLookupResponse>>> searchPatients(@RequestParam String keyword) {
+        List<PatientLookupResponse> patients = queueService.searchPatients(keyword);
+        return ResponseEntity.ok(ApiResponse.success(patients, "Tìm kiếm bệnh nhân thành công"));
+    }
 }
+

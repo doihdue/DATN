@@ -19,6 +19,8 @@ public class CheckInRequest {
     @NotBlank(message = "Số điện thoại không được để trống")
     private String patientPhone;
 
+    private java.time.LocalDate patientDob; // Ngày tháng năm sinh đầy đủ
+
     private Integer patientYearOfBirth;
 
     @NotNull(message = "Phòng khám không được để trống")
