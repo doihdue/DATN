@@ -17,10 +17,13 @@ export class MedicalRecordService {
   private readonly baseUrl = 'http://localhost:8080/api';
 
   // 1. Tìm kiếm và lấy danh mục thuốc
-  getMedicines(search?: string): Observable<ApiResponse<Medicine[]>> {
+  getMedicines(search?: string, categoryId?: number): Observable<ApiResponse<Medicine[]>> {
     let params = new HttpParams();
     if (search && search.trim()) {
       params = params.set('search', search.trim());
+    }
+    if (categoryId) {
+      params = params.set('categoryId', categoryId.toString());
     }
     return this.http.get<ApiResponse<Medicine[]>>(`${this.baseUrl}/medicines`, { params });
   }

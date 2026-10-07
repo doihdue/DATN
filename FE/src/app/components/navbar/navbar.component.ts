@@ -38,8 +38,17 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/admin/specialties" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-diagram-3"></i> Chuyên khoa
               </a>
+              <a routerLink="/admin/medicines" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-capsule"></i> Thuốc
+              </a>
               <a routerLink="/admin/schedules" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-calendar3"></i> Lịch làm việc
+                <i class="bi bi-calendar3"></i> Lịch trực
+              </a>
+              <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
+              </a>
+              <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-sliders"></i> Điều phối
               </a>
             }
             @if (authService.hasRole('DOCTOR')) {
@@ -54,6 +63,9 @@ import { AuthService } from '../../services/auth.service';
               </a>
             }
             @if (authService.hasRole('STAFF')) {
+              <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
+              </a>
               <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-sliders"></i> Điều phối hàng đợi
               </a>

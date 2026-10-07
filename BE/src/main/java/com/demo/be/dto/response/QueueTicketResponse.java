@@ -19,6 +19,7 @@ public class QueueTicketResponse {
     private String patientName;
     private String patientPhone;
     private Integer patientYearOfBirth;
+    private LocalDate patientDob;
     private Boolean isEmergency;
     private Boolean hasAppointment;
     private Integer priorityScore;

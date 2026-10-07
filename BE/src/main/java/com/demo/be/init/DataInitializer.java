@@ -29,6 +29,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ExaminationRoomRepository examinationRoomRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final MedicineRepository medicineRepository;
+    private final MedicineCategoryRepository medicineCategoryRepository;
     private final MedicalRecordRepository medicalRecordRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -192,44 +193,108 @@ public class DataInitializer implements CommandLineRunner {
         log.info("==> Dữ liệu mẫu Unicode NVARCHAR đã được khởi tạo thành công 100%!");
     }
 
+    private MedicineCategory createCategoryIfNotFound(String code, String name, String description, int order) {
+        return medicineCategoryRepository.findByCode(code)
+                .orElseGet(() -> medicineCategoryRepository.save(MedicineCategory.builder()
+                        .code(code)
+                        .name(name)
+                        .description(description)
+                        .displayOrder(order)
+                        .isActive(true)
+                        .build()));
+    }
+
     private void seedMedicinesIfEmpty() {
-        if (medicineRepository.count() > 0) return;
+        MedicineCategory catKS = createCategoryIfNotFound("KS", "Kháng sinh & Kháng khuẩn", "Các loại kháng sinh phổ rộng và chuyên khoa", 1);
+        MedicineCategory catGD = createCategoryIfNotFound("GD-HS", "Giảm đau - Hạ sốt - Kháng viêm", "Thuốc giảm đau thông thường, hạ sốt, NSAIDs", 2);
+        MedicineCategory catTH = createCategoryIfNotFound("TH-DD", "Tiêu hóa & Dạ dày", "Thuốc kháng acid dạ dày, men vi sinh, cầm tiêu chảy", 3);
+        MedicineCategory catTM = createCategoryIfNotFound("TM-HA", "Tim mạch - Huyết áp - Chuyển hóa", "Thuốc hạ huyết áp, mỡ máu, đái tháo đường", 4);
+        MedicineCategory catHH = createCategoryIfNotFound("HH-DU", "Hô hấp & Chống dị ứng", "Thuốc long đờm, giãn phế quản, kháng histamin", 5);
+        MedicineCategory catVT = createCategoryIfNotFound("VT-KCH", "Vitamin - Khoáng chất & Bổ não", "Bổ sung vi chất, tăng đề kháng và tuần hoàn não", 6);
+        MedicineCategory catDN = createCategoryIfNotFound("D-NGOAI", "Thuốc dùng ngoài & Nhỏ mắt", "Thuốc tra mắt, xịt mũi, gel bôi giảm đau ngoài da", 7);
+
+        if (medicineRepository.count() > 0) {
+            List<Medicine> existing = medicineRepository.findAll();
+            for (Medicine m : existing) {
+                if (m.getCategory() == null || m.getCode() == null || m.getPrice() == null) {
+                    if (m.getName().contains("Paracetamol") || m.getName().contains("Panadol") || m.getName().contains("Ibuprofen") || m.getName().contains("Meloxicam") || m.getName().contains("Alpha")) {
+                        m.setCategory(catGD);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 2500.0);
+                    } else if (m.getName().contains("Augmentin") || m.getName().contains("Cefixim") || m.getName().contains("Azithromycin")) {
+                        m.setCategory(catKS);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 18000.0);
+                    } else if (m.getName().contains("Nexium") || m.getName().contains("Omeprazol") || m.getName().contains("Phosphalugel") || m.getName().contains("Smecta") || m.getName().contains("Enterogermina") || m.getName().contains("Oresol")) {
+                        m.setCategory(catTH);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 12000.0);
+                    } else if (m.getName().contains("Amlodipine") || m.getName().contains("Losartan") || m.getName().contains("Metformin") || m.getName().contains("Atorvastatin")) {
+                        m.setCategory(catTM);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 6500.0);
+                    } else if (m.getName().contains("Telfast") || m.getName().contains("Loratadine") || m.getName().contains("Acetylcystein") || m.getName().contains("Prospan") || m.getName().contains("Decolgen")) {
+                        m.setCategory(catHH);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 8000.0);
+                    } else if (m.getName().contains("Berocca") || m.getName().contains("Vitamin C") || m.getName().contains("Ginkgo") || m.getName().contains("Magie B6")) {
+                        m.setCategory(catVT);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 5000.0);
+                    } else {
+                        m.setCategory(catDN);
+                        m.setPrice(m.getPrice() != null ? m.getPrice() : 25000.0);
+                    }
+                    if (m.getCode() == null) {
+                        m.setCode("MED-" + String.format("%03d", m.getId()));
+                    }
+                    if (m.getStockQuantity() == null) {
+                        m.setStockQuantity(500);
+                    }
+                    if (m.getIsActive() == null) {
+                        m.setIsActive(true);
+                    }
+                    if (m.getCreatedAt() == null) {
+                        m.setCreatedAt(java.time.LocalDateTime.now());
+                    }
+                    if (m.getUpdatedAt() == null) {
+                        m.setUpdatedAt(java.time.LocalDateTime.now());
+                    }
+                    medicineRepository.save(m);
+                }
+            }
+            return;
+        }
 
         List<Medicine> medicines = List.of(
-                Medicine.builder().name("Paracetamol 500mg").activeIngredient("Paracetamol").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên khi sốt trên 38.5 độ C, cách 4-6 giờ").build(),
-                Medicine.builder().name("Panadol Extra").activeIngredient("Paracetamol 500mg + Caffeine 65mg").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1-2 viên/lần khi đau đầu, mệt mỏi, tối đa 4 lần/ngày").build(),
-                Medicine.builder().name("Augmentin 1g").activeIngredient("Amoxicillin 875mg + Acid Clavulanic 125mg").dosageForm("Viên bao phim").unit("Viên").defaultUsageInstructions("Uống 1 viên/lần x 2 lần/ngày sau khi ăn no").build(),
-                Medicine.builder().name("Cefixim 200mg").activeIngredient("Cefixime").dosageForm("Viên nang").unit("Viên").defaultUsageInstructions("Uống 1 viên/lần x 2 lần/ngày sau bữa ăn").build(),
-                Medicine.builder().name("Azithromycin 500mg").activeIngredient("Azithromycin").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên/ngày trước ăn 1 giờ hoặc sau ăn 2 giờ (liệu trình 3 ngày)").build(),
-                Medicine.builder().name("Ibuprofen 400mg").activeIngredient("Ibuprofen").dosageForm("Viên bao đường").unit("Viên").defaultUsageInstructions("Uống 1 viên/lần x 2 lần/ngày sau khi ăn no").build(),
-                Medicine.builder().name("Meloxicam 7.5mg").activeIngredient("Meloxicam").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên/ngày sau bữa ăn chính").build(),
-                Medicine.builder().name("Nexium 40mg").activeIngredient("Esomeprazole").dosageForm("Viên bao tan trong ruột").unit("Viên").defaultUsageInstructions("Uống 1 viên vào buổi sáng trước khi ăn 30-60 phút").build(),
-                Medicine.builder().name("Omeprazol 20mg").activeIngredient("Omeprazole").dosageForm("Viên nang").unit("Viên").defaultUsageInstructions("Uống 1 viên trước ăn sáng 30 phút").build(),
-                Medicine.builder().name("Phosphalugel (Chữ P)").activeIngredient("Gel Aluminium Phosphate 20%").dosageForm("Hỗn dịch uống").unit("Gói").defaultUsageInstructions("Uống 1 gói khi đau rát dạ dày hoặc sau bữa ăn").build(),
-                Medicine.builder().name("Amlodipine 5mg").activeIngredient("Amlodipine besylate").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên duy nhất vào buổi sáng cố định").build(),
-                Medicine.builder().name("Losartan 50mg").activeIngredient("Losartan potassium").dosageForm("Viên bao phim").unit("Viên").defaultUsageInstructions("Uống 1 viên/ngày vào buổi sáng").build(),
-                Medicine.builder().name("Metformin 500mg").activeIngredient("Metformin HCl").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên x 2 lần/ngày cùng bữa ăn").build(),
-                Medicine.builder().name("Atorvastatin 20mg").activeIngredient("Atorvastatin calcium").dosageForm("Viên bao phim").unit("Viên").defaultUsageInstructions("Uống 1 viên vào buổi tối trước khi đi ngủ").build(),
-                Medicine.builder().name("Telfast HD 180mg").activeIngredient("Fexofenadine HCl").dosageForm("Viên bao phim").unit("Viên").defaultUsageInstructions("Uống 1 viên/ngày khi có biểu hiện dị ứng").build(),
-                Medicine.builder().name("Loratadine 10mg").activeIngredient("Loratadine").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên vào buổi sáng hoặc tối").build(),
-                Medicine.builder().name("Acetylcystein 200mg").activeIngredient("Acetylcysteine").dosageForm("Gói thuốc bột").unit("Gói").defaultUsageInstructions("Hòa 1 gói với 50ml nước đun sôi để nguội, uống 3 lần/ngày").build(),
-                Medicine.builder().name("Siro ho Prospan 100ml").activeIngredient("Cao lá thường xuân khô").dosageForm("Siro uống").unit("Chai").defaultUsageInstructions("Uống 5ml/lần x 3 lần/ngày sau bữa ăn").build(),
-                Medicine.builder().name("Oresol 245").activeIngredient("Glucose, Natri clorid, Kali clorid").dosageForm("Gói thuốc bột").unit("Gói").defaultUsageInstructions("Pha 1 gói với đúng 200ml nước sôi để nguội, uống từng ngụm rải rác").build(),
-                Medicine.builder().name("Smecta 3g").activeIngredient("Diosmectite").dosageForm("Gói hỗn dịch").unit("Gói").defaultUsageInstructions("Khuấy đều 1 gói vào 50ml nước, uống 2-3 lần/ngày xa bữa ăn").build(),
-                Medicine.builder().name("Enterogermina 5ml").activeIngredient("Bào tử Bacillus clausii").dosageForm("Hỗn dịch uống").unit("Ống").defaultUsageInstructions("Lắc kỹ trước khi uống, dùng 1-2 ống/ngày sau bữa ăn").build(),
-                Medicine.builder().name("Berocca Performance").activeIngredient("Vitamin B complex + Vitamin C + Kẽm").dosageForm("Viên sủi").unit("Viên").defaultUsageInstructions("Hòa tan 1 viên vào 200ml nước, uống vào buổi sáng sau ăn").build(),
-                Medicine.builder().name("Vitamin C 500mg").activeIngredient("Acid ascorbic").dosageForm("Viên sủi").unit("Viên").defaultUsageInstructions("Hòa tan 1 viên trong 150ml nước, uống sau bữa ăn sáng").build(),
-                Medicine.builder().name("Decolgen Forte").activeIngredient("Paracetamol + Chlorpheniramine").dosageForm("Viên nén").unit("Viên").defaultUsageInstructions("Uống 1 viên x 3 lần/ngày để giảm hắt hơi, sổ mũi").build(),
-                Medicine.builder().name("Alpha Chymotrypsine (Choay)").activeIngredient("Chymotrypsin").dosageForm("Viên ngậm dưới lưỡi").unit("Viên").defaultUsageInstructions("Ngậm dưới lưỡi 2 viên/lần x 2-3 lần/ngày").build(),
-                Medicine.builder().name("Nước muối sinh lý 0.9%").activeIngredient("Natri Clorid 0.9%").dosageForm("Dung dịch nhỏ mắt mũi").unit("Lọ").defaultUsageInstructions("Nhỏ 2-3 giọt vào mỗi bên mũi/mắt khi vệ sinh").build(),
-                Medicine.builder().name("Salonpas Gel 30g").activeIngredient("Methyl Salicylate + L-Menthol").dosageForm("Gel bôi ngoài da").unit("Tuýp").defaultUsageInstructions("Bôi xoa bóp nhẹ một lượng vừa đủ lên vùng cơ bị đau nhức").build(),
-                Medicine.builder().name("Tobradex 5ml").activeIngredient("Tobramycin + Dexamethasone").dosageForm("Hỗn dịch nhỏ mắt").unit("Lọ").defaultUsageInstructions("Nhỏ 1 giọt vào mắt bị viêm nhiễm mỗi 4-6 giờ").build(),
-                Medicine.builder().name("Ginkgo Biloba 80mg").activeIngredient("Cao khô lá Bạch quả").dosageForm("Viên nang mềm").unit("Viên").defaultUsageInstructions("Uống 1 viên x 2 lần/ngày trong bữa ăn để tăng tuần hoàn não").build(),
-                Medicine.builder().name("Magie B6").activeIngredient("Magnesium lactate + Vitamin B6").dosageForm("Viên bao phim").unit("Viên").defaultUsageInstructions("Uống 1 viên x 2 lần/ngày với nhiều nước").build()
+                Medicine.builder().code("MED-001").name("Paracetamol 500mg").activeIngredient("Paracetamol").dosageForm("Viên nén").unit("Viên").price(1500.0).stockQuantity(1200).packaging("Hộp 10 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catGD).defaultUsageInstructions("Uống 1 viên khi sốt trên 38.5 độ C, cách 4-6 giờ").build(),
+                Medicine.builder().code("MED-002").name("Panadol Extra").activeIngredient("Paracetamol 500mg + Caffeine 65mg").dosageForm("Viên nén").unit("Viên").price(2500.0).stockQuantity(950).packaging("Hộp 15 vỉ x 12 viên").routeOfAdministration("Đường uống").category(catGD).defaultUsageInstructions("Uống 1-2 viên/lần khi đau đầu, mệt mỏi, tối đa 4 lần/ngày").build(),
+                Medicine.builder().code("MED-003").name("Augmentin 1g").activeIngredient("Amoxicillin 875mg + Acid Clavulanic 125mg").dosageForm("Viên bao phim").unit("Viên").price(22000.0).stockQuantity(400).packaging("Hộp 2 vỉ x 7 viên").routeOfAdministration("Đường uống").category(catKS).defaultUsageInstructions("Uống 1 viên/lần x 2 lần/ngày sau khi ăn no").build(),
+                Medicine.builder().code("MED-004").name("Cefixim 200mg").activeIngredient("Cefixime").dosageForm("Viên nang").unit("Viên").price(14000.0).stockQuantity(600).packaging("Hộp 2 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catKS).defaultUsageInstructions("Uống 1 viên/lần x 2 lần/ngày sau bữa ăn").build(),
+                Medicine.builder().code("MED-005").name("Azithromycin 500mg").activeIngredient("Azithromycin").dosageForm("Viên nén").unit("Viên").price(18000.0).stockQuantity(350).packaging("Hộp 1 vỉ x 3 viên").routeOfAdministration("Đường uống").category(catKS).defaultUsageInstructions("Uống 1 viên/ngày trước ăn 1 giờ hoặc sau ăn 2 giờ (liệu trình 3 ngày)").build(),
+                Medicine.builder().code("MED-006").name("Ibuprofen 400mg").activeIngredient("Ibuprofen").dosageForm("Viên bao đường").unit("Viên").price(3000.0).stockQuantity(800).packaging("Hộp 10 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catGD).defaultUsageInstructions("Uống 1 viên/lần x 2 lần/ngày sau khi ăn no").build(),
+                Medicine.builder().code("MED-007").name("Meloxicam 7.5mg").activeIngredient("Meloxicam").dosageForm("Viên nén").unit("Viên").price(4500.0).stockQuantity(500).packaging("Hộp 3 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catGD).defaultUsageInstructions("Uống 1 viên/ngày sau bữa ăn chính").build(),
+                Medicine.builder().code("MED-008").name("Nexium 40mg").activeIngredient("Esomeprazole").dosageForm("Viên bao tan trong ruột").unit("Viên").price(28000.0).stockQuantity(450).packaging("Hộp 4 vỉ x 7 viên").routeOfAdministration("Đường uống").category(catTH).defaultUsageInstructions("Uống 1 viên vào buổi sáng trước khi ăn 30-60 phút").build(),
+                Medicine.builder().code("MED-009").name("Omeprazol 20mg").activeIngredient("Omeprazole").dosageForm("Viên nang").unit("Viên").price(3500.0).stockQuantity(700).packaging("Hộp 3 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catTH).defaultUsageInstructions("Uống 1 viên trước ăn sáng 30 phút").build(),
+                Medicine.builder().code("MED-010").name("Phosphalugel (Chữ P)").activeIngredient("Gel Aluminium Phosphate 20%").dosageForm("Hỗn dịch uống").unit("Gói").price(6000.0).stockQuantity(850).packaging("Hộp 26 gói").routeOfAdministration("Đường uống").category(catTH).defaultUsageInstructions("Uống 1 gói khi đau rát dạ dày hoặc sau bữa ăn").build(),
+                Medicine.builder().code("MED-011").name("Amlodipine 5mg").activeIngredient("Amlodipine besylate").dosageForm("Viên nén").unit("Viên").price(3200.0).stockQuantity(900).packaging("Hộp 3 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catTM).defaultUsageInstructions("Uống 1 viên duy nhất vào buổi sáng cố định").build(),
+                Medicine.builder().code("MED-012").name("Losartan 50mg").activeIngredient("Losartan potassium").dosageForm("Viên bao phim").unit("Viên").price(4000.0).stockQuantity(800).packaging("Hộp 3 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catTM).defaultUsageInstructions("Uống 1 viên/ngày vào buổi sáng").build(),
+                Medicine.builder().code("MED-013").name("Metformin 500mg").activeIngredient("Metformin HCl").dosageForm("Viên nén").unit("Viên").price(2200.0).stockQuantity(1000).packaging("Hộp 5 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catTM).defaultUsageInstructions("Uống 1 viên x 2 lần/ngày cùng bữa ăn").build(),
+                Medicine.builder().code("MED-014").name("Atorvastatin 20mg").activeIngredient("Atorvastatin calcium").dosageForm("Viên bao phim").unit("Viên").price(8500.0).stockQuantity(650).packaging("Hộp 3 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catTM).defaultUsageInstructions("Uống 1 viên vào buổi tối trước khi đi ngủ").build(),
+                Medicine.builder().code("MED-015").name("Telfast HD 180mg").activeIngredient("Fexofenadine HCl").dosageForm("Viên bao phim").unit("Viên").price(12500.0).stockQuantity(550).packaging("Hộp 1 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catHH).defaultUsageInstructions("Uống 1 viên/ngày khi có biểu hiện dị ứng").build(),
+                Medicine.builder().code("MED-016").name("Loratadine 10mg").activeIngredient("Loratadine").dosageForm("Viên nén").unit("Viên").price(2000.0).stockQuantity(850).packaging("Hộp 10 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catHH).defaultUsageInstructions("Uống 1 viên vào buổi sáng hoặc tối").build(),
+                Medicine.builder().code("MED-017").name("Acetylcystein 200mg").activeIngredient("Acetylcysteine").dosageForm("Gói thuốc bột").unit("Gói").price(3500.0).stockQuantity(900).packaging("Hộp 30 gói x 3g").routeOfAdministration("Đường uống").category(catHH).defaultUsageInstructions("Hòa 1 gói với 50ml nước đun sôi để nguội, uống 3 lần/ngày").build(),
+                Medicine.builder().code("MED-018").name("Siro ho Prospan 100ml").activeIngredient("Cao lá thường xuân khô").dosageForm("Siro uống").unit("Chai").price(85000.0).stockQuantity(300).packaging("Chai 100ml").routeOfAdministration("Đường uống").category(catHH).defaultUsageInstructions("Uống 5ml/lần x 3 lần/ngày sau bữa ăn").build(),
+                Medicine.builder().code("MED-019").name("Oresol 245").activeIngredient("Glucose, Natri clorid, Kali clorid").dosageForm("Gói thuốc bột").unit("Gói").price(2500.0).stockQuantity(1500).packaging("Hộp 20 gói").routeOfAdministration("Đường uống").category(catTH).defaultUsageInstructions("Pha 1 gói với đúng 200ml nước sôi để nguội, uống từng ngụm rải rác").build(),
+                Medicine.builder().code("MED-020").name("Smecta 3g").activeIngredient("Diosmectite").dosageForm("Gói hỗn dịch").unit("Gói").price(4500.0).stockQuantity(1100).packaging("Hộp 30 gói").routeOfAdministration("Đường uống").category(catTH).defaultUsageInstructions("Khuấy đều 1 gói vào 50ml nước, uống 2-3 lần/ngày xa bữa ăn").build(),
+                Medicine.builder().code("MED-021").name("Enterogermina 5ml").activeIngredient("Bào tử Bacillus clausii").dosageForm("Hỗn dịch uống").unit("Ống").price(9000.0).stockQuantity(800).packaging("Hộp 20 ống").routeOfAdministration("Đường uống").category(catTH).defaultUsageInstructions("Lắc kỹ trước khi uống, dùng 1-2 ống/ngày sau bữa ăn").build(),
+                Medicine.builder().code("MED-022").name("Berocca Performance").activeIngredient("Vitamin B complex + Vitamin C + Kẽm").dosageForm("Viên sủi").unit("Viên").price(9500.0).stockQuantity(600).packaging("Tuýp 10 viên sủi").routeOfAdministration("Đường uống").category(catVT).defaultUsageInstructions("Hòa tan 1 viên vào 200ml nước, uống vào buổi sáng sau ăn").build(),
+                Medicine.builder().code("MED-023").name("Vitamin C 500mg").activeIngredient("Acid ascorbic").dosageForm("Viên sủi").unit("Viên").price(3000.0).stockQuantity(750).packaging("Tuýp 10 viên").routeOfAdministration("Đường uống").category(catVT).defaultUsageInstructions("Hòa tan 1 viên trong 150ml nước, uống sau bữa ăn sáng").build(),
+                Medicine.builder().code("MED-024").name("Decolgen Forte").activeIngredient("Paracetamol + Chlorpheniramine").dosageForm("Viên nén").unit("Viên").price(2200.0).stockQuantity(900).packaging("Hộp 25 vỉ x 4 viên").routeOfAdministration("Đường uống").category(catHH).defaultUsageInstructions("Uống 1 viên x 3 lần/ngày để giảm hắt hơi, sổ mũi").build(),
+                Medicine.builder().code("MED-025").name("Alpha Chymotrypsine (Choay)").activeIngredient("Chymotrypsin").dosageForm("Viên ngậm dưới lưỡi").unit("Viên").price(4000.0).stockQuantity(850).packaging("Hộp 2 vỉ x 10 viên").routeOfAdministration("Ngậm dưới lưỡi").category(catGD).defaultUsageInstructions("Ngậm dưới lưỡi 2 viên/lần x 2-3 lần/ngày").build(),
+                Medicine.builder().code("MED-026").name("Nước muối sinh lý 0.9%").activeIngredient("Natri Clorid 0.9%").dosageForm("Dung dịch nhỏ mắt mũi").unit("Lọ").price(5000.0).stockQuantity(1200).packaging("Lọ 10ml").routeOfAdministration("Nhỏ mắt, mũi").category(catDN).defaultUsageInstructions("Nhỏ 2-3 giọt vào mỗi bên mũi/mắt khi vệ sinh").build(),
+                Medicine.builder().code("MED-027").name("Salonpas Gel 30g").activeIngredient("Methyl Salicylate + L-Menthol").dosageForm("Gel bôi ngoài da").unit("Tuýp").price(38000.0).stockQuantity(350).packaging("Tuýp 30g").routeOfAdministration("Bôi ngoài da").category(catDN).defaultUsageInstructions("Bôi xoa bóp nhẹ một lượng vừa đủ lên vùng cơ bị đau nhức").build(),
+                Medicine.builder().code("MED-028").name("Tobradex 5ml").activeIngredient("Tobramycin + Dexamethasone").dosageForm("Hỗn dịch nhỏ mắt").unit("Lọ").price(56000.0).stockQuantity(250).packaging("Lọ 5ml").routeOfAdministration("Nhỏ mắt").category(catDN).defaultUsageInstructions("Nhỏ 1 giọt vào mắt bị viêm nhiễm mỗi 4-6 giờ").build(),
+                Medicine.builder().code("MED-029").name("Ginkgo Biloba 80mg").activeIngredient("Cao khô lá Bạch quả").dosageForm("Viên nang mềm").unit("Viên").price(6500.0).stockQuantity(500).packaging("Hộp 6 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catVT).defaultUsageInstructions("Uống 1 viên x 2 lần/ngày trong bữa ăn để tăng tuần hoàn não").build(),
+                Medicine.builder().code("MED-030").name("Magie B6").activeIngredient("Magnesium lactate + Vitamin B6").dosageForm("Viên bao phim").unit("Viên").price(2500.0).stockQuantity(700).packaging("Hộp 5 vỉ x 10 viên").routeOfAdministration("Đường uống").category(catVT).defaultUsageInstructions("Uống 1 viên x 2 lần/ngày với nhiều nước").build()
         );
 
         medicineRepository.saveAll(medicines);
-        log.info("-> Đã khởi tạo thành công 30 loại thuốc mẫu vào danh mục dược phẩm!");
+        log.info("-> Đã khởi tạo thành công 30 loại thuốc mẫu đầy đủ mã, nhóm, giá và tồn kho!");
     }
 
     private void seedSampleMedicalRecordIfEmpty() {

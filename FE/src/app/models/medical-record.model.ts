@@ -1,11 +1,4 @@
-export interface Medicine {
-  id: number;
-  name: string;
-  activeIngredient?: string;
-  dosageForm?: string;
-  unit?: string;
-  defaultUsageInstructions?: string;
-}
+export type { Medicine } from './medicine.model';
 
 export interface PrescriptionItemRequest {
   medicineId: number;

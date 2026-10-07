@@ -6,6 +6,7 @@ export interface QueueTicket {
   patientName: string;
   patientPhone: string;
   patientYearOfBirth?: number;
+  patientDob?: string;
   isEmergency: boolean;
   hasAppointment: boolean;
   priorityScore: number;
@@ -30,6 +31,7 @@ export interface CheckInRequest {
   patientId?: number;
   patientName: string;
   patientPhone: string;
+  patientDob?: string;
   patientYearOfBirth?: number;
   examinationRoomId: number;
   doctorId?: number;
@@ -90,4 +92,18 @@ export interface MyTicketStatus {
   positionInQueue: number;
   waitingAheadCount: number;
   estimatedWaitingMinutes: number;
+}
+
+export interface PatientLookup {
+  id: number;
+  fullName: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  nationalId?: string;
+  address?: string;
+  bloodGroup?: string;
+  allergies?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
