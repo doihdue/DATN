@@ -225,6 +225,10 @@ public class QueueServiceImpl implements QueueService {
 
         ticket.setStatus("COMPLETED");
         ticket.setEndTime(LocalTime.now());
+        // Đồng bộ trạng thái lịch hẹn online (nếu vé được cấp từ lịch hẹn)
+        if (ticket.getAppointment() != null) {
+            ticket.getAppointment().setStatus("COMPLETED");
+        }
         QueueTicket saved = queueTicketRepository.save(ticket);
         log.info("-> Hoàn thành khám vé {}", saved.getTicketNumber());
 

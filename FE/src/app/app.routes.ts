@@ -10,6 +10,9 @@ import { QueueTrackingComponent } from './pages/queue-tracking/queue-tracking.co
 import { DoctorExaminationComponent } from './pages/doctor-examination/doctor-examination.component';
 import { MedicinesComponent } from './pages/medicines/medicines.component';
 import { CheckInComponent } from './pages/check-in/check-in.component';
+import { BookAppointmentComponent } from './pages/book-appointment/book-appointment.component';
+import { MyAppointmentsComponent } from './pages/my-appointments/my-appointments.component';
+import { AppointmentManagementComponent } from './pages/appointment-management/appointment-management.component';
 import { roleGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -47,6 +50,22 @@ export const routes: Routes = [
     component: SchedulesComponent,
     title: 'Lịch trực Bác sĩ - MedQueue',
     canActivate: [roleGuard(['DOCTOR'])]
+  },
+
+  // Đặt lịch khám online: ai cũng xem được ca trống, đặt lịch cần đăng nhập bệnh nhân
+  { path: 'booking', component: BookAppointmentComponent, title: 'Đặt lịch khám - MedQueue' },
+  {
+    path: 'my-appointments',
+    component: MyAppointmentsComponent,
+    title: 'Lịch hẹn của tôi - MedQueue',
+    canActivate: [roleGuard(['PATIENT'])]
+  },
+  // Lễ tân xác nhận / check-in lịch hẹn online
+  {
+    path: 'staff/appointments',
+    component: AppointmentManagementComponent,
+    title: 'Quản lý lịch hẹn - MedQueue',
+    canActivate: [roleGuard(['STAFF', 'ADMIN'])]
   },
 
   // 3a. Tiếp Đón & Cấp Số Thứ Tự (Patient Reception & Check-in)

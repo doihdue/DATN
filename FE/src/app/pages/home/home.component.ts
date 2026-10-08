@@ -171,9 +171,9 @@ interface QueueRoom {
             @if (authService.hasRole('PATIENT')) {
               <div class="action-card medical-card">
                 <div class="action-icon icon-blue"><i class="bi bi-calendar-check"></i></div>
-                <h3 class="action-title">Đăng Ký Khám Mới</h3>
+                <h3 class="action-title">Đặt Lịch Khám Online</h3>
                 <p class="action-desc">Chọn bác sĩ, chuyên khoa và khung giờ thuận tiện giúp hạn chế tối đa xếp hàng.</p>
-                <a routerLink="/register" class="btn btn-outline btn-sm">Đăng ký ngay <i class="bi bi-arrow-right"></i></a>
+                <a routerLink="/booking" class="btn btn-outline btn-sm">Đặt lịch ngay <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">

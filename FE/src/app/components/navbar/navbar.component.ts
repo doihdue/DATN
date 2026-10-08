@@ -32,6 +32,11 @@ import { AuthService } from '../../services/auth.service';
           <a routerLink="/queue/tracking" routerLinkActive="active" class="nav-item">
             <i class="bi bi-ticket-perforated"></i> Tra cứu phiếu
           </a>
+          @if (!authService.isAuthenticated() || authService.hasRole('PATIENT')) {
+            <a routerLink="/booking" routerLinkActive="active" class="nav-item">
+              <i class="bi bi-calendar-plus"></i> Đặt lịch khám
+            </a>
+          }
 
           @if (authService.isAuthenticated()) {
             @if (authService.hasRole('ADMIN')) {
@@ -44,11 +49,19 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/admin/schedules" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-calendar3"></i> Lịch trực
               </a>
+              <a routerLink="/staff/appointments" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-journal-check"></i> Lịch hẹn
+              </a>
               <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
               </a>
               <a routerLink="/staff/queue" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-sliders"></i> Điều phối
+              </a>
+            }
+            @if (authService.hasRole('PATIENT')) {
+              <a routerLink="/my-appointments" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar2-heart"></i> Lịch hẹn của tôi
               </a>
             }
             @if (authService.hasRole('DOCTOR')) {
@@ -63,6 +76,9 @@ import { AuthService } from '../../services/auth.service';
               </a>
             }
             @if (authService.hasRole('STAFF')) {
+              <a routerLink="/staff/appointments" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-journal-check"></i> Lịch hẹn
+              </a>
               <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
               </a>
