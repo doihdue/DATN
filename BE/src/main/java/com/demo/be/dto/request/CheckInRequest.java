@@ -23,6 +23,8 @@ public class CheckInRequest {
 
     private Integer patientYearOfBirth;
 
+    private String patientGender; // "Nam", "Nữ", "Khác"
+
     @NotNull(message = "Phòng khám không được để trống")
     private Long examinationRoomId;
 

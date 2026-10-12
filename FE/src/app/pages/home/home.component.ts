@@ -21,79 +21,132 @@ interface QueueRoom {
     <div class="home-page">
       <!-- Clinical Welcome Banner -->
       <section class="hero-section">
+        <div class="hero-ambient-glow"></div>
         <div class="hero-content">
           <div class="hero-badge">
-            <i class="bi bi-shield-check"></i> Cổng Tiếp Đón & Quản Lý Hàng Đợi Điện Tử
+            <span class="pulse-dot"></span>
+            <span>Cổng Tiếp Đón &amp; Quản Lý Hàng Đợi Y Tế Điện Tử</span>
           </div>
+
           <h1 class="hero-title">
-            Hệ Thống Đặt Lịch Khám &amp; Điều Phối Số Hàng Đợi
+            Hệ Thống Đặt Lịch Khám &amp;<br class="hero-title-break" />
+            <span class="hero-gradient-text">Điều Phối Hàng Đợi Thông Minh</span>
           </h1>
+
           <p class="hero-desc">
-            Giải pháp số hóa quy trình tiếp đón bệnh nhân tại phòng khám: Cấp số thứ tự tự động, 
-            theo dõi thời gian thực tại sảnh chờ, tối ưu hóa thời gian khám chữa bệnh và hỗ trợ tư vấn phân luồng bằng AI.
+            Giải pháp số hóa toàn diện quy trình tiếp đón: Tự động cấp số thứ tự, giám sát phòng khám thời gian thực,
+            tối ưu hóa thời gian chờ đợi và hỗ trợ tư vấn phân luồng chuyên khoa bằng AI.
           </p>
 
           <div class="hero-actions">
             @if (!authService.isAuthenticated()) {
-              <a routerLink="/register" class="btn btn-primary btn-lg">
-                <i class="bi bi-calendar-plus"></i> Đăng Ký Khám Bệnh
-              </a>
-              <a routerLink="/queue/tracking" class="btn btn-outline btn-lg">
-                <i class="bi bi-ticket-perforated"></i> Tra Cứu Phiếu Khám
-              </a>
-              <a routerLink="/login" class="btn btn-secondary btn-lg">
-                <i class="bi bi-box-arrow-in-right"></i> Đăng Nhập Cán Bộ Y Tế
-              </a>
+              <div class="hero-cta-group">
+                <a routerLink="/register" class="btn btn-primary btn-hero">
+                  <i class="bi bi-calendar-plus"></i> Đăng Ký Khám Bệnh
+                </a>
+                <a routerLink="/queue/tracking" class="btn btn-outline btn-hero">
+                  <i class="bi bi-ticket-perforated"></i> Tra Cứu Phiếu Khám
+                </a>
+                <a routerLink="/queue" class="btn btn-ghost btn-hero">
+                  <i class="bi bi-tv"></i> Màn Hình TV Sảnh
+                </a>
+              </div>
             } @else {
-              <div class="user-greeting-banner">
-                <div class="greeting-avatar">
-                  <i class="bi bi-person-circle"></i>
-                </div>
-                <div class="greeting-text">
-                  <span class="welcome-label">Xin chào cán bộ y tế / bệnh nhân,</span>
-                  <span class="welcome-name">{{ authService.currentUser()?.fullName }}</span>
-                </div>
-                <div class="role-tags">
-                  @for (role of authService.userRoles(); track role) {
-                    <span class="badge" [ngClass]="getRoleBadgeClass(role)">
-                      <i class="bi bi-check-circle-fill"></i> {{ getRoleDisplayName(role) }}
-                    </span>
-                  }
-                </div>
+              <!-- Role-Tailored High-End SaaS Launchers -->
+              <div class="hero-cta-group">
+                @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
+                  <a routerLink="/doctor/examination" class="btn btn-primary btn-hero">
+                    <i class="bi bi-clipboard2-pulse"></i> Vào Bàn Khám Bệnh
+                  </a>
+                  <a routerLink="/doctor/calling" class="btn btn-outline btn-hero">
+                    <i class="bi bi-megaphone"></i> Bàn Gọi Số Khám
+                  </a>
+                  <a routerLink="/doctor/schedule" class="btn btn-ghost btn-hero">
+                    <i class="bi bi-calendar2-week"></i> Xem Ca Trực
+                  </a>
+                  <a routerLink="/queue" class="btn btn-ghost btn-hero">
+                    <i class="bi bi-tv"></i> Màn Hình TV
+                  </a>
+                }
+                @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+                  <a routerLink="/staff/check-in" class="btn btn-primary btn-hero">
+                    <i class="bi bi-person-check-fill"></i> Bàn Tiếp Đón &amp; Cấp Số
+                  </a>
+                  <a routerLink="/staff/queue" class="btn btn-outline btn-hero">
+                    <i class="bi bi-sliders"></i> Điều Phối Hàng Đợi
+                  </a>
+                  <a routerLink="/queue" class="btn btn-ghost btn-hero">
+                    <i class="bi bi-tv"></i> Màn Hình TV
+                  </a>
+                }
+                @if (authService.hasRole('ADMIN')) {
+                  <a routerLink="/admin/specialties" class="btn btn-primary btn-hero">
+                    <i class="bi bi-diagram-3"></i> Quản Lý Chuyên Khoa
+                  </a>
+                  <a routerLink="/admin/medicines" class="btn btn-outline btn-hero">
+                    <i class="bi bi-capsule"></i> Quản Lý Dược Phẩm
+                  </a>
+                  <a routerLink="/admin/schedules" class="btn btn-outline btn-hero">
+                    <i class="bi bi-calendar3"></i> Lịch Trực Phòng
+                  </a>
+                  <a routerLink="/queue" class="btn btn-ghost btn-hero">
+                    <i class="bi bi-tv"></i> Màn Hình TV
+                  </a>
+                }
+                @if (authService.hasRole('PATIENT')) {
+                  <a routerLink="/register" class="btn btn-primary btn-hero">
+                    <i class="bi bi-calendar-plus"></i> Đăng Ký Khám Mới
+                  </a>
+                  <a routerLink="/queue/tracking" class="btn btn-outline btn-hero">
+                    <i class="bi bi-ticket-perforated"></i> Tra Cứu Phiếu Khám
+                  </a>
+                  <a routerLink="/queue" class="btn btn-ghost btn-hero">
+                    <i class="bi bi-tv"></i> Màn Hình TV
+                  </a>
+                }
               </div>
             }
           </div>
         </div>
 
-        <!-- Quick Stats Overview -->
+        <!-- 3-Pillar Clinical Overview (Zero Overflow) -->
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon icon-blue">
-              <i class="bi bi-clock-history"></i>
+            <div class="stat-header">
+              <div class="stat-icon icon-blue">
+                <i class="bi bi-clock-history"></i>
+              </div>
+              <span class="stat-chip chip-blue">Ước tính AI</span>
             </div>
-            <div class="stat-info">
-              <span class="stat-value num">10 - 15 phút</span>
-              <span class="stat-label">Thời gian chờ dự kiến</span>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon icon-teal">
-              <i class="bi bi-qr-code"></i>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">Cấp Số Tự Động</span>
-              <span class="stat-label">Qua hệ thống trực tuyến &amp; Kiosk</span>
+            <div class="stat-body">
+              <div class="stat-value">10 – 15 Phút</div>
+              <div class="stat-label">Thời gian chờ dự kiến trung bình tại các phòng</div>
             </div>
           </div>
 
           <div class="stat-card">
-            <div class="stat-icon icon-indigo">
-              <i class="bi bi-robot"></i>
+            <div class="stat-header">
+              <div class="stat-icon icon-teal">
+                <i class="bi bi-qr-code-scan"></i>
+              </div>
+              <span class="stat-chip chip-teal">Đa kênh</span>
             </div>
-            <div class="stat-info">
-              <span class="stat-value">Tư Vấn AI 24/7</span>
-              <span class="stat-label">Phân luồng chuyên khoa chính xác</span>
+            <div class="stat-body">
+              <div class="stat-value">Cấp Số 1 Chạm</div>
+              <div class="stat-label">Tự động qua Kiosk sảnh &amp; Đặt hẹn online</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <div class="stat-icon icon-indigo">
+                <i class="bi bi-robot"></i>
+              </div>
+              <span class="stat-chip chip-indigo">Hỗ trợ 24/7</span>
+            </div>
+            <div class="stat-body">
+              <div class="stat-value">Tư Vấn AI Thông Minh</div>
+              <div class="stat-label">Phân luồng chuyên khoa chính xác theo triệu chứng</div>
             </div>
           </div>
         </div>
@@ -191,7 +244,7 @@ interface QueueRoom {
               </div>
             }
 
-            @if (authService.hasRole('DOCTOR')) {
+            @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
               <div class="action-card medical-card">
                 <div class="action-icon icon-blue"><i class="bi bi-clipboard2-pulse"></i></div>
                 <h3 class="action-title">Bàn Khám Bệnh &amp; Kê Đơn</h3>
@@ -214,12 +267,12 @@ interface QueueRoom {
               </div>
             }
 
-            @if (authService.hasRole('STAFF')) {
+            @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
               <div class="action-card medical-card">
                 <div class="action-icon icon-blue"><i class="bi bi-person-plus"></i></div>
                 <h3 class="action-title">Bàn Tiếp Đón &amp; Cấp Số</h3>
                 <p class="action-desc">Tiếp đón người bệnh, nhập thông tin, cấp số thứ tự vào phòng khám và gắn cờ cấp cứu.</p>
-                <a routerLink="/staff/queue" class="btn btn-primary btn-sm">Mở bàn tiếp đón <i class="bi bi-arrow-right"></i></a>
+                <a routerLink="/staff/check-in" class="btn btn-primary btn-sm">Mở bàn tiếp đón <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">
@@ -236,6 +289,13 @@ interface QueueRoom {
                 <h3 class="action-title">Danh Mục Chuyên Khoa</h3>
                 <p class="action-desc">Quản lý chuyên khoa, cấu hình mô tả và chỉ định bác sĩ phụ trách từng chuyên khoa.</p>
                 <a routerLink="/admin/specialties" class="btn btn-primary btn-sm">Quản lý chuyên khoa <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card medical-card">
+                <div class="action-icon icon-emerald"><i class="bi bi-capsule"></i></div>
+                <h3 class="action-title">Dược Phẩm &amp; Thuốc</h3>
+                <p class="action-desc">Quản lý danh mục thuốc, hoạt chất, biệt dược và liều dùng tiêu chuẩn bệnh viện.</p>
+                <a routerLink="/admin/medicines" class="btn btn-outline btn-sm">Quản lý thuốc <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">
@@ -267,151 +327,291 @@ interface QueueRoom {
       gap: 3rem;
     }
 
-    /* Hero Section */
+    /* Hero Section - High-End Healthcare Aesthetics */
     .hero-section {
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      gap: 2rem;
-      padding: 2rem 1rem 1rem;
-      background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%);
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-color);
+      gap: 2.25rem;
+      padding: 3rem 1.5rem 2.5rem;
+      background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 85%);
+      border-radius: 20px;
+      border: 1px solid #e0f2fe;
+      box-shadow: 0 10px 30px -5px rgba(2, 132, 199, 0.06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-ambient-glow {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 650px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, rgba(20, 184, 166, 0.05) 50%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      position: relative;
+      z-index: 1;
+      width: 100%;
     }
 
     .hero-badge {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
       background-color: #ffffff;
-      color: var(--primary-700);
-      font-size: 0.825rem;
+      color: #0369a1;
+      font-size: 0.8rem;
       font-weight: 700;
-      padding: 0.35rem 0.95rem;
+      padding: 0.4rem 1.1rem;
       border-radius: var(--radius-full);
-      border: 1px solid var(--primary-200);
-      box-shadow: var(--shadow-xs);
+      border: 1px solid #bae6fd;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.08);
+      letter-spacing: 0.01em;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
     }
 
     .hero-title {
-      font-size: 2.35rem;
-      font-weight: 800;
-      color: var(--primary-950);
-      line-height: 1.2;
-      letter-spacing: -0.02em;
-      max-width: 820px;
+      font-size: 2.55rem;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .hero-title-break {
+      display: block;
+    }
+
+    .hero-gradient-text {
+      background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
     }
 
     .hero-desc {
       font-size: 1.05rem;
-      color: var(--text-secondary);
-      max-width: 780px;
-      line-height: 1.6;
+      color: #475569;
+      max-width: 760px;
+      line-height: 1.65;
+      margin: 0 auto;
     }
 
     .hero-actions {
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 0.85rem;
-      margin-top: 0.25rem;
-    }
-
-    .user-greeting-banner {
-      background-color: #ffffff;
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-sm);
-      border-radius: var(--radius-md);
-      padding: 0.85rem 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .greeting-avatar {
-      font-size: 2rem;
-      color: var(--primary-600);
-      display: flex;
-      align-items: center;
-    }
-
-    .greeting-text {
-      display: flex;
-      flex-direction: column;
-      text-align: left;
-    }
-
-    .welcome-label {
-      font-size: 0.775rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .welcome-name {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: var(--primary-900);
-    }
-
-    .role-tags {
-      display: flex;
-      gap: 0.35rem;
-    }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
       width: 100%;
-      max-width: 960px;
       margin-top: 0.5rem;
     }
 
-    .stat-card {
-      background-color: #ffffff;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 1.15rem 1.25rem;
+    .hero-cta-group {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      box-shadow: var(--shadow-xs);
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+    }
+
+    .btn-hero {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.45rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: 11px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-hero.btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      border: 1px solid #0284c7;
+      box-shadow: 0 4px 14px -2px rgba(2, 132, 199, 0.35);
+
+      &:hover {
+        background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+        box-shadow: 0 6px 20px -2px rgba(2, 132, 199, 0.45);
+        transform: translateY(-1px);
+      }
+    }
+
+    .btn-hero.btn-outline {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+
+      &:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0284c7;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+      }
+    }
+
+    .btn-hero.btn-ghost {
+      background: rgba(255, 255, 255, 0.8);
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+
+      &:hover {
+        background: #ffffff;
+        color: #0284c7;
+        border-color: #bae6fd;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+      }
+    }
+
+    /* Stats 3-Pillar Grid (Robust Zero-Overflow Architecture) */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      box-sizing: border-box;
+    }
+
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 1.25rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: left;
+      min-width: 0;
+      box-sizing: border-box;
+
+      &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.08);
+        border-color: #cbd5e1;
+      }
+    }
+
+    .stat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
     }
 
     .stat-icon {
       width: 44px;
       height: 44px;
-      border-radius: var(--radius-sm);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.4rem;
+      font-size: 1.35rem;
       flex-shrink: 0;
     }
 
-    .icon-blue { background-color: #e0f2fe; color: #0284c7; }
-    .icon-teal { background-color: #ccfbf1; color: #0f766e; }
-    .icon-indigo { background-color: #e0e7ff; color: #4338ca; }
+    .icon-blue {
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+      color: #0284c7;
+    }
 
-    .stat-info {
+    .icon-teal {
+      background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+      color: #0d9488;
+    }
+
+    .icon-indigo {
+      background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+      color: #4f46e5;
+    }
+
+    .icon-emerald {
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      color: #059669;
+    }
+
+    .stat-chip {
+      font-size: 0.725rem;
+      font-weight: 700;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .chip-blue {
+      background: #f0f9ff;
+      color: #0284c7;
+      border: 1px solid #bae6fd;
+    }
+
+    .chip-teal {
+      background: #f0fdfa;
+      color: #0d9488;
+      border: 1px solid #99f6e4;
+    }
+
+    .chip-indigo {
+      background: #eef2ff;
+      color: #4f46e5;
+      border: 1px solid #c7d2fe;
+    }
+
+    .stat-body {
       display: flex;
       flex-direction: column;
-      text-align: left;
+      gap: 0.25rem;
+      min-width: 0;
     }
 
     .stat-value {
-      font-size: 1.15rem;
+      font-size: 1.25rem;
       font-weight: 800;
-      color: var(--text-main);
+      color: #0f172a;
+      letter-spacing: -0.015em;
+      line-height: 1.3;
+      white-space: normal;
+      word-break: break-word;
     }
 
     .stat-label {
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      font-size: 0.825rem;
+      color: #64748b;
       font-weight: 500;
+      line-height: 1.45;
+      white-space: normal;
+      word-break: break-word;
     }
 
     /* Queue Board Section */
@@ -627,12 +827,33 @@ interface QueueRoom {
       flex: 1;
     }
 
-    @media (max-width: 768px) {
-      .hero-title {
-        font-size: 1.85rem;
-      }
+    @media (max-width: 860px) {
       .stats-grid {
         grid-template-columns: 1fr;
+        max-width: 480px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero-title {
+        font-size: 2rem;
+      }
+      .hero-section {
+        padding: 2.5rem 1.25rem 2rem;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .hero-title {
+        font-size: 1.65rem;
+      }
+      .hero-cta-group {
+        flex-direction: column;
+        width: 100%;
+        .btn-hero {
+          width: 100%;
+          justify-content: center;
+        }
       }
     }
   `]

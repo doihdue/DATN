@@ -18,7 +18,7 @@ export class AuthService {
 
   // Signals for reactive state
   readonly currentUser = signal<UserSummary | null>(this.getStoredUser());
-  readonly isAuthenticated = computed(() => this.currentUser() !== null);
+  readonly isAuthenticated = computed(() => this.currentUser() !== null && !!this.getAccessToken());
   readonly userRoles = computed(() => this.currentUser()?.roles ?? []);
 
   constructor() {
@@ -97,9 +97,11 @@ export class AuthService {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
+    this.currentUser.set(null);
   }
 
   private getStoredUser(): UserSummary | null {
+    if (!this.getAccessToken()) return null;
     const data = localStorage.getItem(this.USER_KEY);
     if (!data) return null;
     try {

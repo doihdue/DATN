@@ -57,4 +57,25 @@ export class MedicalRecordService {
   getDoctorRecords(doctorId: number): Observable<ApiResponse<MedicalRecordResponse[]>> {
     return this.http.get<ApiResponse<MedicalRecordResponse[]>>(`${this.baseUrl}/medical-records/doctor/${doctorId}`);
   }
+
+  // 8. Tải file PDF Phiếu khám & Đơn thuốc (JasperReports) theo ID hồ sơ
+  exportMedicalRecordPdf(id: number): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/medical-records/${id}/export-pdf`, {
+      responseType: 'blob'
+    });
+  }
+
+  // 9. Tải file PDF theo ID vé khám hàng đợi
+  exportPdfByTicketId(ticketId: number): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/medical-records/ticket/${ticketId}/export-pdf`, {
+      responseType: 'blob'
+    });
+  }
+
+  // 10. Tải file PDF theo mã số vé khám (Ví dụ: A001, P101-001...)
+  exportPdfByTicketNumber(ticketNumber: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/medical-records/ticket-number/${ticketNumber}/export-pdf`, {
+      responseType: 'blob'
+    });
+  }
 }
