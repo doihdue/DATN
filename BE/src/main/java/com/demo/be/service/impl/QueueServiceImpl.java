@@ -73,38 +73,54 @@ public class QueueServiceImpl implements QueueService {
             yearOfBirth = dob.getYear();
         }
 
+        String requestedGender = (request.getPatientGender() != null && !request.getPatientGender().isBlank())
+                ? request.getPatientGender().trim() : "Chưa rõ";
+
         Patient patient = null;
         if (request.getPatientId() != null) {
             patient = patientRepository.findById(request.getPatientId()).orElse(null);
         }
-        if (patient == null && request.getPatientName() != null && !request.getPatientName().trim().isEmpty()) {
-            List<Patient> allPatients = patientRepository.findAll();
-            for (Patient p : allPatients) {
-                if (p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(request.getPatientName().trim())) {
-                    patient = p;
-                    break;
-                }
-                if (request.getPatientPhone() != null && request.getPatientPhone().trim().equals(p.getPhoneNumber())) {
-                    patient = p;
-                    break;
-                }
-            }
-            if (patient == null) {
-                patient = Patient.builder()
-                        .fullName(request.getPatientName().trim())
-                        .gender("Chưa rõ")
-                        .dateOfBirth(dob)
-                        .emergencyContactPhone(request.getPatientPhone())
-                        .bloodGroup(null)
-                        .build();
-                patient = patientRepository.save(patient);
-            } else if (patient.getDateOfBirth() == null && dob != null) {
-                patient.setDateOfBirth(dob);
-                patientRepository.save(patient);
+
+        // Tìm theo Số điện thoại nếu không truyền ID cụ thể
+        if (patient == null && request.getPatientPhone() != null && !request.getPatientPhone().trim().isEmpty()) {
+            List<Patient> byPhone = patientRepository.findByPhoneNumber(request.getPatientPhone().trim());
+            if (!byPhone.isEmpty()) {
+                patient = byPhone.get(0);
             }
         }
 
-        if (dob == null && patient != null && patient.getDateOfBirth() != null) {
+        if (patient == null) {
+            // Tạo mới bệnh nhân với thông tin tiếp đón
+            patient = Patient.builder()
+                    .fullName(request.getPatientName().trim())
+                    .gender(requestedGender)
+                    .dateOfBirth(dob)
+                    .emergencyContactPhone(request.getPatientPhone().trim())
+                    .bloodGroup(null)
+                    .build();
+            patient = patientRepository.save(patient);
+        } else {
+            // Cập nhật ngày sinh / giới tính nếu bệnh nhân đã tồn tại và thông tin được điều chỉnh ở quầy
+            boolean changed = false;
+            if (dob != null && !dob.equals(patient.getDateOfBirth())) {
+                patient.setDateOfBirth(dob);
+                changed = true;
+            }
+            if (!"Chưa rõ".equalsIgnoreCase(requestedGender) && !requestedGender.equalsIgnoreCase(patient.getGender())) {
+                patient.setGender(requestedGender);
+                changed = true;
+            }
+            if (request.getPatientName() != null && !request.getPatientName().trim().isEmpty() 
+                    && !request.getPatientName().trim().equalsIgnoreCase(patient.getFullName())) {
+                patient.setFullName(request.getPatientName().trim());
+                changed = true;
+            }
+            if (changed) {
+                patient = patientRepository.save(patient);
+            }
+        }
+
+        if (dob == null && patient.getDateOfBirth() != null) {
             dob = patient.getDateOfBirth();
             if (yearOfBirth == null) {
                 yearOfBirth = dob.getYear();
@@ -156,6 +172,7 @@ public class QueueServiceImpl implements QueueService {
                 .patientPhone(request.getPatientPhone().trim())
                 .patientDob(dob)
                 .patientYearOfBirth(yearOfBirth)
+                .patientGender(patient.getGender() != null ? patient.getGender() : requestedGender)
                 .isEmergency(isEmergency)
                 .hasAppointment(hasAppointment)
                 .priorityScore(priorityScore)
@@ -631,6 +648,7 @@ public class QueueServiceImpl implements QueueService {
                 .patientPhone(ticket.getPatientPhone())
                 .patientYearOfBirth(ticket.getPatientYearOfBirth() != null ? ticket.getPatientYearOfBirth() : (ticket.getPatientDob() != null ? ticket.getPatientDob().getYear() : null))
                 .patientDob(ticket.getPatientDob() != null ? ticket.getPatientDob() : (ticket.getPatient() != null ? ticket.getPatient().getDateOfBirth() : null))
+                .patientGender(ticket.getPatientGender() != null ? ticket.getPatientGender() : (ticket.getPatient() != null ? ticket.getPatient().getGender() : "Chưa rõ"))
                 .isEmergency(ticket.getIsEmergency())
                 .hasAppointment(ticket.getHasAppointment())
                 .priorityScore(ticket.getPriorityScore())

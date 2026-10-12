@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { QueueService } from '../../services/queue.service';
 import { ScheduleService } from '../../services/schedule.service';
+import { MedicalRecordService } from '../../services/medical-record.service';
 import { CheckInRequest, MyTicketStatus } from '../../models/queue.model';
 import { ExaminationRoom } from '../../models/schedule.model';
 
@@ -133,6 +134,17 @@ import { ExaminationRoom } from '../../models/schedule.model';
             </div>
 
             <div class="ticket-actions">
+              @if (ticketResult()!.status === 'COMPLETED') {
+                <button
+                  type="button"
+                  class="btn btn-danger btn-pdf"
+                  [disabled]="downloadingPdf()"
+                  (click)="downloadPdfByTicket(ticketResult()!.ticketNumber)"
+                >
+                  <i class="bi" [class.bi-file-earmark-pdf-fill]="!downloadingPdf()" [class.bi-hourglass-split]="downloadingPdf()"></i>
+                  {{ downloadingPdf() ? 'Đang tải PDF...' : 'Tải Phiếu Khám & Đơn Thuốc (PDF)' }}
+                </button>
+              }
               <button class="btn btn-outline" (click)="searchTicket()">
                 <i class="bi bi-arrow-clockwise"></i> Làm mới trạng thái
               </button>
@@ -445,6 +457,21 @@ import { ExaminationRoom } from '../../models/schedule.model';
       padding: 1rem 2rem 1.5rem;
       display: flex;
       justify-content: flex-end;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-pdf {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      color: #ffffff;
+      border: none;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+      transition: all 0.2s ease;
     }
 
     /* CheckIn Online Card */
@@ -491,12 +518,14 @@ import { ExaminationRoom } from '../../models/schedule.model';
 export class QueueTrackingComponent implements OnInit {
   private readonly queueService = inject(QueueService);
   private readonly scheduleService = inject(ScheduleService);
+  private readonly medicalRecordService = inject(MedicalRecordService);
   private readonly route = inject(ActivatedRoute);
 
   activeMode: 'LOOKUP' | 'CHECKIN' = 'LOOKUP';
   searchTicketNumber = '';
   readonly loadingSearch = signal(false);
   readonly submittingCheckIn = signal(false);
+  readonly downloadingPdf = signal(false);
   readonly ticketResult = signal<MyTicketStatus | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly rooms = signal<ExaminationRoom[]>([]);
@@ -600,5 +629,27 @@ export class QueueTrackingComponent implements OnInit {
 
   getCardClassByStatus(status: string): string {
     return 'status-' + status.toLowerCase();
+  }
+
+  downloadPdfByTicket(ticketNumber: string): void {
+    this.downloadingPdf.set(true);
+    this.medicalRecordService.exportPdfByTicketNumber(ticketNumber).subscribe({
+      next: (blob: Blob) => {
+        this.downloadingPdf.set(false);
+        const fileUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = `phieu-kham-${ticketNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(fileUrl);
+      },
+      error: err => {
+        this.downloadingPdf.set(false);
+        console.error('Lỗi khi tải PDF phiếu khám:', err);
+        alert('Hồ sơ bệnh án cho phiếu khám này chưa sẵn sàng hoặc có lỗi từ máy chủ!');
+      }
+    });
   }
 }

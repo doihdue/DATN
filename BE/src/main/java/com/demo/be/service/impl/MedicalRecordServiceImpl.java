@@ -40,17 +40,21 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     public MedicalRecordResponse createMedicalRecord(CreateMedicalRecordRequest request) {
         log.info("Bác sĩ đang tạo hồ sơ bệnh án cho bệnh nhân ID: {}", request.getPatientId());
 
-        Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Bệnh nhân", "id", request.getPatientId()));
-
         // 1. Xác định Bác sĩ phụ trách
         Doctor doctor = resolveDoctor(request.getDoctorId());
 
         // 2. Xác định Vé khám (nếu từ luồng hàng đợi)
         QueueTicket queueTicket = null;
+        Patient patient = null;
+
         if (request.getQueueTicketId() != null) {
             queueTicket = queueTicketRepository.findById(request.getQueueTicketId())
                     .orElseThrow(() -> new ResourceNotFoundException("Phiếu khám hàng đợi", "id", request.getQueueTicketId()));
+
+            // Ưu tiên tuyệt đối lấy bệnh nhân liên kết với vé khám đang phục vụ
+            if (queueTicket.getPatient() != null) {
+                patient = queueTicket.getPatient();
+            }
 
             // Nếu bác sĩ chưa được gán, lấy từ vé khám
             if (doctor == null && queueTicket.getDoctor() != null) {
@@ -70,6 +74,26 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             } catch (Exception e) {
                 log.warn("Không thể gửi websocket event: {}", e.getMessage());
             }
+        }
+
+        if (patient == null && request.getPatientId() != null) {
+            patient = patientRepository.findById(request.getPatientId()).orElse(null);
+        }
+
+        if (patient == null && queueTicket != null && queueTicket.getPatientName() != null && !queueTicket.getPatientName().isBlank()) {
+            patient = Patient.builder()
+                    .fullName(queueTicket.getPatientName().trim())
+                    .emergencyContactPhone(queueTicket.getPatientPhone())
+                    .dateOfBirth(queueTicket.getPatientDob())
+                    .gender("Chưa rõ")
+                    .build();
+            patient = patientRepository.save(patient);
+            queueTicket.setPatient(patient);
+            queueTicketRepository.save(queueTicket);
+        }
+
+        if (patient == null) {
+            throw new ResourceNotFoundException("Bệnh nhân", "id", request.getPatientId() != null ? request.getPatientId() : 0);
         }
 
         // 3. Khởi tạo Hồ sơ bệnh án

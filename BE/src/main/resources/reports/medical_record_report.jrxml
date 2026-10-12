@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="medical_record_report"
+              pageWidth="595"
+              pageHeight="842"
+              columnWidth="535"
+              leftMargin="30"
+              rightMargin="30"
+              topMargin="25"
+              bottomMargin="25"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="b182cb05-c1fa-4011-8285-06a457c6b998">
+
+    <style name="Default" isDefault="true" fontName="Arial" fontSize="9" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+    <style name="Bold" fontName="Arial" fontSize="9" isBold="true" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+    <style name="Title" fontName="Arial" fontSize="15" isBold="true" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+    <style name="SectionHeader" fontName="Arial" fontSize="10" isBold="true" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+    <style name="TableHeader" fontName="Arial" fontSize="8.5" isBold="true" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+
+    <!-- Parameters -->
+    <parameter name="clinicName" class="java.lang.String"/>
+    <parameter name="clinicAddress" class="java.lang.String"/>
+    <parameter name="clinicPhone" class="java.lang.String"/>
+    <parameter name="recordId" class="java.lang.String"/>
+    <parameter name="createdAt" class="java.lang.String"/>
+    <parameter name="ticketNumber" class="java.lang.String"/>
+    <parameter name="patientName" class="java.lang.String"/>
+    <parameter name="patientDob" class="java.lang.String"/>
+    <parameter name="patientGender" class="java.lang.String"/>
+    <parameter name="patientPhone" class="java.lang.String"/>
+    <parameter name="patientAddress" class="java.lang.String"/>
+    <parameter name="bloodGroup" class="java.lang.String"/>
+    <parameter name="allergies" class="java.lang.String"/>
+    <parameter name="doctorName" class="java.lang.String"/>
+    <parameter name="specialtyName" class="java.lang.String"/>
+    <parameter name="bloodPressure" class="java.lang.String"/>
+    <parameter name="heartRate" class="java.lang.String"/>
+    <parameter name="temperature" class="java.lang.String"/>
+    <parameter name="weight" class="java.lang.String"/>
+    <parameter name="height" class="java.lang.String"/>
+    <parameter name="bmi" class="java.lang.String"/>
+    <parameter name="vitalSigns" class="java.lang.String"/>
+    <parameter name="symptoms" class="java.lang.String"/>
+    <parameter name="preliminaryDiagnosis" class="java.lang.String"/>
+    <parameter name="finalDiagnosis" class="java.lang.String"/>
+    <parameter name="icd10Code" class="java.lang.String"/>
+    <parameter name="doctorNotes" class="java.lang.String"/>
+    <parameter name="revisitDate" class="java.lang.String"/>
+    <parameter name="revisitNotes" class="java.lang.String"/>
+    <parameter name="prescriptionAdvice" class="java.lang.String"/>
+    <parameter name="hasPrescription" class="java.lang.Boolean"/>
+
+    <!-- Fields for Prescription items -->
+    <field name="stt" class="java.lang.Integer"/>
+    <field name="medicineName" class="java.lang.String"/>
+    <field name="activeIngredient" class="java.lang.String"/>
+    <field name="quantity" class="java.lang.Integer"/>
+    <field name="unit" class="java.lang.String"/>
+    <field name="instructions" class="java.lang.String"/>
+    <field name="dosageAndRoute" class="java.lang.String"/>
+
+    <title>
+        <band height="295" splitType="Stretch">
+            <!-- Header: Clinic Branding (Left) -->
+            <staticText>
+                <reportElement style="Bold" x="0" y="0" width="350" height="15" forecolor="#1A56DB" uuid="a1a1a1a1-0001-0000-0000-000000000001"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="11" isBold="true"/>
+                </textElement>
+                <text><![CDATA[PHÒNG KHÁM ĐA KHOA QUỐC TẾ MEDQUEUE]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Default" x="0" y="15" width="350" height="13" forecolor="#4B5563" uuid="a1a1a1a1-0002-0000-0000-000000000002"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{clinicAddress}]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Default" x="0" y="28" width="350" height="13" forecolor="#4B5563" uuid="a1a1a1a1-0003-0000-0000-000000000003"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{clinicPhone}]]></textFieldExpression>
+            </textField>
+
+            <!-- Header: Info box (Right) -->
+            <staticText>
+                <reportElement style="Default" x="360" y="0" width="70" height="13" forecolor="#374151" uuid="a1a1a1a1-0004-0000-0000-000000000004"/>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <text><![CDATA[Mã hồ sơ:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="435" y="0" width="100" height="13" forecolor="#111827" uuid="a1a1a1a1-0005-0000-0000-000000000005"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{recordId}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="360" y="13" width="70" height="13" forecolor="#374151" uuid="a1a1a1a1-0006-0000-0000-000000000006"/>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <text><![CDATA[Số thứ tự vé:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="435" y="13" width="100" height="13" forecolor="#1A56DB" uuid="a1a1a1a1-0007-0000-0000-000000000007"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="8.5"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{ticketNumber}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="360" y="26" width="70" height="13" forecolor="#374151" uuid="a1a1a1a1-0008-0000-0000-000000000008"/>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <text><![CDATA[Ngày khám:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Default" x="435" y="26" width="100" height="13" forecolor="#374151" uuid="a1a1a1a1-0009-0000-0000-000000000009"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{createdAt}]]></textFieldExpression>
+            </textField>
+
+            <!-- Line Divider -->
+            <line>
+                <reportElement x="0" y="44" width="535" height="1" forecolor="#D1D5DB" uuid="a1a1a1a1-0010-0000-0000-000000000010"/>
+                <graphicElement>
+                    <pen lineWidth="0.8"/>
+                </graphicElement>
+            </line>
+
+            <!-- Main Title -->
+            <staticText>
+                <reportElement style="Title" x="0" y="50" width="535" height="20" forecolor="#1E3A8A" uuid="a1a1a1a1-0011-0000-0000-000000000011"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[PHIẾU KHÁM BỆNH & ĐƠN THUỐC]]></text>
+            </staticText>
+            <staticText>
+                <reportElement style="Default" x="0" y="70" width="535" height="12" forecolor="#6B7280" uuid="a1a1a1a1-0012-0000-0000-000000000012"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="8" isItalic="true"/>
+                </textElement>
+                <text><![CDATA[(Lưu hành nội bộ & Cung cấp cho bệnh nhân)]]></text>
+            </staticText>
+
+            <!-- I. THÔNG TIN HÀNH CHÍNH -->
+            <rectangle>
+                <reportElement x="0" y="86" width="535" height="16" backcolor="#F3F4F6" uuid="a1a1a1a1-0013-0000-0000-000000000013"/>
+                <graphicElement>
+                    <pen lineWidth="0.0"/>
+                </graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement style="SectionHeader" x="6" y="86" width="520" height="16" forecolor="#1F2937" uuid="a1a1a1a1-0014-0000-0000-000000000014"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="9" isBold="true"/>
+                </textElement>
+                <text><![CDATA[I. THÔNG TIN BỆNH NHÂN & BÁC SĨ PHỤ TRÁCH]]></text>
+            </staticText>
+
+            <!-- Row 1: Name, DOB, Gender -->
+            <staticText>
+                <reportElement style="Default" x="0" y="106" width="70" height="14" uuid="a1a1a1a1-0015-0000-0000-000000000015"/>
+                <text><![CDATA[Họ và tên:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="70" y="106" width="200" height="14" forecolor="#111827" uuid="a1a1a1a1-0016-0000-0000-000000000016"/>
+                <textElement>
+                    <font size="9.5" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{patientName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="275" y="106" width="55" height="14" uuid="a1a1a1a1-0017-0000-0000-000000000017"/>
+                <text><![CDATA[Ngày sinh:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="330" y="106" width="85" height="14" uuid="a1a1a1a1-0018-0000-0000-000000000018"/>
+                <textFieldExpression><![CDATA[$P{patientDob}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="420" y="106" width="50" height="14" uuid="a1a1a1a1-0019-0000-0000-000000000019"/>
+                <text><![CDATA[Giới tính:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="470" y="106" width="65" height="14" uuid="a1a1a1a1-0020-0000-0000-000000000020"/>
+                <textFieldExpression><![CDATA[$P{patientGender}]]></textFieldExpression>
+            </textField>
+
+            <!-- Row 2: Phone, BloodGroup, Allergies -->
+            <staticText>
+                <reportElement style="Default" x="0" y="121" width="70" height="14" uuid="a1a1a1a1-0021-0000-0000-000000000021"/>
+                <text><![CDATA[Điện thoại:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Default" x="70" y="121" width="200" height="14" uuid="a1a1a1a1-0022-0000-0000-000000000022"/>
+                <textFieldExpression><![CDATA[$P{patientPhone}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="275" y="121" width="55" height="14" uuid="a1a1a1a1-0023-0000-0000-000000000023"/>
+                <text><![CDATA[Nhóm máu:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="330" y="121" width="85" height="14" forecolor="#DC2626" uuid="a1a1a1a1-0024-0000-0000-000000000024"/>
+                <textFieldExpression><![CDATA[$P{bloodGroup}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="420" y="121" width="50" height="14" uuid="a1a1a1a1-0025-0000-0000-000000000025"/>
+                <text><![CDATA[Dị ứng:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Default" x="470" y="121" width="65" height="14" forecolor="#DC2626" uuid="a1a1a1a1-0026-0000-0000-000000000026"/>
+                <textFieldExpression><![CDATA[$P{allergies}]]></textFieldExpression>
+            </textField>
+
+            <!-- Row 3: Doctor, Specialty, Address -->
+            <staticText>
+                <reportElement style="Default" x="0" y="136" width="70" height="14" uuid="a1a1a1a1-0027-0000-0000-000000000027"/>
+                <text><![CDATA[Bác sĩ khám:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="70" y="136" width="200" height="14" forecolor="#1F2937" uuid="a1a1a1a1-0028-0000-0000-000000000028"/>
+                <textFieldExpression><![CDATA[$P{doctorName}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="275" y="136" width="65" height="14" uuid="a1a1a1a1-0029-0000-0000-000000000029"/>
+                <text><![CDATA[Chuyên khoa:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="340" y="136" width="195" height="14" forecolor="#1A56DB" uuid="a1a1a1a1-0030-0000-0000-000000000030"/>
+                <textFieldExpression><![CDATA[$P{specialtyName}]]></textFieldExpression>
+            </textField>
+
+            <!-- II. KẾT QUẢ KHÁM LÂM SÀNG & CHỈ SỐ SINH TỒN -->
+            <rectangle>
+                <reportElement x="0" y="156" width="535" height="16" backcolor="#F3F4F6" uuid="a1a1a1a1-0031-0000-0000-000000000031"/>
+                <graphicElement>
+                    <pen lineWidth="0.0"/>
+                </graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement style="SectionHeader" x="6" y="156" width="520" height="16" forecolor="#1F2937" uuid="a1a1a1a1-0032-0000-0000-000000000032"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="9" isBold="true"/>
+                </textElement>
+                <text><![CDATA[II. KẾT QUẢ KHÁM LÂM SÀNG & CHỈ SỐ SINH HIỆU]]></text>
+            </staticText>
+
+            <!-- Vital Signs Table Grid -->
+            <rectangle>
+                <reportElement x="0" y="176" width="535" height="24" backcolor="#FFFFFF" uuid="a1a1a1a1-0033-0000-0000-000000000033"/>
+                <graphicElement>
+                    <pen lineWidth="0.5" lineColor="#D1D5DB"/>
+                </graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement style="Default" x="6" y="178" width="55" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0034-0000-0000-000000000034"/>
+                <textElement><font size="7"/></textElement>
+                <text><![CDATA[Huyết áp]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="6" y="188" width="75" height="11" uuid="a1a1a1a1-0035-0000-0000-000000000035"/>
+                <textElement><font size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{bloodPressure}]]></textFieldExpression>
+            </textField>
+
+            <line>
+                <reportElement x="85" y="176" width="1" height="24" forecolor="#E5E7EB" uuid="a1a1a1a1-0036-0000-0000-000000000036"/>
+            </line>
+            <staticText>
+                <reportElement style="Default" x="92" y="178" width="55" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0037-0000-0000-000000000037"/>
+                <textElement><font size="7"/></textElement>
+                <text><![CDATA[Nhịp tim]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="92" y="188" width="70" height="11" uuid="a1a1a1a1-0038-0000-0000-000000000038"/>
+                <textElement><font size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{heartRate}]]></textFieldExpression>
+            </textField>
+
+            <line>
+                <reportElement x="168" y="176" width="1" height="24" forecolor="#E5E7EB" uuid="a1a1a1a1-0039-0000-0000-000000000039"/>
+            </line>
+            <staticText>
+                <reportElement style="Default" x="175" y="178" width="55" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0040-0000-0000-000000000040"/>
+                <textElement><font size="7"/></textElement>
+                <text><![CDATA[Thân nhiệt]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="175" y="188" width="70" height="11" uuid="a1a1a1a1-0041-0000-0000-000000000041"/>
+                <textElement><font size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{temperature}]]></textFieldExpression>
+            </textField>
+
+            <line>
+                <reportElement x="250" y="176" width="1" height="24" forecolor="#E5E7EB" uuid="a1a1a1a1-0042-0000-0000-000000000042"/>
+            </line>
+            <staticText>
+                <reportElement style="Default" x="257" y="178" width="55" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0043-0000-0000-000000000043"/>
+                <textElement><font size="7"/></textElement>
+                <text><![CDATA[Cân nặng]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="257" y="188" width="60" height="11" uuid="a1a1a1a1-0044-0000-0000-000000000044"/>
+                <textElement><font size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{weight}]]></textFieldExpression>
+            </textField>
+
+            <line>
+                <reportElement x="325" y="176" width="1" height="24" forecolor="#E5E7EB" uuid="a1a1a1a1-0045-0000-0000-000000000045"/>
+            </line>
+            <staticText>
+                <reportElement style="Default" x="332" y="178" width="55" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0046-0000-0000-000000000046"/>
+                <textElement><font size="7"/></textElement>
+                <text><![CDATA[Chiều cao]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="332" y="188" width="60" height="11" uuid="a1a1a1a1-0047-0000-0000-000000000047"/>
+                <textElement><font size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{height}]]></textFieldExpression>
+            </textField>
+
+            <line>
+                <reportElement x="400" y="176" width="1" height="24" forecolor="#E5E7EB" uuid="a1a1a1a1-0048-0000-0000-000000000048"/>
+            </line>
+            <staticText>
+                <reportElement style="Default" x="407" y="178" width="55" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0049-0000-0000-000000000049"/>
+                <textElement><font size="7"/></textElement>
+                <text><![CDATA[Chỉ số BMI]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="407" y="188" width="120" height="11" uuid="a1a1a1a1-0050-0000-0000-000000000050"/>
+                <textElement><font size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{bmi}]]></textFieldExpression>
+            </textField>
+
+            <!-- Diagnosis details -->
+            <staticText>
+                <reportElement style="Bold" x="0" y="206" width="115" height="14" uuid="a1a1a1a1-0051-0000-0000-000000000051"/>
+                <text><![CDATA[Triệu chứng lâm sàng:]]></text>
+            </staticText>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="120" y="206" width="415" height="14" uuid="a1a1a1a1-0052-0000-0000-000000000052"/>
+                <textFieldExpression><![CDATA[$P{symptoms}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Bold" x="0" y="222" width="115" height="14" uuid="a1a1a1a1-0053-0000-0000-000000000053"/>
+                <text><![CDATA[Chẩn đoán sơ bộ:]]></text>
+            </staticText>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="120" y="222" width="415" height="14" uuid="a1a1a1a1-0054-0000-0000-000000000054"/>
+                <textFieldExpression><![CDATA[$P{preliminaryDiagnosis}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Bold" x="0" y="238" width="115" height="14" forecolor="#1E3A8A" uuid="a1a1a1a1-0055-0000-0000-000000000055"/>
+                <text><![CDATA[Chẩn đoán xác định:]]></text>
+            </staticText>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Bold" x="120" y="238" width="280" height="14" forecolor="#1E3A8A" uuid="a1a1a1a1-0056-0000-0000-000000000056"/>
+                <textElement><font size="9.5" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{finalDiagnosis}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Default" x="405" y="238" width="60" height="14" forecolor="#4B5563" uuid="a1a1a1a1-0057-0000-0000-000000000057"/>
+                <text><![CDATA[Mã ICD-10:]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="465" y="238" width="70" height="14" forecolor="#111827" uuid="a1a1a1a1-0058-0000-0000-000000000058"/>
+                <textFieldExpression><![CDATA[$P{icd10Code}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement style="Bold" x="0" y="254" width="115" height="14" uuid="a1a1a1a1-0059-0000-0000-000000000059"/>
+                <text><![CDATA[Lời dặn của bác sĩ:]]></text>
+            </staticText>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="120" y="254" width="415" height="14" uuid="a1a1a1a1-0060-0000-0000-000000000060"/>
+                <textFieldExpression><![CDATA[$P{doctorNotes}]]></textFieldExpression>
+            </textField>
+
+            <!-- III. TIÊU ĐỀ ĐƠN THUỐC -->
+            <rectangle>
+                <reportElement x="0" y="274" width="535" height="16" backcolor="#F3F4F6" uuid="a1a1a1a1-0061-0000-0000-000000000061"/>
+                <graphicElement>
+                    <pen lineWidth="0.0"/>
+                </graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement style="SectionHeader" x="6" y="274" width="520" height="16" forecolor="#1F2937" uuid="a1a1a1a1-0062-0000-0000-000000000062"/>
+                <textElement verticalAlignment="Middle">
+                    <font size="9" isBold="true"/>
+                </textElement>
+                <text><![CDATA[III. CHỈ ĐỊNH DÙNG THUỐC (ĐƠN THUỐC ĐIỆN TỬ)]]></text>
+            </staticText>
+        </band>
+    </title>
+
+    <!-- Column Header: Table header for Prescription items -->
+    <columnHeader>
+        <band height="20" splitType="Stretch">
+            <printWhenExpression><![CDATA[$P{hasPrescription}]]></printWhenExpression>
+            <rectangle>
+                <reportElement x="0" y="0" width="535" height="20" backcolor="#E5E7EB" uuid="a1a1a1a1-0063-0000-0000-000000000063"/>
+                <graphicElement>
+                    <pen lineWidth="0.5" lineColor="#9CA3AF"/>
+                </graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement style="TableHeader" x="0" y="0" width="30" height="20" uuid="a1a1a1a1-0064-0000-0000-000000000064"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle"/>
+                <text><![CDATA[STT]]></text>
+            </staticText>
+            <staticText>
+                <reportElement style="TableHeader" x="35" y="0" width="225" height="20" uuid="a1a1a1a1-0065-0000-0000-000000000065"/>
+                <textElement verticalAlignment="Middle"/>
+                <text><![CDATA[Tên thuốc & Hoạt chất]]></text>
+            </staticText>
+            <staticText>
+                <reportElement style="TableHeader" x="265" y="0" width="60" height="20" uuid="a1a1a1a1-0066-0000-0000-000000000066"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle"/>
+                <text><![CDATA[Số lượng]]></text>
+            </staticText>
+            <staticText>
+                <reportElement style="TableHeader" x="330" y="0" width="200" height="20" uuid="a1a1a1a1-0067-0000-0000-000000000067"/>
+                <textElement verticalAlignment="Middle"/>
+                <text><![CDATA[Cách dùng & Liều lượng chi tiết]]></text>
+            </staticText>
+        </band>
+    </columnHeader>
+
+    <!-- Detail Band: Each prescribed medicine -->
+    <detail>
+        <band height="28" splitType="Stretch">
+            <printWhenExpression><![CDATA[$P{hasPrescription}]]></printWhenExpression>
+            <rectangle>
+                <reportElement positionType="Float" stretchType="RelativeToTallestObject" x="0" y="0" width="535" height="28" backcolor="#FFFFFF" uuid="a1a1a1a1-0068-0000-0000-000000000068"/>
+                <graphicElement>
+                    <pen lineWidth="0.5" lineColor="#E5E7EB"/>
+                </graphicElement>
+            </rectangle>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Default" x="0" y="4" width="30" height="20" uuid="a1a1a1a1-0069-0000-0000-000000000069"/>
+                <textElement textAlignment="Center" verticalAlignment="Top">
+                    <font size="8.5"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{stt}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Bold" x="35" y="4" width="225" height="12" forecolor="#111827" uuid="a1a1a1a1-0070-0000-0000-000000000070"/>
+                <textElement verticalAlignment="Top">
+                    <font size="8.5" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{medicineName}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="35" y="16" width="225" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0071-0000-0000-000000000071"/>
+                <textElement verticalAlignment="Top">
+                    <font size="7.5" isItalic="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{activeIngredient} != null && !$F{activeIngredient}.isEmpty() ? "Hoạt chất: " + $F{activeIngredient} : ""]]></textFieldExpression>
+            </textField>
+            <textField isBlankWhenNull="true">
+                <reportElement style="Bold" x="265" y="4" width="60" height="20" uuid="a1a1a1a1-0072-0000-0000-000000000072"/>
+                <textElement textAlignment="Center" verticalAlignment="Top">
+                    <font size="8.5" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{quantity} + " " + ($F{unit} != null ? $F{unit} : "")]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="330" y="4" width="200" height="12" uuid="a1a1a1a1-0073-0000-0000-000000000073"/>
+                <textElement verticalAlignment="Top">
+                    <font size="8.5"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{instructions}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="330" y="16" width="200" height="10" forecolor="#6B7280" uuid="a1a1a1a1-0074-0000-0000-000000000074"/>
+                <textElement verticalAlignment="Top">
+                    <font size="7.5"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{dosageAndRoute} != null && !$F{dosageAndRoute}.isEmpty() ? "(" + $F{dosageAndRoute} + ")" : ""]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+
+    <!-- Page Footer -->
+    <pageFooter>
+        <band height="15" splitType="Stretch">
+            <textField>
+                <reportElement style="Default" x="435" y="0" width="100" height="13" forecolor="#9CA3AF" uuid="a1a1a1a1-0094-0000-0000-000000000094"/>
+                <textElement textAlignment="Right">
+                    <font size="7.5"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Trang " + $V{PAGE_NUMBER}]]></textFieldExpression>
+            </textField>
+            <staticText>
+                <reportElement style="Default" x="0" y="0" width="300" height="13" forecolor="#9CA3AF" uuid="a1a1a1a1-0095-0000-0000-000000000095"/>
+                <textElement>
+                    <font size="7.5"/>
+                </textElement>
+                <text><![CDATA[Hệ thống Quản lý Phòng khám Thông minh MedQueue]]></text>
+            </staticText>
+        </band>
+    </pageFooter>
+
+    <!-- Summary: Advice, Follow-up date, Signatures -->
+    <summary>
+        <band height="185" splitType="Stretch">
+            <!-- No prescription note if false -->
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="Default" x="0" y="6" width="535" height="14" forecolor="#6B7280" uuid="a1a1a1a1-0075-0000-0000-000000000075">
+                    <printWhenExpression><![CDATA[!$P{hasPrescription}]]></printWhenExpression>
+                </reportElement>
+                <textElement textAlignment="Center">
+                    <font size="9" isItalic="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA["(Ca khám này không kê thuốc Tây / Bệnh nhân tiếp tục theo dõi điều trị lâm sàng)"]]></textFieldExpression>
+            </textField>
+
+            <!-- Prescription Advice -->
+            <frame>
+                <reportElement positionType="Float" x="0" y="24" width="535" height="18" uuid="a1a1a1a1-0076-0000-0000-000000000076">
+                    <printWhenExpression><![CDATA[$P{hasPrescription} && $P{prescriptionAdvice} != null && !$P{prescriptionAdvice}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <staticText>
+                    <reportElement style="Bold" x="0" y="0" width="135" height="14" forecolor="#1E3A8A" uuid="a1a1a1a1-0077-0000-0000-000000000077"/>
+                    <text><![CDATA[Lời dặn về sử dụng thuốc:]]></text>
+                </staticText>
+                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                    <reportElement style="Default" x="140" y="0" width="395" height="14" uuid="a1a1a1a1-0078-0000-0000-000000000078"/>
+                    <textFieldExpression><![CDATA[$P{prescriptionAdvice}]]></textFieldExpression>
+                </textField>
+            </frame>
+
+            <!-- Revisit Follow-up Date Block -->
+            <frame>
+                <reportElement positionType="Float" x="0" y="44" width="535" height="24" uuid="a1a1a1a1-0079-0000-0000-000000000079">
+                    <printWhenExpression><![CDATA[$P{revisitDate} != null && !$P{revisitDate}.isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <rectangle>
+                    <reportElement x="0" y="0" width="535" height="22" backcolor="#EFF6FF" uuid="a1a1a1a1-0080-0000-0000-000000000080"/>
+                    <graphicElement>
+                        <pen lineWidth="0.5" lineColor="#93C5FD"/>
+                    </graphicElement>
+                </rectangle>
+                <staticText>
+                    <reportElement style="Bold" x="8" y="4" width="105" height="14" forecolor="#1D4ED8" uuid="a1a1a1a1-0081-0000-0000-000000000081"/>
+                    <text><![CDATA[Hẹn ngày tái khám:]]></text>
+                </staticText>
+                <textField isBlankWhenNull="true">
+                    <reportElement style="Bold" x="115" y="4" width="90" height="14" forecolor="#1D4ED8" uuid="a1a1a1a1-0082-0000-0000-000000000082"/>
+                    <textFieldExpression><![CDATA[$P{revisitDate}]]></textFieldExpression>
+                </textField>
+                <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                    <reportElement style="Default" x="210" y="4" width="315" height="14" forecolor="#3B82F6" uuid="a1a1a1a1-0083-0000-0000-000000000083"/>
+                    <textFieldExpression><![CDATA[$P{revisitNotes} != null && !$P{revisitNotes}.isEmpty() ? "(" + $P{revisitNotes} + ")" : ""]]></textFieldExpression>
+                </textField>
+            </frame>
+
+            <!-- Signatures Section -->
+            <frame>
+                <reportElement positionType="Float" x="0" y="76" width="535" height="90" uuid="a1a1a1a1-0084-0000-0000-000000000084"/>
+
+                <!-- Patient Signature Column -->
+                <staticText>
+                    <reportElement style="Bold" x="20" y="10" width="200" height="14" uuid="a1a1a1a1-0085-0000-0000-000000000085"/>
+                    <textElement textAlignment="Center"/>
+                    <text><![CDATA[BỆNH NHÂN / NGƯỜI NHÀ]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Default" x="20" y="24" width="200" height="12" forecolor="#6B7280" uuid="a1a1a1a1-0086-0000-0000-000000000086"/>
+                    <textElement textAlignment="Center">
+                        <font size="8" isItalic="true"/>
+                    </textElement>
+                    <text><![CDATA[(Ký và ghi rõ họ tên)]]></text>
+                </staticText>
+                <textField isBlankWhenNull="true">
+                    <reportElement style="Default" x="20" y="70" width="200" height="14" uuid="a1a1a1a1-0087-0000-0000-000000000087"/>
+                    <textElement textAlignment="Center">
+                        <font size="8.5"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA[$P{patientName}]]></textFieldExpression>
+                </textField>
+
+                <!-- Doctor Signature Column -->
+                <textField isBlankWhenNull="true">
+                    <reportElement style="Default" x="310" y="0" width="220" height="12" forecolor="#4B5563" uuid="a1a1a1a1-0088-0000-0000-000000000088"/>
+                    <textElement textAlignment="Center">
+                        <font size="8" isItalic="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA["Hà Nội, " + $P{createdAt}]]></textFieldExpression>
+                </textField>
+                <staticText>
+                    <reportElement style="Bold" x="310" y="14" width="220" height="14" forecolor="#111827" uuid="a1a1a1a1-0089-0000-0000-000000000089"/>
+                    <textElement textAlignment="Center">
+                        <font isBold="true"/>
+                    </textElement>
+                    <text><![CDATA[BÁC SĨ KHÁM BỆNH]]></text>
+                </staticText>
+                <staticText>
+                    <reportElement style="Default" x="310" y="28" width="220" height="12" forecolor="#6B7280" uuid="a1a1a1a1-0090-0000-0000-000000000090"/>
+                    <textElement textAlignment="Center">
+                        <font size="8" isItalic="true"/>
+                    </textElement>
+                    <text><![CDATA[(Ký và ghi rõ họ tên)]]></text>
+                </staticText>
+                <textField isBlankWhenNull="true">
+                    <reportElement style="Bold" x="310" y="70" width="220" height="14" forecolor="#1F2937" uuid="a1a1a1a1-0091-0000-0000-000000000091"/>
+                    <textElement textAlignment="Center">
+                        <font size="9.5" isBold="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA[$P{doctorName}]]></textFieldExpression>
+                </textField>
+            </frame>
+
+            <!-- Bottom Note -->
+            <line>
+                <reportElement positionType="Float" x="0" y="170" width="535" height="1" forecolor="#E5E7EB" uuid="a1a1a1a1-0092-0000-0000-000000000092"/>
+            </line>
+            <staticText>
+                <reportElement style="Default" positionType="Float" x="0" y="173" width="535" height="12" forecolor="#9CA3AF" uuid="a1a1a1a1-0093-0000-0000-000000000093"/>
+                <textElement textAlignment="Center">
+                    <font size="7.5" isItalic="true"/>
+                </textElement>
+                <text><![CDATA[* Chú ý: Đơn thuốc có giá trị mua trong vòng 05 ngày kể từ ngày kê đơn. Vui lòng mang theo phiếu này khi tái khám.]]></text>
+            </staticText>
+        </band>
+    </summary>
+
+</jasperReport>

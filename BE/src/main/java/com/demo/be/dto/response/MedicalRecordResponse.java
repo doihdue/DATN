@@ -79,15 +79,6 @@ public class MedicalRecordResponse {
                 .revisitDate(record.getRevisitDate())
                 .revisitNotes(record.getRevisitNotes());
 
-        if (record.getQueueTicket() != null) {
-            builder.queueTicketId(record.getQueueTicket().getId());
-            builder.ticketNumber(record.getQueueTicket().getTicketNumber());
-        }
-
-        if (record.getAppointment() != null) {
-            builder.appointmentId(record.getAppointment().getId());
-        }
-
         if (record.getPatient() != null) {
             builder.patientId(record.getPatient().getId());
             builder.patientName(record.getPatient().getFullName());
@@ -97,6 +88,27 @@ public class MedicalRecordResponse {
             builder.bloodGroup(record.getPatient().getBloodGroup());
             builder.allergies(record.getPatient().getAllergies());
             builder.medicalHistorySummary(record.getPatient().getMedicalHistorySummary());
+        }
+
+        if (record.getQueueTicket() != null) {
+            builder.queueTicketId(record.getQueueTicket().getId());
+            builder.ticketNumber(record.getQueueTicket().getTicketNumber());
+            if (record.getQueueTicket().getPatientName() != null && !record.getQueueTicket().getPatientName().isBlank()) {
+                builder.patientName(record.getQueueTicket().getPatientName());
+            }
+            if (record.getQueueTicket().getPatientDob() != null) {
+                builder.patientDob(record.getQueueTicket().getPatientDob());
+            }
+            if (record.getQueueTicket().getPatientGender() != null && !record.getQueueTicket().getPatientGender().isBlank() && !"Chưa rõ".equalsIgnoreCase(record.getQueueTicket().getPatientGender())) {
+                builder.patientGender(record.getQueueTicket().getPatientGender());
+            }
+            if (record.getQueueTicket().getPatientPhone() != null && !record.getQueueTicket().getPatientPhone().isBlank()) {
+                builder.patientPhone(record.getQueueTicket().getPatientPhone());
+            }
+        }
+
+        if (record.getAppointment() != null) {
+            builder.appointmentId(record.getAppointment().getId());
         }
 
         if (record.getDoctor() != null) {

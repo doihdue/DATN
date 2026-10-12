@@ -61,10 +61,13 @@
           @if (currentTicket()?.isEmergency) {
             <span class="emergency-badge"><i class="bi bi-lightning-fill"></i> ƯU TIÊN CẤP CỨU</span>
           }
+          <button type="button" class="btn btn-sm btn-outline-primary btn-switch-patient" (click)="showQueueDrawer.set(true)" title="Chọn bệnh nhân khác trong phòng">
+            <i class="bi bi-arrow-left-right"></i> Đổi bệnh nhân ({{ roomTickets().length }} trong hàng đợi)
+          </button>
         </div>
         <div class="patient-details-row">
-          <span><i class="bi bi-gender-ambiguous"></i> Giới tính: <strong>{{ patientHistory()?.gender || 'Chưa rõ' }}</strong></span>
-          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ (patientHistory()?.dateOfBirth | date:'dd/MM/yyyy') || (currentTicket()?.patientDob | date:'dd/MM/yyyy') || (currentTicket()?.patientYearOfBirth ? ('Năm ' + currentTicket()?.patientYearOfBirth) : 'Đang cập nhật') }}</strong></span>
+          <span><i class="bi bi-gender-ambiguous"></i> Giới tính: <strong>{{ currentTicket()?.patientGender || patientHistory()?.gender || 'Chưa rõ' }}</strong></span>
+          <span><i class="bi bi-calendar3"></i> Ngày sinh: <strong>{{ (currentTicket()?.patientDob | date:'dd/MM/yyyy') || (patientHistory()?.dateOfBirth | date:'dd/MM/yyyy') || (currentTicket()?.patientYearOfBirth ? ('Năm ' + currentTicket()?.patientYearOfBirth) : 'Đang cập nhật') }}</strong></span>
           <span><i class="bi bi-telephone"></i> SĐT: <strong>{{ currentTicket()?.patientPhone || patientHistory()?.phoneNumber || 'Chưa có' }}</strong></span>
           <span><i class="bi bi-droplet-half"></i> Nhóm máu: <strong class="text-danger">{{ patientHistory()?.bloodGroup || 'Chưa xác định' }}</strong></span>
         </div>
@@ -575,6 +578,9 @@
                   <div class="timeline-card-header">
                     <span class="timeline-date"><i class="bi bi-calendar3"></i> {{ rec.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
                     <span class="timeline-doc"><i class="bi bi-person-badge"></i> {{ rec.doctorName || 'Bác sĩ' }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger btn-history-pdf" (click)="downloadPdf(rec.id)" title="Xuất PDF phiếu khám & đơn thuốc (JasperReports)">
+                      <i class="bi bi-file-earmark-pdf"></i> Xuất PDF
+                    </button>
                   </div>
                   <div class="timeline-diagnosis">
                     <strong>Chẩn đoán:</strong> {{ rec.finalDiagnosis }}
@@ -615,141 +621,250 @@
       <div class="print-modal-container">
         <div class="modal-actions-bar no-print">
           <div class="modal-left">
-            <span class="text-success font-weight-bold"><i class="bi bi-check-circle-fill"></i> Đã lưu hồ sơ thành công!</span>
+            <span class="badge-success-glow"><i class="bi bi-check-circle-fill"></i> Đã lưu hồ sơ bệnh án thành công!</span>
           </div>
           <div class="modal-right">
-            <button class="btn btn-primary btn-print" (click)="printDocument()">
-              <i class="bi bi-printer"></i> In Phiếu & Đơn Thuốc
+            <button type="button" class="btn btn-danger btn-pdf" [disabled]="downloadingPdf()" (click)="downloadPdf()">
+              <i class="bi" [class.bi-file-earmark-pdf-fill]="!downloadingPdf()" [class.bi-hourglass-split]="downloadingPdf()"></i>
+              {{ downloadingPdf() ? 'Đang xuất PDF...' : 'Tải File PDF' }}
             </button>
-            <button class="btn btn-outline" (click)="finishAndReturnToQueue()">
-              <i class="bi bi-arrow-right"></i> Tiếp Tục Gọi Số Tiếp Theo
+            <button type="button" class="btn btn-outline-primary btn-preview-pdf" [disabled]="downloadingPdf()" (click)="previewPdfInNewTab()">
+              <i class="bi bi-box-arrow-up-right"></i> Xem PDF
+            </button>
+            <button type="button" class="btn btn-primary btn-print" (click)="printDocument()">
+              <i class="bi bi-printer"></i> In Nhanh
+            </button>
+            <button type="button" class="btn btn-outline btn-return-queue" (click)="finishAndReturnToQueue()">
+              <i class="bi bi-arrow-right"></i> Tiếp Tục Gọi Số Mới
             </button>
           </div>
         </div>
 
         <!-- Printable Document (A4 hospital standard format) -->
         <div class="hospital-document-sheet" id="printableArea">
-          <!-- Hospital Header -->
-          <div class="doc-header">
-            <div class="doc-clinic-info">
-              <h3 class="clinic-brand">PHÒNG KHÁM ĐA KHOA QUỐC TẾ MEDQUEUE</h3>
-              <p>Địa chỉ: Km10, Đường Nguyễn Trãi, Q. Hà Đông, Hà Nội</p>
-              <p>Hotline cấp cứu & Đặt hẹn: 1900 6868 | Website: medqueue.vn</p>
+          <!-- Hospital Header (Left: Clinic info, Right: Document codes) -->
+          <div class="doc-header-row">
+            <div class="doc-clinic-col">
+              <div class="clinic-brand-title">HỆ THỐNG PHÒNG KHÁM ĐA KHOA QUỐC TẾ MEDQUEUE</div>
+              <div class="clinic-sub">Địa chỉ: Km10, Đường Nguyễn Trãi, Q. Hà Đông, Hà Nội</div>
+              <div class="clinic-sub">Hotline: <strong>1900 6868</strong> • Website: <strong>medqueue.vn</strong></div>
             </div>
-            <div class="doc-title-box">
-              <h2 class="doc-main-title">PHIẾU KHÁM BỆNH & ĐƠN THUỐC</h2>
-              <div class="doc-number">Mã hồ sơ: <strong>#REC-{{ completedRecord()!.id }}</strong></div>
-              <div class="doc-date">Ngày: {{ completedRecord()!.createdAt | date:'dd/MM/yyyy HH:mm' }}</div>
+            <div class="doc-meta-col">
+              <div class="meta-item"><span class="meta-label">Mã hồ sơ:</span> <strong class="meta-val text-primary">#REC-{{ completedRecord()!.id }}</strong></div>
+              <div class="meta-item"><span class="meta-label">Số phiếu khám:</span> <strong class="meta-val text-danger">#{{ completedRecord()!.ticketNumber || 'N/A' }}</strong></div>
+              <div class="meta-item"><span class="meta-label">Ngày khám:</span> <span class="meta-val">{{ completedRecord()!.createdAt | date:'dd/MM/yyyy HH:mm' }}</span></div>
             </div>
           </div>
 
-          <hr class="doc-divider" />
+          <div class="doc-header-line"></div>
 
-          <!-- Patient Information -->
-          <div class="doc-patient-info">
-            <div class="row">
-              <div class="col-7">
-                <p>Họ và tên: <strong class="uppercase text-primary">{{ completedRecord()!.patientName }}</strong></p>
-                <p>Ngày sinh: {{ completedRecord()!.patientDob | date:'dd/MM/yyyy' }} | Giới tính: {{ completedRecord()!.patientGender }}</p>
-                <p>Điện thoại: {{ completedRecord()!.patientPhone || 'Chưa cập nhật' }}</p>
+          <!-- Document Main Centered Title -->
+          <div class="doc-title-block">
+            <h1 class="doc-main-title">PHIẾU KHÁM BỆNH &amp; ĐƠN THUỐC</h1>
+            <p class="doc-sub-title">(Lưu hành tại cơ sở khám chữa bệnh &amp; Cung cấp cho người bệnh)</p>
+          </div>
+
+          <!-- I. Patient & Doctor Information -->
+          <div class="doc-section-card">
+            <div class="section-badge-title">I. THÔNG TIN BỆNH NHÂN &amp; BÁC SĨ PHỤ TRÁCH</div>
+            <div class="doc-info-grid">
+              <div class="info-row">
+                <div class="info-cell"><span class="lbl">Họ và tên:</span> <strong class="val uppercase text-primary">{{ completedRecord()!.patientName }}</strong></div>
+                <div class="info-cell"><span class="lbl">Ngày sinh:</span> <span class="val">{{ completedRecord()!.patientDob ? (completedRecord()!.patientDob | date:'dd/MM/yyyy') : 'Chưa cập nhật' }}</span></div>
+                <div class="info-cell"><span class="lbl">Giới tính:</span> <span class="val">{{ completedRecord()!.patientGender || '---' }}</span></div>
               </div>
-              <div class="col-5">
-                <p>Số phiếu khám: <strong>#{{ completedRecord()!.ticketNumber || 'N/A' }}</strong></p>
-                <p>Bác sĩ khám: <strong>{{ completedRecord()!.doctorTitle }} {{ completedRecord()!.doctorName }}</strong></p>
-                <p>Chuyên khoa: {{ completedRecord()!.specialtyName || 'Khám bệnh tổng quát' }}</p>
+              <div class="info-row">
+                <div class="info-cell"><span class="lbl">Điện thoại:</span> <span class="val">{{ completedRecord()!.patientPhone || 'Chưa cập nhật' }}</span></div>
+                <div class="info-cell"><span class="lbl">Bác sĩ khám:</span> <strong class="val">{{ completedRecord()!.doctorTitle }} {{ completedRecord()!.doctorName }}</strong></div>
+                <div class="info-cell"><span class="lbl">Chuyên khoa:</span> <span class="val">{{ completedRecord()!.specialtyName || 'Khám bệnh đa khoa' }}</span></div>
               </div>
             </div>
           </div>
 
-          <!-- Vital Signs Table -->
-          <div class="doc-vital-table">
-            <table>
-              <tr>
-                <td>Huyết áp: <strong>{{ completedRecord()!.bloodPressure || 'N/A' }} mmHg</strong></td>
-                <td>Mạch: <strong>{{ completedRecord()!.heartRate || 'N/A' }} bpm</strong></td>
-                <td>Nhiệt độ: <strong>{{ completedRecord()!.temperature || 'N/A' }} °C</strong></td>
-                <td>Cân nặng: <strong>{{ completedRecord()!.weight || 'N/A' }} kg</strong></td>
-                <td>Chiều cao: <strong>{{ completedRecord()!.height || 'N/A' }} cm</strong></td>
-              </tr>
-            </table>
+          <!-- II. Vital Signs -->
+          <div class="doc-section-card">
+            <div class="section-badge-title">II. CHỈ SỐ SINH TỒN (VITAL SIGNS)</div>
+            <div class="vital-metrics-grid">
+              <div class="metric-box">
+                <span class="m-label">Huyết áp</span>
+                <span class="m-val">{{ completedRecord()!.bloodPressure || '---' }} <small>mmHg</small></span>
+              </div>
+              <div class="metric-box">
+                <span class="m-label">Nhịp tim</span>
+                <span class="m-val">{{ completedRecord()!.heartRate || '---' }} <small>bpm</small></span>
+              </div>
+              <div class="metric-box">
+                <span class="m-label">Nhiệt độ</span>
+                <span class="m-val">{{ completedRecord()!.temperature || '---' }} <small>°C</small></span>
+              </div>
+              <div class="metric-box">
+                <span class="m-label">Cân nặng</span>
+                <span class="m-val">{{ completedRecord()!.weight || '---' }} <small>kg</small></span>
+              </div>
+              <div class="metric-box">
+                <span class="m-label">Chiều cao</span>
+                <span class="m-val">{{ completedRecord()!.height || '---' }} <small>cm</small></span>
+              </div>
+            </div>
           </div>
 
-          <!-- Clinical Diagnosis -->
-          <div class="doc-clinical-block">
-            <p><strong>Triệu chứng lâm sàng:</strong> {{ completedRecord()!.symptoms }}</p>
-            <p class="diagnosis-highlight">
-              <strong>Chẩn đoán xác định:</strong> <span class="final-diag-text">{{ completedRecord()!.finalDiagnosis }}</span>
-              @if (completedRecord()!.icd10Code) {
-                <span class="icd-pill">Mã ICD-10: {{ completedRecord()!.icd10Code }}</span>
+          <!-- III. Clinical Diagnosis -->
+          <div class="doc-section-card">
+            <div class="section-badge-title">III. CHẨN ĐOÁN LÂM SÀNG</div>
+            <div class="clinical-content">
+              <p><strong>Triệu chứng lâm sàng:</strong> {{ completedRecord()!.symptoms || 'Chưa ghi nhận triệu chứng đặc biệt' }}</p>
+              <p class="diagnosis-lead">
+                <strong>Chẩn đoán xác định:</strong> 
+                <span class="diag-text">{{ completedRecord()!.finalDiagnosis }}</span>
+                @if (completedRecord()!.icd10Code) {
+                  <span class="icd-code-pill">Mã ICD-10: {{ completedRecord()!.icd10Code }}</span>
+                }
+              </p>
+              @if (completedRecord()!.notes) {
+                <p><strong>Lời dặn của bác sĩ:</strong> {{ completedRecord()!.notes }}</p>
               }
-            </p>
-            @if (completedRecord()!.notes) {
-              <p><strong>Lời dặn của bác sĩ:</strong> {{ completedRecord()!.notes }}</p>
-            }
+            </div>
           </div>
 
-          <!-- Prescription Section -->
+          <!-- IV. Prescription Table -->
           @if (completedRecord()!.prescription && completedRecord()!.prescription!.items.length > 0) {
-            <div class="doc-prescription-block">
-              <h4 class="pres-title">CHỈ ĐỊNH DÙNG THUỐC</h4>
-              <table class="doc-med-table">
+            <div class="doc-section-card">
+              <div class="section-badge-title">IV. CHỈ ĐỊNH DÙNG THUỐC (ĐƠN THUỐC)</div>
+              <table class="doc-medicine-table">
                 <thead>
                   <tr>
-                    <th style="width: 5%;">STT</th>
-                    <th style="width: 45%;">Tên thuốc & Hàm lượng</th>
-                    <th style="width: 15%;">Số lượng</th>
-                    <th style="width: 35%;">Cách dùng & Liều lượng</th>
+                    <th style="width: 6%; text-align: center;">STT</th>
+                    <th style="width: 44%;">Tên thuốc &amp; Hoạt chất</th>
+                    <th style="width: 15%; text-align: center;">Số lượng</th>
+                    <th style="width: 35%;">Cách dùng &amp; Liều lượng</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (it of completedRecord()!.prescription!.items; track it.id; let idx = $index) {
                     <tr>
-                      <td class="text-center">{{ idx + 1 }}</td>
+                      <td style="text-align: center; font-weight: bold;">{{ idx + 1 }}</td>
                       <td>
-                        <strong>{{ it.medicineName }}</strong>
-                        <div class="text-muted small">Hoạt chất: {{ it.activeIngredient }}</div>
+                        <div class="med-name">{{ it.medicineName }}</div>
+                        @if (it.activeIngredient) {
+                          <div class="med-active text-muted small">Hoạt chất: {{ it.activeIngredient }}</div>
+                        }
                       </td>
-                      <td class="text-center"><strong>{{ it.quantity }}</strong> {{ it.unit }}</td>
+                      <td style="text-align: center;">
+                        <strong class="text-primary">{{ it.quantity }}</strong> {{ it.unit }}
+                      </td>
                       <td>
-                        <div>{{ it.instructions }}</div>
+                        <div class="med-instructions">{{ it.instructions }}</div>
                         <div class="text-muted small">({{ it.dosage }} - {{ it.route }})</div>
                       </td>
                     </tr>
                   }
                 </tbody>
               </table>
-              <div class="doc-pres-advice">
-                <strong>Lời dặn bác sĩ về thuốc:</strong> {{ completedRecord()!.prescription!.doctorAdvice }}
+              @if (completedRecord()!.prescription!.doctorAdvice) {
+                <div class="prescription-doctor-advice">
+                  <strong><i class="bi bi-info-circle"></i> Lời dặn dùng thuốc:</strong> {{ completedRecord()!.prescription!.doctorAdvice }}
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="no-prescription-notice">
+              <em>(Ca khám này không kê đơn thuốc Tây / Bệnh nhân tiếp tục theo dõi điều trị lâm sàng)</em>
+            </div>
+          }
+
+          <!-- V. Revisit Appointment -->
+          @if (completedRecord()!.revisitDate) {
+            <div class="doc-revisit-alert">
+              <div class="revisit-main">
+                <i class="bi bi-calendar-check-fill text-danger"></i>
+                <span>Hẹn ngày tái khám: <strong class="text-danger">{{ completedRecord()!.revisitDate | date:'dd/MM/yyyy' }}</strong></span>
+                @if (completedRecord()!.revisitNotes) {
+                  <span class="text-muted">({{ completedRecord()!.revisitNotes }})</span>
+                }
               </div>
             </div>
           }
 
-          <!-- Revisit Appointment -->
-          @if (completedRecord()!.revisitDate) {
-            <div class="doc-revisit-block">
-              <p class="revisit-text">
-                <i class="bi bi-calendar-check"></i> Hẹn ngày tái khám:
-                <strong class="text-primary">{{ completedRecord()!.revisitDate | date:'dd/MM/yyyy' }}</strong>
-                @if (completedRecord()!.revisitNotes) {
-                  <span>({{ completedRecord()!.revisitNotes }})</span>
-                }
-              </p>
+          <!-- VI. Signatures Block -->
+          <div class="doc-signatures-row">
+            <div class="signature-col patient-sig-box">
+              <div class="sig-role">NGƯỜI BỆNH / ĐẠI DIỆN</div>
+              <div class="sig-sub">(Ký và ghi rõ họ tên)</div>
+              <div class="sig-space"></div>
+              <div class="sig-name">{{ completedRecord()!.patientName }}</div>
             </div>
-          }
 
-          <!-- Signatures -->
-          <div class="doc-footer-signatures">
-            <div class="patient-sig">
-              <p>BỆNH NHÂN / NGƯỜI NHÀ</p>
-              <span class="sig-note">(Ký và ghi rõ họ tên)</span>
-            </div>
-            <div class="doctor-sig">
-              <p>Ngày ..... tháng ..... năm 2026</p>
-              <p class="doc-sig-title">BÁC SĨ KHÁM BỆNH</p>
-              <div class="doc-sig-space"></div>
-              <p class="doc-sig-name"><strong>{{ completedRecord()!.doctorTitle }} {{ completedRecord()!.doctorName }}</strong></p>
+            <div class="signature-col doctor-sig-box">
+              <div class="sig-date">Hà Nội, {{ completedRecord()!.createdAt | date:'dd/MM/yyyy' }}</div>
+              <div class="sig-role">BÁC SĨ KHÁM BỆNH</div>
+              <div class="sig-sub">(Ký và ghi rõ họ tên)</div>
+              <div class="sig-space"></div>
+              <div class="sig-name">{{ completedRecord()!.doctorTitle }} {{ completedRecord()!.doctorName }}</div>
             </div>
           </div>
+
+          <!-- Bottom Footer Notice -->
+          <div class="doc-bottom-notice">
+            * Chú ý: Đơn thuốc có giá trị mua trong vòng 05 ngày kể từ ngày kê đơn. Vui lòng mang theo phiếu này khi tái khám.
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- DRAWER: Chọn Bệnh Nhân Trong Hàng Đợi -->
+  @if (showQueueDrawer()) {
+    <div class="drawer-backdrop" (click)="showQueueDrawer.set(false)">
+      <div class="queue-drawer-panel" (click)="$event.stopPropagation()">
+        <div class="drawer-header">
+          <div class="drawer-title">
+            <i class="bi bi-people-fill text-primary"></i> Hàng Đợi Bệnh Nhân Của Phòng Khám
+          </div>
+          <button type="button" class="btn-close-drawer" (click)="showQueueDrawer.set(false)">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="drawer-body">
+          <p class="drawer-subtitle">
+            Bấm chọn bệnh nhân để chuyển sang ca khám của người đó ngay lập tức:
+          </p>
+          @if (roomTickets().length === 0) {
+            <div class="queue-empty-box">
+              <i class="bi bi-inbox"></i>
+              <p>Hiện không có bệnh nhân nào trong hàng đợi của phòng khám.</p>
+            </div>
+          } @else {
+            <div class="queue-ticket-cards">
+              @for (ticket of roomTickets(); track ticket.id) {
+                <div class="queue-patient-card" [class.selected]="currentTicket()?.id === ticket.id" (click)="selectTicketToExamine(ticket)">
+                  <div class="card-top-line">
+                    <span class="ticket-num-badge">#{{ ticket.ticketNumber }}</span>
+                    <span class="ticket-state-tag" [ngClass]="ticket.status === 'IN_PROGRESS' ? 'state-examining' : (ticket.status === 'CALLED' ? 'state-called' : 'state-waiting')">
+                      {{ ticket.status === 'IN_PROGRESS' ? 'Đang khám' : (ticket.status === 'CALLED' ? 'Đang gọi' : 'Đang chờ') }}
+                    </span>
+                  </div>
+                  <div class="patient-full-name">{{ ticket.patientName }}</div>
+                  <div class="patient-sub-meta">
+                    <span><i class="bi bi-telephone"></i> {{ ticket.patientPhone || 'Chưa có SĐT' }}</span>
+                    @if (ticket.patientDob) {
+                      <span> • NS: {{ ticket.patientDob | date:'dd/MM/yyyy' }}</span>
+                    } @else if (ticket.patientYearOfBirth) {
+                      <span> • Năm {{ ticket.patientYearOfBirth }}</span>
+                    }
+                  </div>
+                  <div class="select-btn-wrap">
+                    @if (currentTicket()?.id === ticket.id) {
+                      <span class="badge-current"><i class="bi bi-check-circle-fill"></i> Đang mở khám</span>
+                    } @else {
+                      <button type="button" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-box-arrow-in-right"></i> Chọn khám ca này
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </div>
       </div>
     </div>
