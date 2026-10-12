@@ -182,6 +182,14 @@ import { ExaminationRoom } from '../../models/schedule.model';
                     />
                   </div>
                   <div class="form-group flex-1">
+                    <label class="form-label required">Giới tính</label>
+                    <select [(ngModel)]="form.patientGender" name="patientGender" class="form-control" required>
+                      <option value="Nam">Nam</option>
+                      <option value="Nữ">Nữ</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
                     <label class="form-label required">Số điện thoại</label>
                     <input
                       type="tel"
@@ -396,6 +404,10 @@ import { ExaminationRoom } from '../../models/schedule.model';
                   <div class="receipt-row">
                     <span class="r-label">Người bệnh:</span>
                     <span class="r-val font-bold">{{ printedTicket()?.patientName }}</span>
+                  </div>
+                  <div class="receipt-row">
+                    <span class="r-label">Giới tính:</span>
+                    <span class="r-val">{{ printedTicket()?.patientGender || '---' }}</span>
                   </div>
                   <div class="receipt-row">
                     <span class="r-label">Ngày sinh:</span>
@@ -1235,6 +1247,7 @@ export class CheckInComponent implements OnInit, OnDestroy {
     patientPhone: '',
     patientDob: '',
     patientYearOfBirth: undefined,
+    patientGender: 'Nam',
     examinationRoomId: 1,
     isEmergency: false,
     notes: '',
@@ -1353,6 +1366,9 @@ export class CheckInComponent implements OnInit, OnDestroy {
     this.form.patientId = p.id;
     this.form.patientName = p.fullName;
     this.form.patientPhone = p.phoneNumber || '';
+    if (p.gender) {
+      this.form.patientGender = p.gender;
+    }
     if (p.dateOfBirth) {
       this.form.patientDob = p.dateOfBirth;
       this.onDobChange();
@@ -1370,6 +1386,7 @@ export class CheckInComponent implements OnInit, OnDestroy {
       patientPhone: '',
       patientDob: '',
       patientYearOfBirth: undefined,
+      patientGender: 'Nam',
       examinationRoomId: this.rooms().length > 0 ? this.rooms()[0].id : 1,
       isEmergency: false,
       notes: '',
