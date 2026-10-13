@@ -363,113 +363,146 @@ import { MedicineCategory, MedicineCategoryRequest } from '../../models/medicine
             <p>Nhấn nút "Thêm Nhóm Thuốc" để tạo phân loại dược lý mới.</p>
           </div>
         } @else {
-          <div class="categories-grid">
-            @for (cat of paginatedCategories(); track cat.id) {
-              <div class="category-card">
-                <div class="cat-card-header">
-                  <div class="cat-code-badge">
-                    <i class="bi bi-folder-symlink-fill"></i> {{ cat.code || 'CAT' }}
-                  </div>
-                  <div class="cat-meta-right">
-                    <button class="badge-count btn-link-badge" (click)="filterMedicinesByCategory(cat.id)" title="Bấm để lọc danh sách thuốc thuộc nhóm này">
-                      <i class="bi bi-capsule"></i> {{ cat.medicineCount || 0 }} thuốc
-                    </button>
-                    <span class="status-pill" [class.status-active]="cat.isActive" [class.status-inactive]="!cat.isActive">
-                      <span class="status-dot"></span>
-                      {{ cat.isActive ? 'Hoạt động' : 'Tạm ngừng' }}
-                    </span>
-                  </div>
-                </div>
-
-                <h3 class="cat-title">{{ cat.name }}</h3>
-                <p class="cat-desc">{{ cat.description || 'Chưa có thông tin mô tả chi tiết cho nhóm thuốc này.' }}</p>
-
-                <div class="cat-card-footer">
-                  <span class="order-info"><i class="bi bi-sort-numeric-down"></i> Thứ tự: <strong>{{ cat.displayOrder || 0 }}</strong></span>
-                  <div class="cat-actions">
-                    <button class="btn btn-sm btn-outline-primary" (click)="openEditCategoryModal(cat)" title="Chỉnh sửa nhóm">
-                      <i class="bi bi-pencil-square"></i> Sửa
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" (click)="confirmDeleteCategory(cat)" title="Xóa nhóm thuốc">
-                      <i class="bi bi-trash3"></i> Xóa
-                    </button>
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
-
-          <!-- Category Pagination Bar -->
-          <div class="pagination-footer mt-4">
-            <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ categoryStartIndex() }} - {{ categoryEndIndex() }}</strong> trên tổng số <strong>{{ filteredCategories().length }}</strong> nhóm thuốc
-              </span>
-              <div class="page-size-selector">
-                <label for="catPageSizeSelect">Số nhóm/trang:</label>
-                <select
-                  id="catPageSizeSelect"
-                  [ngModel]="categoryPageSize()"
-                  (ngModelChange)="onCategoryPageSizeChange($event)"
-                  class="form-select-sm"
-                >
-                  @for (opt of categoryPageSizeOptions; track opt) {
-                    <option [ngValue]="opt">{{ opt }}</option>
+          <!-- Category Table & Pagination Container -->
+          <div class="table-card">
+            <div class="table-responsive">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th style="width: 110px; text-align: center;">Mã nhóm</th>
+                    <th style="min-width: 250px;">Tên nhóm thuốc</th>
+                    <th style="min-width: 320px;">Mô tả &amp; Phạm vi điều trị</th>
+                    <th style="width: 140px; text-align: center;">Số lượng thuốc</th>
+                    <th style="width: 90px; text-align: center;">Thứ tự</th>
+                    <th style="width: 130px; text-align: center;">Trạng thái</th>
+                    <th style="width: 110px; text-align: center;">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (cat of paginatedCategories(); track cat.id) {
+                    <tr class="table-row">
+                      <td style="text-align: center;">
+                        <span class="code-badge">
+                          {{ cat.code || 'CAT-' + cat.id }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="cat-name-cell">
+                          <strong class="cat-table-title">{{ cat.name }}</strong>
+                          <span class="cat-table-sub">
+                            <i class="bi bi-folder2-open"></i> Phân loại dược lý
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <p class="cat-table-desc" [title]="cat.description || ''">
+                          {{ cat.description || 'Chưa có thông tin mô tả chi tiết cho nhóm thuốc này.' }}
+                        </p>
+                      </td>
+                      <td style="text-align: center;">
+                        <button class="badge-count btn-link-badge" (click)="filterMedicinesByCategory(cat.id)" title="Bấm để lọc danh sách thuốc thuộc nhóm này">
+                          <i class="bi bi-capsule"></i>
+                          <span>{{ cat.medicineCount || 0 }} thuốc</span>
+                          <i class="bi bi-chevron-right" style="font-size: 0.75rem;"></i>
+                        </button>
+                      </td>
+                      <td style="text-align: center;">
+                        <span class="order-badge">#{{ cat.displayOrder || 0 }}</span>
+                      </td>
+                      <td style="text-align: center;">
+                        <span class="status-pill" [class.status-active]="cat.isActive" [class.status-inactive]="!cat.isActive">
+                          <span class="status-dot"></span>
+                          {{ cat.isActive ? 'Hoạt động' : 'Tạm ngừng' }}
+                        </span>
+                      </td>
+                      <td style="text-align: center;">
+                        <div class="action-buttons-cell">
+                          <button class="btn-action btn-action-edit" (click)="openEditCategoryModal(cat)" title="Chỉnh sửa thông tin nhóm">
+                            <i class="bi bi-pencil-fill"></i>
+                          </button>
+                          <button class="btn-action btn-action-delete" (click)="confirmDeleteCategory(cat)" title="Xóa nhóm thuốc">
+                            <i class="bi bi-trash3-fill"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   }
-                </select>
-              </div>
+                </tbody>
+              </table>
             </div>
 
-            <!-- Pagination Navigation Buttons -->
-            <div class="pagination-controls">
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="categoryCurrentPage() === 1"
-                (click)="goToCategoryPage(1)"
-                title="Về trang đầu tiên"
-              >
-                <i class="bi bi-chevron-double-left"></i>
-              </button>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="categoryCurrentPage() === 1"
-                (click)="prevCategoryPage()"
-                title="Trang trước"
-              >
-                <i class="bi bi-chevron-left"></i> Trước
-              </button>
-
-              <!-- Page Number Pills -->
-              <div class="page-numbers-group">
-                @for (p of categoryPagesList(); track p) {
-                  <button
-                    class="btn-page btn-page-num"
-                    [class.active]="categoryCurrentPage() === p"
-                    (click)="goToCategoryPage(p)"
+            <!-- Category Pagination Bar -->
+            <div class="pagination-footer">
+              <div class="pagination-info">
+                <span>
+                  Hiển thị <strong>{{ categoryStartIndex() }} - {{ categoryEndIndex() }}</strong> trên tổng số <strong>{{ filteredCategories().length }}</strong> nhóm thuốc
+                </span>
+                <div class="page-size-selector">
+                  <label for="catPageSizeSelect">Số nhóm/trang:</label>
+                  <select
+                    id="catPageSizeSelect"
+                    [ngModel]="categoryPageSize()"
+                    (ngModelChange)="onPageSizeChange($event)"
+                    class="form-select-sm"
                   >
-                    {{ p }}
-                  </button>
-                }
+                    @for (opt of categoryPageSizeOptions; track opt) {
+                      <option [ngValue]="opt">{{ opt }}</option>
+                    }
+                  </select>
+                </div>
               </div>
 
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="categoryCurrentPage() === categoryTotalPages()"
-                (click)="nextCategoryPage()"
-                title="Trang sau"
-              >
-                Sau <i class="bi bi-chevron-right"></i>
-              </button>
+              <!-- Pagination Navigation Buttons -->
+              <div class="pagination-controls">
+                <button
+                  class="btn-page btn-page-nav"
+                  [disabled]="categoryCurrentPage() === 1"
+                  (click)="goToCategoryPage(1)"
+                  title="Về trang đầu tiên"
+                >
+                  <i class="bi bi-chevron-double-left"></i>
+                </button>
 
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="categoryCurrentPage() === categoryTotalPages()"
-                (click)="goToCategoryPage(categoryTotalPages())"
-                title="Đến trang cuối cùng"
-              >
-                <i class="bi bi-chevron-double-right"></i>
-              </button>
+                <button
+                  class="btn-page btn-page-nav"
+                  [disabled]="categoryCurrentPage() === 1"
+                  (click)="prevCategoryPage()"
+                  title="Trang trước"
+                >
+                  <i class="bi bi-chevron-left"></i> Trước
+                </button>
+
+                <!-- Page Number Pills -->
+                <div class="page-numbers-group">
+                  @for (p of categoryPagesList(); track p) {
+                    <button
+                      class="btn-page btn-page-num"
+                      [class.active]="categoryCurrentPage() === p"
+                      (click)="goToCategoryPage(p)"
+                    >
+                      {{ p }}
+                    </button>
+                  }
+                </div>
+
+                <button
+                  class="btn-page btn-page-nav"
+                  [disabled]="categoryCurrentPage() === categoryTotalPages()"
+                  (click)="nextCategoryPage()"
+                  title="Trang sau"
+                >
+                  Sau <i class="bi bi-chevron-right"></i>
+                </button>
+
+                <button
+                  class="btn-page btn-page-nav"
+                  [disabled]="categoryCurrentPage() === categoryTotalPages()"
+                  (click)="goToCategoryPage(categoryTotalPages())"
+                  title="Đến trang cuối cùng"
+                >
+                  <i class="bi bi-chevron-double-right"></i>
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -1480,6 +1513,47 @@ import { MedicineCategory, MedicineCategoryRequest } from '../../models/medicine
     .cat-actions {
       display: flex;
       gap: 0.4rem;
+    }
+
+    .cat-name-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .cat-table-title {
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+
+    .cat-table-sub {
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .cat-table-desc {
+      color: #475569;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .order-badge {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.82rem;
     }
 
     /* Modal Backdrop & Dialog (Clean Light Styling) */
