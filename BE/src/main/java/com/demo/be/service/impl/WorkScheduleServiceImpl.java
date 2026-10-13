@@ -1,6 +1,8 @@
 package com.demo.be.service.impl;
 
+import com.demo.be.dto.request.BatchWorkScheduleRequest;
 import com.demo.be.dto.request.WorkScheduleRequest;
+import com.demo.be.dto.response.BatchWorkScheduleResponse;
 import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
 import com.demo.be.exception.BadRequestException;
@@ -18,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -109,6 +113,111 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         log.info("-> Đã tạo lịch làm việc mới: Bác sĩ {} tại phòng {} ngày {}", 
                 doctor.getFullName(), room.getRoomNumber(), saved.getWorkDate());
         return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public BatchWorkScheduleResponse createBatchSchedules(BatchWorkScheduleRequest request) {
+        if (request.getStartDate() == null || request.getEndDate() == null) {
+            throw new BadRequestException("Khoảng thời gian (Từ ngày - Đến ngày) không được để trống");
+        }
+        if (request.getStartDate().isAfter(request.getEndDate())) {
+            throw new BadRequestException("Ngày bắt đầu không được sau ngày kết thúc");
+        }
+        long daysDiff = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate());
+        if (daysDiff > 180) {
+            throw new BadRequestException("Khoảng thời gian đăng ký lịch định kỳ tối đa là 180 ngày (khoảng 6 tháng)");
+        }
+        if (!request.getStartTime().isBefore(request.getEndTime())) {
+            throw new BadRequestException("Giờ bắt đầu (" + request.getStartTime() + 
+                    ") phải trước giờ kết thúc (" + request.getEndTime() + ")");
+        }
+
+        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Bác sĩ", "id", request.getDoctorId()));
+
+        ExaminationRoom room = examinationRoomRepository.findById(request.getExaminationRoomId())
+                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", request.getExaminationRoomId()));
+
+        List<Integer> daysOfWeek = request.getDaysOfWeek();
+        String shiftType = request.getShiftType() != null && !request.getShiftType().isBlank()
+                ? request.getShiftType()
+                : (request.getStartTime().getHour() < 12 ? "CA_SÁNG" : (request.getStartTime().getHour() < 18 ? "CA_CHIỀU" : "CA_TỐI"));
+        String status = request.getStatus() != null && !request.getStatus().isBlank()
+                ? request.getStatus() : "AVAILABLE";
+
+        List<WorkScheduleResponse> createdSchedules = new ArrayList<>();
+        List<String> conflictMessages = new ArrayList<>();
+        int totalRequested = 0;
+
+        LocalDate curr = request.getStartDate();
+        while (!curr.isAfter(request.getEndDate())) {
+            int dayValue = curr.getDayOfWeek().getValue(); // 1 = Monday, ..., 7 = Sunday
+            if (daysOfWeek != null && !daysOfWeek.isEmpty() && !daysOfWeek.contains(dayValue)) {
+                curr = curr.plusDays(1);
+                continue;
+            }
+
+            totalRequested++;
+
+            // 1. Kiểm tra xung đột lịch Bác sĩ
+            boolean doctorConflict = workScheduleRepository.hasDoctorConflict(
+                    doctor.getId(),
+                    curr,
+                    request.getStartTime(),
+                    request.getEndTime(),
+                    null
+            );
+            if (doctorConflict) {
+                conflictMessages.add("Ngày " + curr + ": Bác sĩ " + doctor.getFullName() + 
+                        " đã có ca làm việc khác trong khung giờ " + request.getStartTime() + " - " + request.getEndTime());
+                curr = curr.plusDays(1);
+                continue;
+            }
+
+            // 2. Kiểm tra xung đột Phòng khám
+            boolean roomConflict = workScheduleRepository.hasRoomConflict(
+                    room.getId(),
+                    curr,
+                    request.getStartTime(),
+                    request.getEndTime(),
+                    null
+            );
+            if (roomConflict) {
+                conflictMessages.add("Ngày " + curr + ": Phòng " + room.getRoomNumber() + " (" + room.getRoomName() + ")" +
+                        " đã được xếp ca cho bác sĩ khác trong khung giờ này");
+                curr = curr.plusDays(1);
+                continue;
+            }
+
+            // Không xung đột -> Tạo và lưu ca
+            WorkSchedule schedule = WorkSchedule.builder()
+                    .doctor(doctor)
+                    .examinationRoom(room)
+                    .workDate(curr)
+                    .shiftType(shiftType)
+                    .startTime(request.getStartTime())
+                    .endTime(request.getEndTime())
+                    .maxPatients(request.getMaxPatients())
+                    .currentBookedCount(0)
+                    .status(status)
+                    .build();
+
+            WorkSchedule saved = workScheduleRepository.save(schedule);
+            createdSchedules.add(mapToResponse(saved));
+            curr = curr.plusDays(1);
+        }
+
+        log.info("-> Đăng ký lịch định kỳ hoàn tất: Bác sĩ {} tại phòng {}, tổng ngày: {}, tạo thành công: {}, xung đột: {}",
+                doctor.getFullName(), room.getRoomNumber(), totalRequested, createdSchedules.size(), conflictMessages.size());
+
+        return BatchWorkScheduleResponse.builder()
+                .totalRequested(totalRequested)
+                .successCount(createdSchedules.size())
+                .conflictCount(conflictMessages.size())
+                .createdSchedules(createdSchedules)
+                .conflictMessages(conflictMessages)
+                .build();
     }
 
     @Override
