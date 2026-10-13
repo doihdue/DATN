@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SpecialtyService } from '../../services/specialty.service';
@@ -68,57 +68,155 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
         </div>
       }
 
-      <!-- Grid Cards of Specialties -->
-      @if (loading()) {
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <p>Đang tải danh mục chuyên khoa...</p>
-        </div>
-      } @else if (filteredSpecialties().length === 0) {
-        <div class="empty-state">
-          <i class="bi bi-inbox-fill"></i>
-          <h3>Không tìm thấy chuyên khoa nào</h3>
-          <p>Thử tìm kiếm với từ khóa khác hoặc nhấn "Thêm Chuyên Khoa Mới" để tạo.</p>
-        </div>
-      } @else {
-        <div class="specialties-grid">
-          @for (item of filteredSpecialties(); track item.id) {
-            <div class="specialty-card">
-              <div class="card-top">
-                <div class="card-icon">
-                  @if (item.iconUrl) {
-                    <i [class]="item.iconUrl"></i>
-                  } @else {
-                    <i class="bi bi-heart-pulse-fill"></i>
+      <!-- Table List of Specialties & Pagination -->
+      <div class="table-card">
+        @if (loading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Đang tải danh mục chuyên khoa...</p>
+          </div>
+        } @else if (filteredSpecialties().length === 0) {
+          <div class="empty-state">
+            <i class="bi bi-inbox-fill"></i>
+            <h3>Không tìm thấy chuyên khoa nào</h3>
+            <p>Thử tìm kiếm với từ khóa khác hoặc nhấn "Thêm Chuyên Khoa Mới" để tạo.</p>
+          </div>
+        } @else {
+          <div class="table-responsive">
+            <table class="clinical-table">
+              <thead>
+                <tr>
+                  <th style="width: 90px; text-align: center;">Mã khoa</th>
+                  <th style="min-width: 240px;">Tên chuyên khoa</th>
+                  <th style="min-width: 320px;">Mô tả nhiệm vụ &amp; chức năng</th>
+                  <th style="width: 170px; text-align: center;">Đội ngũ bác sĩ</th>
+                  <th style="width: 130px; text-align: center;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of paginatedSpecialties(); track item.id) {
+                  <tr class="table-row">
+                    <td style="text-align: center;">
+                      <span class="code-badge">CK-{{ item.id < 10 ? '0' + item.id : item.id }}</span>
+                    </td>
+                    <td>
+                      <div class="specialty-cell">
+                        <div class="specialty-icon-circle">
+                          @if (item.iconUrl) {
+                            <i [class]="item.iconUrl"></i>
+                          } @else {
+                            <i class="bi bi-heart-pulse-fill"></i>
+                          }
+                        </div>
+                        <div class="specialty-meta">
+                          <strong class="specialty-name">{{ item.name }}</strong>
+                          <span class="specialty-sub">Khoa chuyên môn điều trị</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <p class="specialty-desc" [title]="item.description || ''">
+                        {{ item.description || 'Chưa có thông tin mô tả chi tiết cho chuyên khoa này.' }}
+                      </p>
+                    </td>
+                    <td style="text-align: center;">
+                      <button class="btn-doctor-badge" (click)="viewDoctors(item)" title="Xem danh sách bác sĩ thuộc khoa">
+                        <i class="bi bi-person-badge-fill"></i>
+                        <span>{{ item.doctorCount }} Bác sĩ</span>
+                        <i class="bi bi-chevron-right icon-arrow"></i>
+                      </button>
+                    </td>
+                    <td style="text-align: center;">
+                      <div class="action-buttons-cell">
+                        <button class="btn-action btn-action-edit" (click)="openEditModal(item)" title="Chỉnh sửa thông tin">
+                          <i class="bi bi-pencil-fill"></i>
+                        </button>
+                        <button class="btn-action btn-action-delete" (click)="confirmDelete(item)" title="Xóa chuyên khoa">
+                          <i class="bi bi-trash3-fill"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- CLEAR & POWERFUL PAGINATION BAR -->
+          <div class="pagination-footer">
+            <div class="pagination-info">
+              <span>
+                Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredSpecialties().length }}</strong> chuyên khoa
+              </span>
+              <div class="page-size-selector">
+                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <select
+                  id="pageSizeSelect"
+                  [ngModel]="pageSize()"
+                  (ngModelChange)="onPageSizeChange($event)"
+                  class="form-select-sm"
+                >
+                  @for (opt of pageSizeOptions; track opt) {
+                    <option [ngValue]="opt">{{ opt }}</option>
                   }
-                </div>
-                <div class="card-badges">
-                  <span class="badge badge-doctor-count">
-                    <i class="bi bi-person-badge-fill"></i> {{ item.doctorCount }} Bác sĩ
-                  </span>
-                </div>
-              </div>
-
-              <h3 class="card-title">{{ item.name }}</h3>
-              <p class="card-desc">{{ item.description || 'Chưa có mô tả chi tiết cho chuyên khoa này.' }}</p>
-
-              <div class="card-footer">
-                <button class="btn btn-sm btn-ghost" (click)="viewDoctors(item)">
-                  <i class="bi bi-eye"></i> Xem bác sĩ
-                </button>
-                <div class="action-buttons">
-                  <button class="btn btn-sm btn-outline-primary" (click)="openEditModal(item)" title="Chỉnh sửa">
-                    <i class="bi bi-pencil-square"></i> Sửa
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger" (click)="confirmDelete(item)" title="Xóa chuyên khoa">
-                    <i class="bi bi-trash3"></i> Xóa
-                  </button>
-                </div>
+                </select>
               </div>
             </div>
-          }
-        </div>
-      }
+
+            <!-- Pagination Navigation Buttons -->
+            <div class="pagination-controls">
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === 1"
+                (click)="goToPage(1)"
+                title="Về trang đầu tiên"
+              >
+                <i class="bi bi-chevron-double-left"></i>
+              </button>
+
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === 1"
+                (click)="prevPage()"
+                title="Trang trước"
+              >
+                <i class="bi bi-chevron-left"></i> Trước
+              </button>
+
+              <!-- Page Number Pills -->
+              <div class="page-numbers-group">
+                @for (p of pagesList(); track p) {
+                  <button
+                    class="btn-page btn-page-num"
+                    [class.active]="currentPage() === p"
+                    (click)="goToPage(p)"
+                  >
+                    {{ p }}
+                  </button>
+                }
+              </div>
+
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === totalPages()"
+                (click)="nextPage()"
+                title="Trang sau"
+              >
+                Sau <i class="bi bi-chevron-right"></i>
+              </button>
+
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === totalPages()"
+                (click)="goToPage(totalPages())"
+                title="Đến trang cuối cùng"
+              >
+                <i class="bi bi-chevron-double-right"></i>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
 
       <!-- Modal Thêm / Chỉnh Sửa Chuyên Khoa -->
       @if (showModal()) {
@@ -335,103 +433,281 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
       border: 1px solid var(--primary-200);
     }
 
-    .specialties-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .specialty-card {
+    /* Table Card & Responsive */
+    .table-card {
       background: #ffffff;
-      border-radius: var(--radius-lg);
+      border-radius: var(--radius-xl);
       border: 1px solid var(--border-color);
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
-      transition: all 0.25s ease;
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
+      animation: modalFadeIn 0.25s ease-out;
     }
 
-    .specialty-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 30px -4px rgba(2, 132, 199, 0.15);
-      border-color: var(--primary-300);
+    .table-responsive {
+      overflow-x: auto;
     }
 
-    .card-top {
+    .clinical-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.92rem;
+    }
+
+    .clinical-table thead th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 800;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 1rem 1.15rem;
+      border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap;
+    }
+
+    .clinical-table tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.15s;
+    }
+
+    .clinical-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .clinical-table td {
+      padding: 1rem 1.15rem;
+      vertical-align: middle;
+      color: #1e293b;
+    }
+
+    /* Specialty Cell */
+    .specialty-cell {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.25rem;
+      gap: 0.85rem;
     }
 
-    .card-icon {
-      width: 50px;
-      height: 50px;
-      border-radius: var(--radius-md);
+    .specialty-icon-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
       background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
       color: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+      font-size: 1.35rem;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
     }
 
-    .badge-doctor-count {
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
+    .specialty-meta {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .specialty-name {
+      color: #0f172a;
+      font-size: 0.98rem;
+      font-weight: 800;
+    }
+
+    .specialty-sub {
+      color: #64748b;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .code-badge {
+      background: #f5f3ff;
+      color: #6d28d9;
+      border: 1px solid #ddd6fe;
+      padding: 0.25rem 0.55rem;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 800;
       font-size: 0.8rem;
-      padding: 0.35rem 0.65rem;
-      border-radius: var(--radius-full);
-      font-weight: 700;
+      display: inline-block;
     }
 
-    .card-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin: 0 0 0.5rem;
-    }
-
-    .card-desc {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      line-height: 1.5;
-      flex-grow: 1;
-      margin-bottom: 1.5rem;
+    .specialty-desc {
+      color: #475569;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      margin: 0;
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    .card-footer {
+    .btn-doctor-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      padding: 0.4rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-doctor-badge:hover {
+      background: #d1fae5;
+      border-color: #6ee7b7;
+      transform: translateY(-1px);
+    }
+
+    .btn-doctor-badge .icon-arrow {
+      font-size: 0.8rem;
+      opacity: 0.6;
+      transition: transform 0.2s;
+    }
+
+    .btn-doctor-badge:hover .icon-arrow {
+      transform: translateX(2px);
+      opacity: 1;
+    }
+
+    /* Action Buttons in Cell */
+    .action-buttons-cell {
+      display: flex;
+      justify-content: center;
+      gap: 0.45rem;
+    }
+
+    .btn-action {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+    }
+
+    .btn-action-edit {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      color: #0284c7;
+    }
+
+    .btn-action-edit:hover {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }
+
+    .btn-action-delete {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+    }
+
+    .btn-action-delete:hover {
+      background: #dc2626;
+      color: #ffffff;
+      border-color: #dc2626;
+    }
+
+    /* ==================== PAGINATION BAR ==================== */
+    .pagination-footer {
+      padding: 1rem 1.35rem;
+      background: #ffffff;
+      border-top: 1.5px solid #f1f5f9;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-top: 1rem;
-      border-top: 1px solid #f1f5f9;
+      flex-wrap: wrap;
+      gap: 1rem;
     }
 
-    .action-buttons {
+    .pagination-info {
       display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.88rem;
+      color: #475569;
+    }
+
+    .pagination-info strong {
+      color: #0f172a;
+    }
+
+    .page-size-selector {
+      display: flex;
+      align-items: center;
       gap: 0.5rem;
+      font-size: 0.85rem;
     }
 
-    .btn-ghost {
-      background: transparent;
-      border: none;
-      color: var(--primary-700);
-      font-weight: 600;
-      padding: 0.4rem 0.6rem;
-      border-radius: var(--radius-sm);
+    .form-select-sm {
+      padding: 0.35rem 0.65rem;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      color: #0f172a;
+      font-weight: 700;
+      background: #ffffff;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-page {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 0.5rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      font-weight: 700;
+      font-size: 0.85rem;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
     }
 
-    .btn-ghost:hover {
-      background: var(--primary-50);
+    .btn-page:hover:not(:disabled) {
+      background: #f0f9ff;
+      border-color: #0284c7;
+      color: #0284c7;
+    }
+
+    .btn-page.active {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+    }
+
+    .btn-page:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    .btn-page-nav {
+      gap: 0.25rem;
+      padding: 0 0.75rem;
+    }
+
+    .page-numbers-group {
+      display: flex;
+      gap: 0.3rem;
     }
 
     /* Modal Styles */
@@ -680,6 +956,73 @@ export class SpecialtiesComponent implements OnInit {
     iconUrl: 'bi bi-heart-pulse-fill'
   };
 
+  // Pagination for Specialties
+  readonly currentPage = signal(1);
+  readonly pageSize = signal(5);
+  readonly pageSizeOptions = [5, 10, 15, 20];
+
+  readonly totalPages = computed(() => {
+    const total = this.filteredSpecialties().length;
+    return Math.max(1, Math.ceil(total / this.pageSize()));
+  });
+
+  readonly paginatedSpecialties = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredSpecialties().slice(start, start + this.pageSize());
+  });
+
+  readonly startIndex = computed(() => {
+    if (this.filteredSpecialties().length === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+
+  readonly endIndex = computed(() => {
+    const end = this.currentPage() * this.pageSize();
+    return Math.min(end, this.filteredSpecialties().length);
+  });
+
+  readonly pagesList = computed(() => {
+    const total = this.totalPages();
+    const curr = this.currentPage();
+    const pages: number[] = [];
+    const maxVisible = 5;
+
+    let start = Math.max(1, curr - Math.floor(maxVisible / 2));
+    let end = Math.min(total, start + maxVisible - 1);
+
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  });
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.update(p => p - 1);
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.update(p => p + 1);
+    }
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+  }
+
   get totalDoctors(): () => number {
     return () => this.specialties().reduce((sum, item) => sum + item.doctorCount, 0);
   }
@@ -709,12 +1052,13 @@ export class SpecialtiesComponent implements OnInit {
     const kw = this.searchKeyword.trim().toLowerCase();
     if (!kw) {
       this.filteredSpecialties.set(this.specialties());
-      return;
+    } else {
+      const filtered = this.specialties().filter(s =>
+        s.name.toLowerCase().includes(kw) || (s.description && s.description.toLowerCase().includes(kw))
+      );
+      this.filteredSpecialties.set(filtered);
     }
-    const filtered = this.specialties().filter(s =>
-      s.name.toLowerCase().includes(kw) || (s.description && s.description.toLowerCase().includes(kw))
-    );
-    this.filteredSpecialties.set(filtered);
+    this.currentPage.set(1);
   }
 
   openAddModal(): void {

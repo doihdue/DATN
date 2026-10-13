@@ -137,7 +137,7 @@ import { Specialty } from '../../models/specialty.model';
               </tr>
             </thead>
             <tbody>
-              @for (item of schedules(); track item.id) {
+              @for (item of paginatedSchedules(); track item.id) {
                 <tr [class.row-cancelled]="item.status === 'CANCELLED'">
                   <td>
                     <div class="date-col">
@@ -200,6 +200,80 @@ import { Specialty } from '../../models/specialty.model';
               }
             </tbody>
           </table>
+
+          <!-- CLEAR & POWERFUL PAGINATION BAR -->
+          <div class="pagination-footer">
+            <div class="pagination-info">
+              <span>
+                Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ schedules().length }}</strong> ca trực
+              </span>
+              <div class="page-size-selector">
+                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <select
+                  id="pageSizeSelect"
+                  [ngModel]="pageSize()"
+                  (ngModelChange)="onPageSizeChange($event)"
+                  class="form-select-sm"
+                >
+                  @for (opt of pageSizeOptions; track opt) {
+                    <option [ngValue]="opt">{{ opt }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <!-- Pagination Navigation Buttons -->
+            <div class="pagination-controls">
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === 1"
+                (click)="goToPage(1)"
+                title="Về trang đầu tiên"
+              >
+                <i class="bi bi-chevron-double-left"></i>
+              </button>
+
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === 1"
+                (click)="prevPage()"
+                title="Trang trước"
+              >
+                <i class="bi bi-chevron-left"></i> Trước
+              </button>
+
+              <!-- Page Number Pills -->
+              <div class="page-numbers-group">
+                @for (p of pagesList(); track p) {
+                  <button
+                    class="btn-page btn-page-num"
+                    [class.active]="currentPage() === p"
+                    (click)="goToPage(p)"
+                  >
+                    {{ p }}
+                  </button>
+                }
+              </div>
+
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === totalPages()"
+                (click)="nextPage()"
+                title="Trang sau"
+              >
+                Sau <i class="bi bi-chevron-right"></i>
+              </button>
+
+              <button
+                class="btn-page btn-page-nav"
+                [disabled]="currentPage() === totalPages()"
+                (click)="goToPage(totalPages())"
+                title="Đến trang cuối cùng"
+              >
+                <i class="bi bi-chevron-double-right"></i>
+              </button>
+            </div>
+          </div>
         }
       </div>
 
@@ -560,6 +634,99 @@ import { Specialty } from '../../models/specialty.model';
 
     .text-right { text-align: right; }
 
+    /* ==================== PAGINATION BAR ==================== */
+    .pagination-footer {
+      padding: 0.95rem 1.35rem;
+      background: #ffffff;
+      border-top: 1.5px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .pagination-info {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.88rem;
+      color: #475569;
+    }
+
+    .pagination-info strong {
+      color: #0f172a;
+    }
+
+    .page-size-selector {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .form-select-sm {
+      padding: 0.35rem 0.65rem;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      color: #0f172a;
+      font-weight: 700;
+      background: #ffffff;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-page {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 0.5rem;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .btn-page:hover:not(:disabled) {
+      background: #f0f9ff;
+      border-color: #0284c7;
+      color: #0284c7;
+    }
+
+    .btn-page.active {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+    }
+
+    .btn-page:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    .btn-page-nav {
+      gap: 0.25rem;
+      padding: 0 0.75rem;
+    }
+
+    .page-numbers-group {
+      display: flex;
+      gap: 0.3rem;
+    }
+
     /* Modal */
     .modal-backdrop {
       position: fixed;
@@ -730,6 +897,73 @@ export class SchedulesComponent implements OnInit {
   filterRoomId: number | null = null;
   filterSpecialtyId: number | null = null;
 
+  // Pagination for Schedules
+  readonly currentPage = signal(1);
+  readonly pageSize = signal(10);
+  readonly pageSizeOptions = [5, 10, 15, 20, 50];
+
+  readonly totalPages = computed(() => {
+    const total = this.schedules().length;
+    return Math.max(1, Math.ceil(total / this.pageSize()));
+  });
+
+  readonly paginatedSchedules = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.schedules().slice(start, start + this.pageSize());
+  });
+
+  readonly startIndex = computed(() => {
+    if (this.schedules().length === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize() + 1;
+  });
+
+  readonly endIndex = computed(() => {
+    const end = this.currentPage() * this.pageSize();
+    return Math.min(end, this.schedules().length);
+  });
+
+  readonly pagesList = computed(() => {
+    const total = this.totalPages();
+    const curr = this.currentPage();
+    const pages: number[] = [];
+    const maxVisible = 5;
+
+    let start = Math.max(1, curr - Math.floor(maxVisible / 2));
+    let end = Math.min(total, start + maxVisible - 1);
+
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  });
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.update(p => p - 1);
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.update(p => p + 1);
+    }
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+  }
+
   formData: WorkScheduleRequest = {
     doctorId: 0,
     examinationRoomId: 0,
@@ -807,6 +1041,7 @@ export class SchedulesComponent implements OnInit {
       next: res => {
         if (res.success && res.data) {
           this.schedules.set(res.data);
+          this.currentPage.set(1);
         }
         this.loading.set(false);
       },
@@ -822,6 +1057,7 @@ export class SchedulesComponent implements OnInit {
     this.filterEndDate = '';
     this.filterRoomId = null;
     this.filterSpecialtyId = null;
+    this.currentPage.set(1);
     this.loadSchedules();
   }
 

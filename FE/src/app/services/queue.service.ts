@@ -30,6 +30,12 @@ export class QueueService {
     return this.http.get<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/my-ticket/${ticketNumber}`);
   }
 
+  getMyActiveTicket(phone?: string): Observable<ApiResponse<MyTicketStatus>> {
+    const params: Record<string, string> = {};
+    if (phone && phone.trim()) params['phone'] = phone.trim();
+    return this.http.get<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/my-active-ticket`, { params });
+  }
+
   getTicketById(ticketId: number): Observable<ApiResponse<QueueTicket>> {
     return this.http.get<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}`);
   }

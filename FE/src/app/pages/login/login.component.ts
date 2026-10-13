@@ -340,9 +340,20 @@ export class LoginComponent {
     this.authService.login({ username: this.username, password: this.password }).subscribe({
       next: res => {
         this.isLoading.set(false);
-        if (res.success) {
-          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/';
-          this.router.navigateByUrl(returnUrl);
+        if (res.success && res.data) {
+          const userRoles = res.data.user?.roles || [];
+          const isAdmin = userRoles.includes('ROLE_ADMIN') || userRoles.includes('ADMIN');
+
+          const returnUrl = this.route.snapshot.queryParams['returnUrl'];
+          if (returnUrl && returnUrl !== '/') {
+            this.router.navigateByUrl(returnUrl);
+          } else if (isAdmin) {
+            // Chỉ Admin vào thẳng Dashboard
+            this.router.navigateByUrl('/dashboard');
+          } else {
+            // Bác sĩ, Lễ tân và Bệnh nhân đều vào Trang chủ '/'
+            this.router.navigateByUrl('/');
+          }
         } else {
           this.errorMessage.set(res.message || 'Đăng nhập không thành công');
         }

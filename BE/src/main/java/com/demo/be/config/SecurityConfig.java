@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/api/examination-rooms/**",
                                 "/api/queue/display-board",
                                 "/api/queue/my-ticket/**",
+                                "/api/queue/my-active-ticket",
                                 "/api/queue/ticket/**",
                                 "/api/medical-records/**",
                                 "/api/queue/check-in",

@@ -23,20 +23,75 @@ interface QueueRoom {
       <section class="hero-section">
         <div class="hero-ambient-glow"></div>
         <div class="hero-content">
-          <div class="hero-badge">
-            <span class="pulse-dot"></span>
-            <span>Cổng Tiếp Đón &amp; Quản Lý Hàng Đợi Y Tế Điện Tử</span>
-          </div>
+          @if (authService.hasRole('PATIENT')) {
+            <div class="hero-badge patient-badge">
+              <span class="pulse-dot"></span>
+              <span>Hồ Sơ Y Tế Bệnh Nhân • {{ authService.currentUser()?.fullName }}</span>
+            </div>
 
-          <h1 class="hero-title">
-            Hệ Thống Đặt Lịch Khám &amp;<br class="hero-title-break" />
-            <span class="hero-gradient-text">Điều Phối Hàng Đợi Thông Minh</span>
-          </h1>
+            <h1 class="hero-title">
+              Xin chào, <span class="hero-gradient-text">{{ authService.currentUser()?.fullName }}</span>!
+            </h1>
 
-          <p class="hero-desc">
-            Giải pháp số hóa toàn diện quy trình tiếp đón: Tự động cấp số thứ tự, giám sát phòng khám thời gian thực,
-            tối ưu hóa thời gian chờ đợi và hỗ trợ tư vấn phân luồng chuyên khoa bằng AI.
-          </p>
+            <p class="hero-desc">
+              Hồ sơ y tế của bạn đã kết nối thành công với MedQueue. Bạn có thể đăng ký lấy số khám trực tuyến nhanh chóng,
+              theo dõi vị trí gọi số theo thời gian thực và tra cứu lịch sử khám bệnh.
+            </p>
+          } @else if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
+            <div class="hero-badge doctor-badge">
+              <span class="pulse-dot"></span>
+              <span>Bác Sĩ Khám Chữa Bệnh • {{ authService.currentUser()?.fullName }}</span>
+            </div>
+
+            <h1 class="hero-title">
+              Chào Bác Sĩ, <span class="hero-gradient-text">{{ authService.currentUser()?.fullName }}</span>!
+            </h1>
+
+            <p class="hero-desc">
+              Chào mừng Bác sĩ đến với Cổng làm việc MedQueue. Bác sĩ có thể tiếp nhận bệnh nhân, ghi nhận chỉ số sinh tồn, chẩn đoán ICD-10 và kê đơn thuốc điện tử.
+            </p>
+          } @else if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+            <div class="hero-badge staff-badge">
+              <span class="pulse-dot"></span>
+              <span>Bộ Phận Lễ Tân &amp; Tiếp Đón • {{ authService.currentUser()?.fullName }}</span>
+            </div>
+
+            <h1 class="hero-title">
+              Bàn Tiếp Đón - <span class="hero-gradient-text">{{ authService.currentUser()?.fullName }}</span>
+            </h1>
+
+            <p class="hero-desc">
+              Chào mừng bạn đến với Cổng điều hành tiếp đón &amp; điều phối. Tiếp nhận người bệnh, cấp số thứ tự vào phòng khám chuyên khoa và giám sát luồng hàng đợi thời gian thực.
+            </p>
+          } @else if (authService.hasRole('ADMIN')) {
+            <div class="hero-badge admin-badge">
+              <span class="pulse-dot"></span>
+              <span>Quản Trị Toàn Viện • {{ authService.currentUser()?.fullName }}</span>
+            </div>
+
+            <h1 class="hero-title">
+              Trung Tâm Điều Hành <span class="hero-gradient-text">MedQueue Admin</span>
+            </h1>
+
+            <p class="hero-desc">
+              Giám sát toàn diện chỉ số hoạt động bệnh viện, quản lý danh mục chuyên khoa, danh mục dược phẩm và điều phối lịch trực phòng khám.
+            </p>
+          } @else {
+            <div class="hero-badge">
+              <span class="pulse-dot"></span>
+              <span>Cổng Tiếp Đón &amp; Quản Lý Hàng Đợi Y Tế Điện Tử</span>
+            </div>
+
+            <h1 class="hero-title">
+              Hệ Thống Đặt Lịch Khám &amp;<br class="hero-title-break" />
+              <span class="hero-gradient-text">Điều Phối Hàng Đợi Thông Minh</span>
+            </h1>
+
+            <p class="hero-desc">
+              Giải pháp số hóa toàn diện quy trình tiếp đón: Tự động cấp số thứ tự, giám sát phòng khám thời gian thực,
+              tối ưu hóa thời gian chờ đợi và hỗ trợ tư vấn phân luồng chuyên khoa bằng AI.
+            </p>
+          }
 
           <div class="hero-actions">
             @if (!authService.isAuthenticated()) {
@@ -44,8 +99,11 @@ interface QueueRoom {
                 <a routerLink="/register" class="btn btn-primary btn-hero">
                   <i class="bi bi-calendar-plus"></i> Đăng Ký Khám Bệnh
                 </a>
-                <a routerLink="/queue/tracking" class="btn btn-outline btn-hero">
-                  <i class="bi bi-ticket-perforated"></i> Tra Cứu Phiếu Khám
+                <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="btn btn-outline btn-hero">
+                  <i class="bi bi-ticket-perforated"></i> Lấy Số Khám Online
+                </a>
+                <a routerLink="/queue/tracking" [queryParams]="{ mode: 'lookup' }" class="btn btn-outline btn-hero">
+                  <i class="bi bi-search"></i> Tra Cứu Phiếu Khám
                 </a>
                 <a routerLink="/queue" class="btn btn-ghost btn-hero">
                   <i class="bi bi-tv"></i> Màn Hình TV Sảnh
@@ -55,17 +113,14 @@ interface QueueRoom {
               <!-- Role-Tailored High-End SaaS Launchers -->
               <div class="hero-cta-group">
                 @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
-                  <a routerLink="/doctor/examination" class="btn btn-primary btn-hero">
-                    <i class="bi bi-clipboard2-pulse"></i> Vào Bàn Khám Bệnh
-                  </a>
-                  <a routerLink="/doctor/calling" class="btn btn-outline btn-hero">
+                  <a routerLink="/doctor/calling" class="btn btn-primary btn-hero">
                     <i class="bi bi-megaphone"></i> Bàn Gọi Số Khám
+                  </a>
+                  <a routerLink="/doctor/examination" class="btn btn-outline btn-hero">
+                    <i class="bi bi-clipboard2-pulse"></i> Vào Bàn Khám Bệnh
                   </a>
                   <a routerLink="/doctor/schedule" class="btn btn-ghost btn-hero">
                     <i class="bi bi-calendar2-week"></i> Xem Ca Trực
-                  </a>
-                  <a routerLink="/queue" class="btn btn-ghost btn-hero">
-                    <i class="bi bi-tv"></i> Màn Hình TV
                   </a>
                 }
                 @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
@@ -76,32 +131,32 @@ interface QueueRoom {
                     <i class="bi bi-sliders"></i> Điều Phối Hàng Đợi
                   </a>
                   <a routerLink="/queue" class="btn btn-ghost btn-hero">
-                    <i class="bi bi-tv"></i> Màn Hình TV
+                    <i class="bi bi-tv"></i> Màn Hình TV Sảnh Chờ
                   </a>
                 }
                 @if (authService.hasRole('ADMIN')) {
-                  <a routerLink="/admin/specialties" class="btn btn-primary btn-hero">
+                  <a routerLink="/dashboard" class="btn btn-primary btn-hero">
+                    <i class="bi bi-speedometer2"></i> Dashboard Quản Trị
+                  </a>
+                  <a routerLink="/admin/specialties" class="btn btn-outline btn-hero">
                     <i class="bi bi-diagram-3"></i> Quản Lý Chuyên Khoa
                   </a>
                   <a routerLink="/admin/medicines" class="btn btn-outline btn-hero">
                     <i class="bi bi-capsule"></i> Quản Lý Dược Phẩm
                   </a>
-                  <a routerLink="/admin/schedules" class="btn btn-outline btn-hero">
+                  <a routerLink="/admin/schedules" class="btn btn-ghost btn-hero">
                     <i class="bi bi-calendar3"></i> Lịch Trực Phòng
-                  </a>
-                  <a routerLink="/queue" class="btn btn-ghost btn-hero">
-                    <i class="bi bi-tv"></i> Màn Hình TV
                   </a>
                 }
                 @if (authService.hasRole('PATIENT')) {
-                  <a routerLink="/register" class="btn btn-primary btn-hero">
-                    <i class="bi bi-calendar-plus"></i> Đăng Ký Khám Mới
+                  <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="btn btn-primary btn-hero">
+                    <i class="bi bi-ticket-perforated-fill"></i> Lấy Số Khám Ngay
                   </a>
-                  <a routerLink="/queue/tracking" class="btn btn-outline btn-hero">
-                    <i class="bi bi-ticket-perforated"></i> Tra Cứu Phiếu Khám
+                  <a routerLink="/my-tickets" class="btn btn-outline btn-hero">
+                    <i class="bi bi-clock-history"></i> Phiếu Khám Của Tôi
                   </a>
                   <a routerLink="/queue" class="btn btn-ghost btn-hero">
-                    <i class="bi bi-tv"></i> Màn Hình TV
+                    <i class="bi bi-tv"></i> Màn Hình TV Sảnh
                   </a>
                 }
               </div>
@@ -160,11 +215,13 @@ interface QueueRoom {
             <h2 class="section-title">Bảng Theo Dõi Số Khám Tại Các Phòng</h2>
             <p class="section-desc">Tiến độ gọi số và trạng thái khám bệnh hiện thời tại sảnh tiếp đón</p>
           </div>
-          <div class="header-right-actions">
-            <a routerLink="/queue" class="btn btn-outline btn-sm">
-              <i class="bi bi-tv"></i> Mở Màn Hình TV Sảnh Chờ
-            </a>
-          </div>
+          @if (!authService.hasRole('ADMIN') && !authService.hasRole('DOCTOR')) {
+            <div class="header-right-actions">
+              <a routerLink="/queue" class="btn btn-outline btn-sm">
+                <i class="bi bi-tv"></i> Mở Màn Hình TV Sảnh Chờ
+              </a>
+            </div>
+          }
         </div>
 
         <div class="rooms-grid">
@@ -211,29 +268,71 @@ interface QueueRoom {
       </section>
 
       <!-- Role-Specific Action Shortcuts -->
-      @if (authService.isAuthenticated()) {
-        <section class="portal-actions-section">
-          <div class="section-header">
-            <div>
-              <h2 class="section-title">Chức Năng Phân Quyền</h2>
-              <p class="section-desc">Truy cập các tính năng theo vai trò công tác của bạn</p>
-            </div>
+      <section class="portal-actions-section">
+        <div class="section-header">
+          <div>
+            @if (authService.hasRole('PATIENT')) {
+              <h2 class="section-title">Dịch Vụ Dành Cho Bệnh Nhân</h2>
+              <p class="section-desc">Truy cập nhanh các tiện ích lấy số trực tuyến và theo dõi tiến độ khám bệnh</p>
+            } @else if (authService.hasRole('DOCTOR')) {
+              <h2 class="section-title">Bàn Làm Việc Bác Sĩ</h2>
+              <p class="section-desc">Truy cập nhanh công cụ gọi khám, bàn khám bệnh lâm sàng và lịch trực</p>
+            } @else if (authService.hasRole('STAFF')) {
+              <h2 class="section-title">Bàn Tiếp Đón &amp; Điều Phối</h2>
+              <p class="section-desc">Công cụ cấp số tiếp đón bệnh nhân và điều phối hàng đợi phòng khám</p>
+            } @else if (authService.hasRole('ADMIN')) {
+              <h2 class="section-title">Trung Tâm Quản Trị Hệ Thống</h2>
+              <p class="section-desc">Quản lý toàn diện cơ sở dữ liệu chuyên khoa, dược phẩm và lịch trực phòng khám</p>
+            } @else {
+              <h2 class="section-title">Dịch Vụ &amp; Tiện Ích Y Tế</h2>
+              <p class="section-desc">Đăng ký lấy số trực tuyến, tra cứu phiếu khám và theo dõi hàng đợi phòng khám</p>
+            }
           </div>
+        </div>
 
-          <div class="actions-grid">
+        <div class="actions-grid">
+          @if (!authService.isAuthenticated()) {
+            <div class="action-card medical-card">
+              <div class="action-icon icon-blue"><i class="bi bi-ticket-perforated-fill"></i></div>
+              <h3 class="action-title">Lấy Số Khám Trực Tuyến</h3>
+              <p class="action-desc">Đăng ký xếp hàng tự động online trước khi tới phòng khám để không phải xếp hàng bốc số.</p>
+              <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="btn btn-primary btn-sm">Lấy số ngay <i class="bi bi-arrow-right"></i></a>
+            </div>
+
+            <div class="action-card medical-card">
+              <div class="action-icon icon-teal"><i class="bi bi-search"></i></div>
+              <h3 class="action-title">Tra Cứu Phiếu Khám</h3>
+              <p class="action-desc">Nhập mã số vé để theo dõi tiến độ gọi số và thời gian chờ ước tính thời gian thực.</p>
+              <a routerLink="/queue/tracking" [queryParams]="{ mode: 'lookup' }" class="btn btn-outline btn-sm">Tra cứu ngay <i class="bi bi-arrow-right"></i></a>
+            </div>
+
+            <div class="action-card medical-card">
+              <div class="action-icon icon-indigo"><i class="bi bi-display"></i></div>
+              <h3 class="action-title">Bảng Gọi Số Sảnh Chờ</h3>
+              <p class="action-desc">Theo dõi toàn bộ danh sách phòng khám trên màn hình lớn sảnh bệnh viện.</p>
+              <a routerLink="/queue" class="btn btn-outline btn-sm">Mở bảng TV <i class="bi bi-arrow-right"></i></a>
+            </div>
+
+            <div class="action-card medical-card">
+              <div class="action-icon icon-emerald"><i class="bi bi-box-arrow-in-right"></i></div>
+              <h3 class="action-title">Cổng Nhân Viên Y Tế</h3>
+              <p class="action-desc">Đăng nhập tài khoản Bác sĩ, Lễ tân hoặc Quản trị viên để bắt đầu ca làm việc.</p>
+              <a routerLink="/login" class="btn btn-outline btn-sm">Đăng nhập <i class="bi bi-arrow-right"></i></a>
+            </div>
+          } @else {
             @if (authService.hasRole('PATIENT')) {
               <div class="action-card medical-card">
-                <div class="action-icon icon-blue"><i class="bi bi-calendar-check"></i></div>
-                <h3 class="action-title">Đăng Ký Khám Mới</h3>
-                <p class="action-desc">Chọn bác sĩ, chuyên khoa và khung giờ thuận tiện giúp hạn chế tối đa xếp hàng.</p>
-                <a routerLink="/register" class="btn btn-outline btn-sm">Đăng ký ngay <i class="bi bi-arrow-right"></i></a>
+                <div class="action-icon icon-blue"><i class="bi bi-ticket-perforated-fill"></i></div>
+                <h3 class="action-title">Lấy Số Khám Trực Tuyến</h3>
+                <p class="action-desc">Đăng ký xếp hàng tự động online trước khi tới phòng khám để không phải xếp hàng bốc số.</p>
+                <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="btn btn-primary btn-sm">Lấy số ngay <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">
-                <div class="action-icon icon-teal"><i class="bi bi-ticket-perforated"></i></div>
-                <h3 class="action-title">Tra Cứu Phiếu &amp; Hàng Đợi</h3>
+                <div class="action-icon icon-teal"><i class="bi bi-clock-history"></i></div>
+                <h3 class="action-title">Phiếu Khám Của Tôi</h3>
                 <p class="action-desc">Xem tiến độ gọi số khám của bạn theo thời gian thực và thời gian dự kiến.</p>
-                <a routerLink="/queue/tracking" class="btn btn-outline btn-sm">Xem tiến độ phiếu <i class="bi bi-arrow-right"></i></a>
+                <a routerLink="/my-tickets" class="btn btn-outline btn-sm">Xem tiến độ phiếu <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">
@@ -246,17 +345,17 @@ interface QueueRoom {
 
             @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
               <div class="action-card medical-card">
-                <div class="action-icon icon-blue"><i class="bi bi-clipboard2-pulse"></i></div>
-                <h3 class="action-title">Bàn Khám Bệnh &amp; Kê Đơn</h3>
-                <p class="action-desc">Ghi nhận chỉ số sinh tồn, chẩn đoán ICD-10 và lập đơn thuốc điện tử cho bệnh nhân.</p>
-                <a routerLink="/doctor/examination" class="btn btn-primary btn-sm">Vào bàn khám <i class="bi bi-arrow-right"></i></a>
-              </div>
-
-              <div class="action-card medical-card">
                 <div class="action-icon icon-teal"><i class="bi bi-megaphone"></i></div>
                 <h3 class="action-title">Điều Phối &amp; Gọi Số Khám</h3>
                 <p class="action-desc">Bấm chuông mời bệnh nhân tiếp theo vào phòng khám hoặc chuyển luồng cấp cứu.</p>
-                <a routerLink="/doctor/calling" class="btn btn-outline btn-sm">Vào gọi số <i class="bi bi-arrow-right"></i></a>
+                <a routerLink="/doctor/calling" class="btn btn-primary btn-sm">Vào gọi số <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card medical-card">
+                <div class="action-icon icon-blue"><i class="bi bi-clipboard2-pulse"></i></div>
+                <h3 class="action-title">Bàn Khám Bệnh &amp; Kê Đơn</h3>
+                <p class="action-desc">Ghi nhận chỉ số sinh tồn, chẩn đoán ICD-10 và lập đơn thuốc điện tử cho bệnh nhân.</p>
+                <a routerLink="/doctor/examination" class="btn btn-outline btn-sm">Vào bàn khám <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">
@@ -281,14 +380,28 @@ interface QueueRoom {
                 <p class="action-desc">Theo dõi danh sách bệnh nhân đang chờ, gọi lại lượt bị nhỡ hoặc đổi phòng khám.</p>
                 <a routerLink="/staff/queue" class="btn btn-outline btn-sm">Quản lý hàng đợi <i class="bi bi-arrow-right"></i></a>
               </div>
+
+              <div class="action-card medical-card">
+                <div class="action-icon icon-indigo"><i class="bi bi-display"></i></div>
+                <h3 class="action-title">Bảng Gọi Số Sảnh Chờ</h3>
+                <p class="action-desc">Theo dõi luồng hiển thị trên màn hình TV sảnh bệnh viện theo thời gian thực.</p>
+                <a routerLink="/queue" class="btn btn-outline btn-sm">Mở bảng TV <i class="bi bi-arrow-right"></i></a>
+              </div>
             }
 
             @if (authService.hasRole('ADMIN')) {
               <div class="action-card medical-card">
-                <div class="action-icon icon-blue"><i class="bi bi-diagram-3"></i></div>
+                <div class="action-icon icon-blue"><i class="bi bi-speedometer2"></i></div>
+                <h3 class="action-title">Dashboard Thống Kê</h3>
+                <p class="action-desc">Chỉ số thời gian chờ, lượt khám thực tế, tỷ lệ hoàn thành và biểu đồ hiệu suất khám.</p>
+                <a routerLink="/dashboard" class="btn btn-primary btn-sm">Xem Dashboard <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card medical-card">
+                <div class="action-icon icon-indigo"><i class="bi bi-diagram-3"></i></div>
                 <h3 class="action-title">Danh Mục Chuyên Khoa</h3>
                 <p class="action-desc">Quản lý chuyên khoa, cấu hình mô tả và chỉ định bác sĩ phụ trách từng chuyên khoa.</p>
-                <a routerLink="/admin/specialties" class="btn btn-primary btn-sm">Quản lý chuyên khoa <i class="bi bi-arrow-right"></i></a>
+                <a routerLink="/admin/specialties" class="btn btn-outline btn-sm">Quản lý chuyên khoa <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">
@@ -304,17 +417,10 @@ interface QueueRoom {
                 <p class="action-desc">Xếp lịch làm việc cho bác sĩ, kiểm tra xung đột trùng giờ và thiết lập giới hạn tiếp nhận.</p>
                 <a routerLink="/admin/schedules" class="btn btn-outline btn-sm">Cấu hình lịch <i class="bi bi-arrow-right"></i></a>
               </div>
-
-              <div class="action-card medical-card">
-                <div class="action-icon icon-indigo"><i class="bi bi-display"></i></div>
-                <h3 class="action-title">Bảng Gọi Số Sảnh Chờ</h3>
-                <p class="action-desc">Theo dõi toàn bộ danh sách phòng khám trên màn hình lớn sảnh bệnh viện thời gian thực.</p>
-                <a routerLink="/queue" class="btn btn-outline btn-sm">Mở bảng TV <i class="bi bi-arrow-right"></i></a>
-              </div>
             }
-          </div>
-        </section>
-      }
+          }
+        </div>
+      </section>
     </div>
   `,
   styles: [`
@@ -378,6 +484,30 @@ interface QueueRoom {
       border: 1px solid #bae6fd;
       box-shadow: 0 2px 6px rgba(2, 132, 199, 0.08);
       letter-spacing: 0.01em;
+    }
+
+    .hero-badge.patient-badge {
+      background-color: #ecfdf5;
+      color: #047857;
+      border-color: #a7f3d0;
+    }
+
+    .hero-badge.doctor-badge {
+      background-color: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+
+    .hero-badge.staff-badge {
+      background-color: #fffbeb;
+      color: #b45309;
+      border-color: #fde68a;
+    }
+
+    .hero-badge.admin-badge {
+      background-color: #f5f3ff;
+      color: #6d28d9;
+      border-color: #ddd6fe;
     }
 
     .pulse-dot {

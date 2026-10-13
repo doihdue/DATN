@@ -240,6 +240,62 @@ $text-muted: #64748b;
       }
     }
   }
+
+  &.patient-empty-state {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #fcd34d;
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);
+
+    .empty-patient-content {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      width: 100%;
+    }
+
+    .empty-patient-icon {
+      width: 52px;
+      height: 52px;
+      background: #f59e0b;
+      color: #ffffff;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(245, 158, 11, 0.25);
+    }
+
+    .empty-patient-text {
+      flex: 1;
+
+      .empty-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #92400e;
+        margin: 0 0 0.25rem 0;
+      }
+
+      .empty-desc {
+        font-size: 0.88rem;
+        color: #b45309;
+        margin: 0;
+        line-height: 1.4;
+
+        strong {
+          color: #78350f;
+        }
+      }
+    }
+
+    .empty-patient-actions {
+      display: flex;
+      gap: 0.65rem;
+      flex-shrink: 0;
+      align-items: center;
+    }
+  }
 }
 
 // 3. Vital Signs Quick Bar
@@ -361,42 +417,12 @@ $text-muted: #64748b;
   gap: 1.25rem;
 }
 
-.exam-row-top {
-  display: grid;
-  grid-template-columns: 1.45fr 1fr;
-  gap: 1.25rem;
-  align-items: stretch;
-
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.exam-col-records {
-  display: flex;
-  flex-direction: column;
-}
-
-.exam-col-revisit {
-  display: flex;
-  flex-direction: column;
-
-  .revisit-card {
-    height: 100%;
-    margin-bottom: 0;
-  }
-}
-
-.exam-row-prescription {
-  width: 100%;
-}
-
 .exam-section-card {
   background: #ffffff;
   border: 1px solid $border;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
 
   .card-header {
     padding: 0.85rem 1.25rem;
@@ -423,27 +449,55 @@ $text-muted: #64748b;
     }
 
     .sub-tag {
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 700;
       background: #e2e8f0;
       color: #475569;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
-    }
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
 
-    .extend-pill {
-      font-size: 0.72rem;
-      font-weight: 800;
-      background: #f0fdf4;
-      color: #16a34a;
-      border: 1px solid #bbf7d0;
-      padding: 0.15rem 0.5rem;
-      border-radius: 12px;
+      &.tag-required {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+      }
+
+      &.tag-active {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+      }
+
+      &.tag-disabled {
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+      }
+
+      &.tag-info {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+      }
     }
   }
 
   .card-body {
     padding: 1.25rem;
+  }
+}
+
+.revisit-inner-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+
+  .revisit-empty-hint {
+    padding: 1rem 0;
   }
 }
 
@@ -813,33 +867,35 @@ $text-muted: #64748b;
 }
 
 // 5. Drawer: Xem Tiền Sử Bệnh
+// 5. Drawer: Xem Tiền Sử Bệnh
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
-  z-index: 1050;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 1500;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .history-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 480px;
-  max-width: 90vw;
   background: #ffffff;
-  z-index: 1060;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+  width: 520px;
+  max-width: 90vw;
+  height: 100%;
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   animation: slideDrawer 0.25s ease-out;
+  position: relative;
+  z-index: 1510;
 
   .drawer-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.25rem;
+    padding: 1.25rem 1.5rem;
     border-bottom: 1px solid #e2e8f0;
     background: #f8fafc;
 
@@ -856,7 +912,7 @@ $text-muted: #64748b;
         font-weight: 700;
         background: $primary-light;
         color: $primary-dark;
-        padding: 0.2rem 0.5rem;
+        padding: 0.2rem 0.55rem;
         border-radius: 6px;
       }
     }
@@ -864,13 +920,19 @@ $text-muted: #64748b;
     .btn-close-drawer {
       background: transparent;
       border: none;
-      font-size: 1.5rem;
-      line-height: 1;
+      font-size: 1.1rem;
       cursor: pointer;
-      color: #94a3b8;
+      color: #64748b;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
 
       &:hover {
-        color: #334155;
+        color: #0f172a;
+        background: #e2e8f0;
       }
     }
   }
@@ -878,7 +940,7 @@ $text-muted: #64748b;
   .drawer-body {
     flex: 1;
     overflow-y: auto;
-    padding: 1.25rem;
+    padding: 1.25rem 1.5rem;
 
     .history-summary-box {
       background: #f0fdf4;
@@ -1448,16 +1510,6 @@ $text-muted: #64748b;
 }
 
 // Drawer: Chọn Bệnh Nhân Trong Hàng Đợi Phòng Khám
-.drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(4px);
-  z-index: 1500;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .queue-drawer-panel {
   background: #ffffff;
   width: 440px;

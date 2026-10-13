@@ -27,45 +27,20 @@ import { AuthService } from '../../services/auth.service';
             <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
               <i class="bi bi-house"></i> Trang chủ
             </a>
+            <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" routerLinkActive="active" class="nav-item">
+              <i class="bi bi-ticket-perforated"></i> Đăng ký lấy số
+            </a>
+            <a routerLink="/queue/tracking" [queryParams]="{ mode: 'lookup' }" routerLinkActive="active" class="nav-item">
+              <i class="bi bi-search"></i> Tra cứu phiếu
+            </a>
             <a routerLink="/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
               <i class="bi bi-display"></i> Màn hình TV
             </a>
-            <a routerLink="/queue/tracking" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-              <i class="bi bi-search"></i> Tra cứu phiếu
-            </a>
           } @else {
-            @if (authService.hasRole('DOCTOR')) {
-              <a routerLink="/doctor/examination" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
-              </a>
-              <a routerLink="/doctor/calling" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-megaphone"></i> Gọi khám
-              </a>
-              <a routerLink="/doctor/schedule" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-calendar2-week"></i> Ca trực
-              </a>
-              <a routerLink="/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-display"></i> Màn hình TV
-              </a>
-              <a routerLink="/queue/tracking" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-search"></i> Tra cứu
-              </a>
-            }
-            @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
-              <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
-              </a>
-              <a routerLink="/staff/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-sliders"></i> Điều phối hàng đợi
-              </a>
-              <a routerLink="/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-display"></i> Màn hình TV
-              </a>
-              <a routerLink="/queue/tracking" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-search"></i> Tra cứu
-              </a>
-            }
             @if (authService.hasRole('ADMIN')) {
+              <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-speedometer2"></i> Dashboard
+              </a>
               <a routerLink="/admin/specialties" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-diagram-3"></i> Chuyên khoa
               </a>
@@ -75,11 +50,47 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/admin/schedules" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-calendar3"></i> Lịch trực
               </a>
+            }
+            @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
+              <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-house"></i> Trang chủ
+              </a>
+              <a routerLink="/doctor/calling" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-megaphone"></i> Gọi khám
+              </a>
+              <a routerLink="/doctor/examination" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
+              </a>
+              <a routerLink="/doctor/schedule" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar2-week"></i> Ca trực
+              </a>
+            }
+            @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+              <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-house"></i> Trang chủ
+              </a>
+              <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
+              </a>
+              <a routerLink="/staff/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-sliders"></i> Điều phối hàng đợi
+              </a>
               <a routerLink="/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
                 <i class="bi bi-display"></i> Màn hình TV
               </a>
-              <a routerLink="/queue/tracking" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-search"></i> Tra cứu
+            }
+            @if (authService.hasRole('PATIENT') && !authService.hasRole('ADMIN') && !authService.hasRole('DOCTOR') && !authService.hasRole('STAFF')) {
+              <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-house"></i> Trang chủ
+              </a>
+              <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-ticket-perforated-fill"></i> Lấy số khám online
+              </a>
+              <a routerLink="/my-tickets" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-clock-history"></i> Phiếu khám của tôi
+              </a>
+              <a routerLink="/queue" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-display"></i> Màn hình TV
               </a>
             }
           }
