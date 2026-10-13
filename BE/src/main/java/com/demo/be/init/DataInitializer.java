@@ -38,7 +38,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        log.info("==> Đang khởi tạo dữ liệu mẫu với bảng mã Unicode NVARCHAR chuẩn...");
+        log.info("==> Đang khởi tạo bộ dữ liệu mẫu đa dạng phục vụ Demo & Test...");
 
         // 1. Tạo các vai trò (Roles)
         Role adminRole = createRoleIfNotFound("ROLE_ADMIN", "Quản trị viên toàn hệ thống");
@@ -46,23 +46,32 @@ public class DataInitializer implements CommandLineRunner {
         Role staffRole = createRoleIfNotFound("ROLE_STAFF", "Nhân viên tiếp đón và điều phối hàng đợi");
         Role patientRole = createRoleIfNotFound("ROLE_PATIENT", "Bệnh nhân đặt khám và lấy số thứ tự");
 
-        // 2. Tạo chuyên khoa mẫu
-        Specialty generalSpecialty = createSpecialtyIfNotFound("Khoa Khám bệnh tổng quát", "Khám, chẩn đoán và tư vấn ban đầu");
-        Specialty cardioSpecialty = createSpecialtyIfNotFound("Khoa Tim mạch", "Khám và điều trị các bệnh lý tim mạch");
-        Specialty pediatricsSpecialty = createSpecialtyIfNotFound("Khoa Nhi", "Chăm sóc và điều trị sức khỏe trẻ em");
+        // 2. Tạo 7 chuyên khoa lâm sàng đa dạng
+        Specialty generalSpecialty = createSpecialtyIfNotFound("Khoa Khám bệnh tổng quát", "Khám, chẩn đoán, sàng lọc và tư vấn sức khỏe ban đầu");
+        Specialty cardioSpecialty = createSpecialtyIfNotFound("Khoa Tim mạch", "Khám và điều trị chuyên sâu các bệnh lý tim mạch, tăng huyết áp, mạch vành");
+        Specialty pediatricsSpecialty = createSpecialtyIfNotFound("Khoa Nhi", "Chăm sóc, theo dõi phát triển thể chất và điều trị bệnh lý trẻ em");
+        Specialty entSpecialty = createSpecialtyIfNotFound("Khoa Tai Mũi Họng", "Nội soi chẩn đoán và điều trị bệnh lý tai mũi họng người lớn & trẻ em");
+        Specialty eyeSpecialty = createSpecialtyIfNotFound("Khoa Mắt", "Khám thị lực, đo tật khúc xạ, điều trị viêm giác mạc và bệnh lý đáy mắt");
+        Specialty dentalSpecialty = createSpecialtyIfNotFound("Khoa Răng Hàm Mặt", "Khám, điều trị bệnh lý răng miệng, nha khoa tổng quát và phục hình");
+        Specialty dermaSpecialty = createSpecialtyIfNotFound("Khoa Da Liễu", "Khám, điều trị viêm da cơ địa, dị ứng, mụn trứng cá và chăm sóc da");
 
-        // 2b. Tạo các phòng khám mẫu
+        // 3. Tạo 8 phòng khám lâm sàng
         ExaminationRoom room101 = createRoomIfNotFound("P.101", "Phòng Khám Nội Tổng Quát 1", 1);
         ExaminationRoom room102 = createRoomIfNotFound("P.102", "Phòng Khám Tim Mạch Chuyên Sâu", 1);
+        ExaminationRoom room103 = createRoomIfNotFound("P.103", "Phòng Khám Tai Mũi Họng & Nội Soi", 1);
         ExaminationRoom room201 = createRoomIfNotFound("P.201", "Phòng Khám Nhi - Dinh Dưỡng", 2);
+        ExaminationRoom room202 = createRoomIfNotFound("P.202", "Phòng Khám Mắt & Đo Khúc Xạ", 2);
+        ExaminationRoom room203 = createRoomIfNotFound("P.203", "Phòng Khám Răng Hàm Mặt", 2);
+        ExaminationRoom room301 = createRoomIfNotFound("P.301", "Phòng Khám Da Liễu & Thẩm Mỹ", 3);
+        ExaminationRoom room302 = createRoomIfNotFound("P.100", "Phòng Cấp Cứu Ban Đầu & Xử Trí Nhanh", 1);
 
-        // 3. Tạo tài khoản Quản trị viên (Admin)
+        // 4. Tạo tài khoản Quản trị viên (Admin)
         if (!userRepository.existsByUsername("admin")) {
             Person adminPerson = Person.builder()
                     .fullName("Quản trị viên Hệ thống")
                     .gender("Nam")
                     .dateOfBirth(LocalDate.of(1990, 1, 1))
-                    .address("Hà Nội")
+                    .address("Số 1 Đại Cồ Việt, Hai Bà Trưng, Hà Nội")
                     .nationalId("001090123456")
                     .build();
             adminPerson = personRepository.save(adminPerson);
@@ -80,44 +89,63 @@ public class DataInitializer implements CommandLineRunner {
             log.info("-> Đã tạo tài khoản Admin: admin / Admin@123456 (Quản trị viên Hệ thống)");
         }
 
-        // 4. Tạo tài khoản Bác sĩ mẫu
-        if (!userRepository.existsByUsername("doctor_hung")) {
-            Doctor doctor = Doctor.builder()
-                    .academicTitle("Bác sĩ Chuyên khoa II")
-                    .yearsOfExperience(18)
-                    .biography("Bác sĩ có hơn 18 năm kinh nghiệm trong lĩnh vực khám chữa bệnh nội tổng quát.")
-                    .averageConsultationTime(15)
-                    .specialty(generalSpecialty)
-                    .employeeCode("DOC001")
-                    .position("Bác sĩ Trưởng khoa")
-                    .fullName("BS.CKII Nguyễn Văn Hùng")
-                    .gender("Nam")
-                    .dateOfBirth(LocalDate.of(1980, 5, 20))
-                    .address("Hà Nội")
-                    .nationalId("001080654321")
-                    .build();
-            doctor = doctorRepository.save(doctor);
+        // 5. Tạo 7 Bác sĩ mẫu cho từng chuyên khoa
+        Doctor doctorHung = createDoctorIfNotFound(
+                "doctor_hung", "DOC001", "BS.CKII Nguyễn Văn Hùng", "Bác sĩ Chuyên khoa II",
+                18, "Hơn 18 năm kinh nghiệm trong lĩnh vực khám chữa bệnh nội tổng quát và lão khoa.",
+                generalSpecialty, "Trưởng khoa Khám bệnh", "Nam",
+                LocalDate.of(1978, 5, 20), "001078654321", "hung.nguyen@clinic.com", "0987654321", doctorRole
+        );
 
-            User doctorUser = User.builder()
-                    .username("doctor_hung")
-                    .passwordHash(passwordEncoder.encode("Doctor@123456"))
-                    .email("hung.nguyen@clinic.com")
-                    .phoneNumber("0987654321")
-                    .status("ACTIVE")
-                    .person(doctor)
-                    .build();
-            doctorUser.addRole(doctorRole);
-            userRepository.save(doctorUser);
-            log.info("-> Đã tạo tài khoản Bác sĩ: doctor_hung / Doctor@123456 (BS.CKII Nguyễn Văn Hùng)");
-        }
+        Doctor doctorHoa = createDoctorIfNotFound(
+                "doctor_hoa", "DOC002", "BS.CKI Trần Thị Mai Hoa", "Bác sĩ Chuyên khoa I",
+                14, "Chuyên gia tim mạch can thiệp và điều trị tăng huyết áp, rối loạn nhịp tim.",
+                cardioSpecialty, "Phó trưởng khoa Tim mạch", "Nữ",
+                LocalDate.of(1984, 8, 12), "001084112233", "hoa.tran@clinic.com", "0988112233", doctorRole
+        );
 
-        // 5. Tạo tài khoản Nhân viên tiếp đón / Lễ tân mẫu
+        Doctor doctorLong = createDoctorIfNotFound(
+                "doctor_long", "DOC003", "ThS.BS Lê Hoàng Long", "Thạc sĩ Bác sĩ",
+                10, "Tốt nghiệp ĐH Y Hà Nội, chuyên sâu về dinh dưỡng và hô hấp nhi khoa.",
+                pediatricsSpecialty, "Bác sĩ điều trị Khoa Nhi", "Nam",
+                LocalDate.of(1988, 3, 25), "001088445566", "long.le@clinic.com", "0989223344", doctorRole
+        );
+
+        Doctor doctorDuc = createDoctorIfNotFound(
+                "doctor_duc", "DOC004", "BS.CKI Phạm Minh Đức", "Bác sĩ Chuyên khoa I",
+                12, "Chuyên phẫu thuật nội soi mũi xoang, vi phẫu thanh quản và thính học.",
+                entSpecialty, "Bác sĩ điều trị Tai Mũi Họng", "Nam",
+                LocalDate.of(1986, 11, 8), "001086778899", "duc.pham@clinic.com", "0987334455", doctorRole
+        );
+
+        Doctor doctorThuy = createDoctorIfNotFound(
+                "doctor_thuy", "DOC005", "BS.CKII Hoàng Thu Thủy", "Bác sĩ Chuyên khoa II",
+                16, "Nguyên bác sĩ Viện Mắt TW, chuyên gia về tật khúc xạ và phẫu thuật đục thủy tinh thể.",
+                eyeSpecialty, "Trưởng khoa Mắt", "Nữ",
+                LocalDate.of(1980, 2, 14), "001080998877", "thuy.hoang@clinic.com", "0986445566", doctorRole
+        );
+
+        Doctor doctorDung = createDoctorIfNotFound(
+                "doctor_dung", "DOC006", "BS.CKI Đỗ Quang Dũng", "Bác sĩ Chuyên khoa I",
+                9, "Chuyên sâu về cấy ghép Implant, chỉnh nha niềng răng và phục hình thẩm mỹ.",
+                dentalSpecialty, "Bác sĩ điều trị Răng Hàm Mặt", "Nam",
+                LocalDate.of(1991, 7, 30), "001091223344", "dung.do@clinic.com", "0985556677", doctorRole
+        );
+
+        Doctor doctorYen = createDoctorIfNotFound(
+                "doctor_yen", "DOC007", "ThS.BS Vũ Hải Yến", "Thạc sĩ Bác sĩ",
+                11, "Chuyên gia da liễu thẩm mỹ, laser y học và điều trị các bệnh viêm da tự miễn.",
+                dermaSpecialty, "Bác sĩ điều trị Da Liễu", "Nữ",
+                LocalDate.of(1989, 9, 18), "001089334455", "yen.vu@clinic.com", "0984667788", doctorRole
+        );
+
+        // 6. Tạo 2 tài khoản Nhân viên Lễ tân / Điều phối
         if (!userRepository.existsByUsername("staff_mai")) {
             Employee staff = Employee.builder()
                     .fullName("Lê Thị Mai")
                     .gender("Nữ")
                     .dateOfBirth(LocalDate.of(1998, 8, 15))
-                    .address("Hà Nội")
+                    .address("Cầu Giấy, Hà Nội")
                     .nationalId("001098112233")
                     .employeeCode("STF001")
                     .position("Nhân viên Tiếp đón & Lễ tân")
@@ -138,64 +166,233 @@ public class DataInitializer implements CommandLineRunner {
             log.info("-> Đã tạo tài khoản Nhân viên: staff_mai / Staff@123456 (Lê Thị Mai)");
         }
 
-        // 6. Tạo tài khoản Bệnh nhân mẫu
-        if (!userRepository.existsByUsername("patient_nam")) {
-            Patient patient = Patient.builder()
-                    .fullName("Trần Hoài Nam")
+        if (!userRepository.existsByUsername("staff_quang")) {
+            Employee staff2 = Employee.builder()
+                    .fullName("Nguyễn Văn Quang")
                     .gender("Nam")
-                    .dateOfBirth(LocalDate.of(2000, 10, 10))
-                    .address("Hà Đông, Hà Nội")
-                    .nationalId("001200998877")
-                    .bloodGroup("O+")
-                    .emergencyContactName("Trần Văn Ba")
-                    .emergencyContactPhone("0977889900")
+                    .dateOfBirth(LocalDate.of(1996, 4, 10))
+                    .address("Đống Đa, Hà Nội")
+                    .nationalId("001096556677")
+                    .employeeCode("STF002")
+                    .position("Nhân viên Điều phối Khám & Viện phí")
+                    .hireDate(LocalDate.of(2023, 6, 1))
                     .build();
-            patient = patientRepository.save(patient);
+            staff2 = employeeRepository.save(staff2);
 
-            User patientUser = User.builder()
-                    .username("patient_nam")
-                    .passwordHash(passwordEncoder.encode("Patient@123456"))
-                    .email("nam.tran@gmail.com")
-                    .phoneNumber("0977112233")
+            User staffUser2 = User.builder()
+                    .username("staff_quang")
+                    .passwordHash(passwordEncoder.encode("Staff@123456"))
+                    .email("quang.nguyen@clinic.com")
+                    .phoneNumber("0936789012")
                     .status("ACTIVE")
-                    .person(patient)
+                    .person(staff2)
                     .build();
-            patientUser.addRole(patientRole);
-            userRepository.save(patientUser);
-            log.info("-> Đã tạo tài khoản Bệnh nhân: patient_nam / Patient@123456 (Trần Hoài Nam)");
+            staffUser2.addRole(staffRole);
+            userRepository.save(staffUser2);
+            log.info("-> Đã tạo tài khoản Nhân viên: staff_quang / Staff@123456 (Nguyễn Văn Quang)");
         }
 
-        // 7. Tạo lịch làm việc mẫu hôm nay cho Bác sĩ Hùng
-        if (doctorRepository.findByEmployeeCode("DOC001").isPresent()) {
-            Doctor doc = doctorRepository.findByEmployeeCode("DOC001").get();
-            LocalDate today = LocalDate.now();
-            if (workScheduleRepository.findByDoctorIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(doc.getId(), today, today).isEmpty()) {
-                WorkSchedule schedule = WorkSchedule.builder()
-                        .doctor(doc)
-                        .examinationRoom(room101)
-                        .workDate(today)
-                        .shiftType("CA_SÁNG")
-                        .startTime(LocalTime.of(8, 0))
-                        .endTime(LocalTime.of(12, 0))
-                        .maxPatients(20)
-                        .currentBookedCount(0)
-                        .status("AVAILABLE")
-                        .build();
-                workScheduleRepository.save(schedule);
-                log.info("-> Đã tạo ca làm việc mẫu hôm nay cho BS.CKII Nguyễn Văn Hùng tại phòng P.101");
+        // 7. Tạo 5 Bệnh nhân mẫu với các độ tuổi và nhóm máu khác nhau
+        Patient patientNam = createPatientIfNotFound(
+                "patient_nam", "Trần Hoài Nam", "Nam", LocalDate.of(2000, 10, 10),
+                "001200998877", "0977112233", "nam.tran@gmail.com", "O+", patientRole
+        );
+
+        Patient patientLan = createPatientIfNotFound(
+                "patient_lan", "Nguyễn Thị Lan", "Nữ", LocalDate.of(1952, 6, 15),
+                "001052123456", "0912345678", "lan.nguyen@gmail.com", "A+", patientRole
+        );
+
+        Patient patientBao = createPatientIfNotFound(
+                "patient_bao", "Vũ Quốc Bảo", "Nam", LocalDate.of(1995, 12, 22),
+                "001095234567", "0903456789", "bao.vu@gmail.com", "B+", patientRole
+        );
+
+        Patient patientThao = createPatientIfNotFound(
+                "patient_thao", "Đặng Thu Thảo", "Nữ", LocalDate.of(1998, 4, 5),
+                "001098345678", "0944556677", "thao.dang@gmail.com", "AB+", patientRole
+        );
+
+        Patient patientKhang = createPatientIfNotFound(
+                "patient_khang", "Bé Lê Tuấn Khang", "Nam", LocalDate.of(2021, 9, 1),
+                "001221456789", "0933221100", "khang.le@gmail.com", "O+", patientRole
+        );
+
+        // 8. Tạo phong phú danh sách Lịch làm việc (WorkSchedules) cho nhiều ngày
+        seedRichWorkSchedulesIfEmpty(
+                doctorHung, doctorHoa, doctorLong, doctorDuc, doctorThuy, doctorDung, doctorYen,
+                room101, room102, room103, room201, room202, room203, room301
+        );
+
+        // 9. Khởi tạo danh mục thuốc mẫu (30 loại thuốc chuẩn phục vụ kê đơn)
+        seedMedicinesIfEmpty();
+
+        // 10. Khởi tạo các bệnh án mẫu đa dạng
+        seedSampleMedicalRecordsIfEmpty(doctorHung, doctorHoa, doctorDuc, patientNam, patientLan, patientBao, patientThao);
+
+        // 11. Khởi tạo vé khám mẫu & lịch hẹn mẫu cho Dashboard thống kê
+        seedSampleTicketsAndAppointmentsIfEmpty(room101, room102, room103, room201, doctorHung, doctorHoa, patientNam, patientLan);
+
+        log.info("==> Dữ liệu mẫu phong phú đã được khởi tạo thành công 100%!");
+    }
+
+    private void seedRichWorkSchedulesIfEmpty(
+            Doctor dHung, Doctor dHoa, Doctor dLong, Doctor dDuc, Doctor dThuy, Doctor dDung, Doctor dYen,
+            ExaminationRoom r101, ExaminationRoom r102, ExaminationRoom r103,
+            ExaminationRoom r201, ExaminationRoom r202, ExaminationRoom r203, ExaminationRoom r301
+    ) {
+        LocalDate today = LocalDate.now();
+
+        // Tạo lịch từ hôm qua, hôm nay đến 7 ngày tới
+        for (int i = -1; i <= 7; i++) {
+            LocalDate d = today.plusDays(i);
+
+            // Ca Sáng
+            createScheduleIfNotFound(dHung, r101, d, "CA_SÁNG", LocalTime.of(7, 30), LocalTime.of(12, 0), 20, i == 0 ? 16 : 8, i == 0 ? "AVAILABLE" : "AVAILABLE");
+            createScheduleIfNotFound(dHoa, r102, d, "CA_SÁNG", LocalTime.of(7, 30), LocalTime.of(12, 0), 18, i == 0 ? 18 : 12, i == 0 ? "FULL" : "AVAILABLE");
+            createScheduleIfNotFound(dLong, r201, d, "CA_SÁNG", LocalTime.of(8, 0), LocalTime.of(12, 0), 25, i == 0 ? 10 : 5, "AVAILABLE");
+            createScheduleIfNotFound(dDuc, r103, d, "CA_SÁNG", LocalTime.of(7, 30), LocalTime.of(11, 30), 15, i == 0 ? 6 : 4, "AVAILABLE");
+
+            // Ca Chiều
+            createScheduleIfNotFound(dHung, r101, d, "CA_CHIỀU", LocalTime.of(13, 30), LocalTime.of(17, 30), 20, i == 0 ? 12 : 2, "AVAILABLE");
+            createScheduleIfNotFound(dThuy, r202, d, "CA_CHIỀU", LocalTime.of(13, 30), LocalTime.of(17, 0), 15, i == 0 ? 9 : 3, "AVAILABLE");
+            createScheduleIfNotFound(dDung, r203, d, "CA_CHIỀU", LocalTime.of(13, 30), LocalTime.of(17, 30), 12, i == 0 ? 7 : 0, "AVAILABLE");
+            createScheduleIfNotFound(dYen, r301, d, "CA_CHIỀU", LocalTime.of(14, 0), LocalTime.of(18, 0), 16, i == 0 ? 11 : 1, "AVAILABLE");
+
+            // Ca Tối (thứ 2, 4, 6)
+            int dayOfWeek = d.getDayOfWeek().getValue();
+            if (dayOfWeek == 1 || dayOfWeek == 3 || dayOfWeek == 5) {
+                createScheduleIfNotFound(dHung, r101, d, "CA_TỐI", LocalTime.of(18, 0), LocalTime.of(21, 0), 12, i == 0 ? 5 : 0, "AVAILABLE");
+                createScheduleIfNotFound(dHoa, r102, d, "CA_TỐI", LocalTime.of(18, 0), LocalTime.of(21, 0), 10, i == 0 ? 4 : 0, "AVAILABLE");
+            }
+        }
+        log.info("-> Đã khởi tạo đầy đủ ca trực cho 7 bác sĩ trên 7 phòng khám xuyên suốt 9 ngày!");
+    }
+
+    private void createScheduleIfNotFound(
+            Doctor doctor,
+            ExaminationRoom room,
+            LocalDate date,
+            String shiftType,
+            LocalTime start,
+            LocalTime end,
+            int maxPatients,
+            int booked,
+            String status
+    ) {
+        boolean exists = workScheduleRepository.findByDoctorIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(doctor.getId(), date, date)
+                .stream()
+                .anyMatch(s -> s.getStartTime().equals(start));
+        if (!exists) {
+            WorkSchedule ws = WorkSchedule.builder()
+                    .doctor(doctor)
+                    .examinationRoom(room)
+                    .workDate(date)
+                    .shiftType(shiftType)
+                    .startTime(start)
+                    .endTime(end)
+                    .maxPatients(maxPatients)
+                    .currentBookedCount(booked)
+                    .status(status)
+                    .build();
+            workScheduleRepository.save(ws);
+        }
+    }
+
+    private Doctor createDoctorIfNotFound(
+            String username,
+            String employeeCode,
+            String fullName,
+            String academicTitle,
+            Integer yearsOfExperience,
+            String biography,
+            Specialty specialty,
+            String position,
+            String gender,
+            LocalDate dob,
+            String nationalId,
+            String email,
+            String phone,
+            Role doctorRole
+    ) {
+        if (doctorRepository.findByEmployeeCode(employeeCode).isPresent()) {
+            return doctorRepository.findByEmployeeCode(employeeCode).get();
+        }
+
+        Doctor doctor = Doctor.builder()
+                .academicTitle(academicTitle)
+                .yearsOfExperience(yearsOfExperience)
+                .biography(biography)
+                .averageConsultationTime(15)
+                .specialty(specialty)
+                .employeeCode(employeeCode)
+                .position(position)
+                .fullName(fullName)
+                .gender(gender)
+                .dateOfBirth(dob)
+                .address("Hà Nội")
+                .nationalId(nationalId)
+                .build();
+        doctor = doctorRepository.save(doctor);
+
+        if (!userRepository.existsByUsername(username)) {
+            User doctorUser = User.builder()
+                    .username(username)
+                    .passwordHash(passwordEncoder.encode("Doctor@123456"))
+                    .email(email)
+                    .phoneNumber(phone)
+                    .status("ACTIVE")
+                    .person(doctor)
+                    .build();
+            doctorUser.addRole(doctorRole);
+            userRepository.save(doctorUser);
+            log.info("-> Đã tạo tài khoản Bác sĩ: {} / Doctor@123456 ({})", username, fullName);
+        }
+        return doctor;
+    }
+
+    private Patient createPatientIfNotFound(
+            String username,
+            String fullName,
+            String gender,
+            LocalDate dob,
+            String nationalId,
+            String phone,
+            String email,
+            String bloodGroup,
+            Role patientRole
+    ) {
+        if (userRepository.existsByUsername(username)) {
+            User u = userRepository.findByUsername(username).orElse(null);
+            if (u != null && u.getPerson() instanceof Patient) {
+                return (Patient) u.getPerson();
             }
         }
 
-        // 8. Khởi tạo danh mục thuốc mẫu (30 loại thuốc phổ biến phục vụ kê đơn)
-        seedMedicinesIfEmpty();
+        Patient patient = Patient.builder()
+                .fullName(fullName)
+                .gender(gender)
+                .dateOfBirth(dob)
+                .address("Hà Nội")
+                .nationalId(nationalId)
+                .bloodGroup(bloodGroup)
+                .emergencyContactName("Người thân của " + fullName)
+                .emergencyContactPhone(phone)
+                .build();
+        patient = patientRepository.save(patient);
 
-        // 9. Khởi tạo bệnh án tiền sử mẫu cho Bệnh nhân Nam
-        seedSampleMedicalRecordIfEmpty();
-
-        // 10. Khởi tạo vé khám mẫu & lịch hẹn mẫu cho Dashboard thống kê
-        seedSampleTicketsAndAppointmentsIfEmpty(room101, room102, room201);
-
-        log.info("==> Dữ liệu mẫu Unicode NVARCHAR đã được khởi tạo thành công 100%!");
+        User patientUser = User.builder()
+                .username(username)
+                .passwordHash(passwordEncoder.encode("Patient@123456"))
+                .email(email)
+                .phoneNumber(phone)
+                .status("ACTIVE")
+                .person(patient)
+                .build();
+        patientUser.addRole(patientRole);
+        userRepository.save(patientUser);
+        log.info("-> Đã tạo tài khoản Bệnh nhân: {} / Patient@123456 ({})", username, fullName);
+        return patient;
     }
 
     private MedicineCategory createCategoryIfNotFound(String code, String name, String description, int order) {
@@ -302,81 +499,134 @@ public class DataInitializer implements CommandLineRunner {
         log.info("-> Đã khởi tạo thành công 30 loại thuốc mẫu đầy đủ mã, nhóm, giá và tồn kho!");
     }
 
-    private void seedSampleMedicalRecordIfEmpty() {
-        if (medicalRecordRepository.count() > 0) return;
+    private void seedSampleMedicalRecordsIfEmpty(
+            Doctor dHung, Doctor dHoa, Doctor dDuc,
+            Patient pNam, Patient pLan, Patient pBao, Patient pThao
+    ) {
+        if (medicalRecordRepository.count() >= 3) return;
 
-        patientRepository.findAll().stream().findFirst().ifPresent(patient -> {
-            doctorRepository.findByEmployeeCode("DOC001").ifPresent(doctor -> {
-                MedicalRecord record = MedicalRecord.builder()
-                        .patient(patient)
-                        .doctor(doctor)
-                        .bloodPressure("120/80")
-                        .heartRate(78)
-                        .temperature(37.2)
-                        .weight(68.0)
-                        .height(172.0)
-                        .vitalSigns("Thể trạng trung bình, da niêm mạc hồng, không phù")
-                        .symptoms("Bệnh nhân sốt nhẹ 2 ngày, đau rát họng khi nuốt, ho khan từng cơn, nghẹt mũi")
-                        .preliminaryDiagnosis("Viêm đường hô hấp trên cấp tính")
-                        .finalDiagnosis("Viêm họng cấp (J02) - Cúm mùa")
-                        .icd10Code("J02.9")
-                        .notes("Uống nhiều nước ấm, súc họng bằng nước muối sinh lý 0.9%, nghỉ ngơi tại nhà")
-                        .revisitDate(LocalDate.now().plusDays(5))
-                        .revisitNotes("Tái khám sau 5 ngày hoặc ngay khi sốt cao > 39 độ hoặc khó thở")
-                        .build();
+        // Bệnh án 1: Viêm họng cấp (BS Hùng khám cho BN Nam)
+        if (pNam != null && dHung != null) {
+            MedicalRecord record1 = MedicalRecord.builder()
+                    .patient(pNam)
+                    .doctor(dHung)
+                    .bloodPressure("120/80")
+                    .heartRate(78)
+                    .temperature(37.4)
+                    .weight(68.0)
+                    .height(172.0)
+                    .vitalSigns("Thể trạng trung bình, niêm mạc họng đỏ rực, amidan sưng nhẹ")
+                    .symptoms("Bệnh nhân sốt nhẹ 2 ngày, đau rát họng khi nuốt, ho khan từng cơn, nghẹt mũi")
+                    .preliminaryDiagnosis("Viêm đường hô hấp trên cấp tính")
+                    .finalDiagnosis("Viêm họng cấp (J02) - Cúm mùa")
+                    .icd10Code("J02.9")
+                    .notes("Uống nhiều nước ấm, súc họng bằng nước muối sinh lý 0.9%, tránh uống nước đá")
+                    .revisitDate(LocalDate.now().plusDays(5))
+                    .revisitNotes("Tái khám sau 5 ngày nếu còn sốt hoặc đau rát họng tăng")
+                    .build();
 
-                Medicine para = medicineRepository.findByName("Paracetamol 500mg").orElse(null);
-                Medicine aug = medicineRepository.findByName("Augmentin 1g").orElse(null);
-                Medicine pro = medicineRepository.findByName("Siro ho Prospan 100ml").orElse(null);
+            Medicine para = medicineRepository.findByName("Paracetamol 500mg").orElse(null);
+            Medicine aug = medicineRepository.findByName("Augmentin 1g").orElse(null);
+            Medicine pro = medicineRepository.findByName("Siro ho Prospan 100ml").orElse(null);
 
-                Prescription prescription = Prescription.builder()
-                        .medicalRecord(record)
-                        .doctorAdvice("Uống thuốc đúng giờ, không tự ý ngưng kháng sinh giữa chừng.")
-                        .items(new ArrayList<>())
-                        .build();
+            Prescription pres1 = Prescription.builder()
+                    .medicalRecord(record1)
+                    .doctorAdvice("Uống thuốc đúng giờ, uống hết liệu trình kháng sinh 5 ngày.")
+                    .items(new ArrayList<>())
+                    .build();
 
-                if (para != null) {
-                    prescription.getItems().add(PrescriptionItem.builder()
-                            .prescription(prescription)
-                            .medicine(para)
-                            .quantity(10)
-                            .dosage("1 viên/lần khi sốt")
-                            .route("Đường uống")
-                            .daysSupply(5)
-                            .instructions("Uống khi sốt > 38.5 độ C, cách nhau tối thiểu 4 tiếng")
-                            .build());
-                }
+            if (para != null) {
+                pres1.getItems().add(PrescriptionItem.builder().prescription(pres1).medicine(para).quantity(10).dosage("1 viên/lần khi sốt").route("Đường uống").daysSupply(5).instructions("Uống khi sốt > 38.5 độ C, cách 4-6 giờ").build());
+            }
+            if (aug != null) {
+                pres1.getItems().add(PrescriptionItem.builder().prescription(pres1).medicine(aug).quantity(10).dosage("1 viên/lần, ngày 2 lần").route("Đường uống").daysSupply(5).instructions("Uống sau bữa ăn sáng và tối").build());
+            }
+            if (pro != null) {
+                pres1.getItems().add(PrescriptionItem.builder().prescription(pres1).medicine(pro).quantity(1).dosage("5ml/lần, ngày 3 lần").route("Đường uống").daysSupply(5).instructions("Uống sau bữa ăn").build());
+            }
+            record1.setPrescription(pres1);
+            medicalRecordRepository.save(record1);
+        }
 
-                if (aug != null) {
-                    prescription.getItems().add(PrescriptionItem.builder()
-                            .prescription(prescription)
-                            .medicine(aug)
-                            .quantity(10)
-                            .dosage("1 viên/lần, ngày 2 lần")
-                            .route("Đường uống")
-                            .daysSupply(5)
-                            .instructions("Uống sáng 1 viên, tối 1 viên sau ăn no")
-                            .build());
-                }
+        // Bệnh án 2: Tăng huyết áp & Mỡ máu (BS Hoa khám cho BN Lan)
+        if (pLan != null && dHoa != null) {
+            MedicalRecord record2 = MedicalRecord.builder()
+                    .patient(pLan)
+                    .doctor(dHoa)
+                    .bloodPressure("155/95")
+                    .heartRate(84)
+                    .temperature(36.8)
+                    .weight(62.0)
+                    .height(155.0)
+                    .vitalSigns("Huyết áp cao, tim đều, không phù chi dưới, tiếng T1 T2 rõ")
+                    .symptoms("Bệnh nhân hoa mắt chóng mặt khi thay đổi tư thế, nặng đầu vùng gáy vào buổi sáng")
+                    .preliminaryDiagnosis("Tăng huyết áp vô căn độ 2")
+                    .finalDiagnosis("Tăng huyết áp nguyên phát (I10) - Rối loạn chuyển hóa lipoprotein (E78.0)")
+                    .icd10Code("I10")
+                    .notes("Hạn chế ăn mặn (<5g muối/ngày), giảm mỡ động vật, tập thể dục dưỡng sinh 30 phút/ngày")
+                    .revisitDate(LocalDate.now().plusDays(28))
+                    .revisitNotes("Tái khám định kỳ sau 1 tháng mang theo sổ theo dõi huyết áp tại nhà")
+                    .build();
 
-                if (pro != null) {
-                    prescription.getItems().add(PrescriptionItem.builder()
-                            .prescription(prescription)
-                            .medicine(pro)
-                            .quantity(1)
-                            .dosage("5ml/lần, ngày 3 lần")
-                            .route("Đường uống")
-                            .daysSupply(5)
-                            .instructions("Uống sáng, trưa, tối sau khi ăn")
-                            .build());
-                }
+            Medicine amlo = medicineRepository.findByName("Amlodipine 5mg").orElse(null);
+            Medicine ator = medicineRepository.findByName("Atorvastatin 20mg").orElse(null);
 
-                record.setPrescription(prescription);
-                medicalRecordRepository.save(record);
-                log.info("-> Đã khởi tạo hồ sơ bệnh án tiền sử mẫu cho bệnh nhân {} (BS khám: {})", 
-                        patient.getFullName(), doctor.getFullName());
-            });
-        });
+            Prescription pres2 = Prescription.builder()
+                    .medicalRecord(record2)
+                    .doctorAdvice("Duy trì uống thuốc huyết áp đều đặn mỗi sáng, không tự ý ngừng thuốc.")
+                    .items(new ArrayList<>())
+                    .build();
+
+            if (amlo != null) {
+                pres2.getItems().add(PrescriptionItem.builder().prescription(pres2).medicine(amlo).quantity(30).dosage("1 viên/ngày vào buổi sáng").route("Đường uống").daysSupply(30).instructions("Uống cố định vào 7h sáng mỗi ngày").build());
+            }
+            if (ator != null) {
+                pres2.getItems().add(PrescriptionItem.builder().prescription(pres2).medicine(ator).quantity(30).dosage("1 viên/ngày vào buổi tối").route("Đường uống").daysSupply(30).instructions("Uống trước khi đi ngủ").build());
+            }
+            record2.setPrescription(pres2);
+            medicalRecordRepository.save(record2);
+        }
+
+        // Bệnh án 3: Viêm mũi xoang dị ứng (BS Đức khám cho BN Thảo)
+        if (pThao != null && dDuc != null) {
+            MedicalRecord record3 = MedicalRecord.builder()
+                    .patient(pThao)
+                    .doctor(dDuc)
+                    .bloodPressure("110/70")
+                    .heartRate(72)
+                    .temperature(36.6)
+                    .weight(50.0)
+                    .height(160.0)
+                    .vitalSigns("Thể trạng tốt, niêm mạc cuốn mũi nề nhẹ, dịch mũi trong")
+                    .symptoms("Hắt hơi liên tục vào buổi sáng, ngứa mũi ngứa mắt, chảy nước mũi trong khi tiếp xúc bụi")
+                    .preliminaryDiagnosis("Viêm mũi xoang dị ứng mạn tính")
+                    .finalDiagnosis("Viêm mũi dị ứng do thời tiết & dị nguyên (J30.4)")
+                    .icd10Code("J30.4")
+                    .notes("Đeo khẩu trang khi ra đường, rửa mũi bằng nước muối sinh lý ấm mỗi ngày")
+                    .revisitDate(LocalDate.now().plusDays(14))
+                    .revisitNotes("Tái khám sau 2 tuần nếu triệu chứng ngạt mũi không thuyên giảm")
+                    .build();
+
+            Medicine telfast = medicineRepository.findByName("Telfast HD 180mg").orElse(null);
+            Medicine muoi = medicineRepository.findByName("Nước muối sinh lý 0.9%").orElse(null);
+
+            Prescription pres3 = Prescription.builder()
+                    .medicalRecord(record3)
+                    .doctorAdvice("Rửa mũi sạch trước khi dùng thuốc xịt, giữ ấm cổ ngực.")
+                    .items(new ArrayList<>())
+                    .build();
+
+            if (telfast != null) {
+                pres3.getItems().add(PrescriptionItem.builder().prescription(pres3).medicine(telfast).quantity(10).dosage("1 viên/ngày").route("Đường uống").daysSupply(10).instructions("Uống sau bữa ăn tối").build());
+            }
+            if (muoi != null) {
+                pres3.getItems().add(PrescriptionItem.builder().prescription(pres3).medicine(muoi).quantity(3).dosage("Nhỏ 2-3 giọt/bên x 3 lần/ngày").route("Nhỏ mũi").daysSupply(10).instructions("Rửa mũi hàng ngày").build());
+            }
+            record3.setPrescription(pres3);
+            medicalRecordRepository.save(record3);
+        }
+
+        log.info("-> Đã khởi tạo các hồ sơ bệnh án và đơn thuốc mẫu chi tiết!");
     }
 
     private Role createRoleIfNotFound(String name, String description) {
@@ -404,12 +654,13 @@ public class DataInitializer implements CommandLineRunner {
                         .build()));
     }
 
-    private void seedSampleTicketsAndAppointmentsIfEmpty(ExaminationRoom room101, ExaminationRoom room102, ExaminationRoom room201) {
+    private void seedSampleTicketsAndAppointmentsIfEmpty(
+            ExaminationRoom room101, ExaminationRoom room102, ExaminationRoom room103, ExaminationRoom room201,
+            Doctor doctorHung, Doctor doctorHoa, Patient patientNam, Patient patientLan
+    ) {
         if (queueTicketRepository.count() > 0 && appointmentRepository.count() > 0) return;
 
         LocalDate today = LocalDate.now();
-        Doctor doctorHung = doctorRepository.findByEmployeeCode("DOC001").orElse(null);
-        Patient patientNam = patientRepository.findAll().stream().findFirst().orElse(null);
 
         // 1. Tạo các vé khám mẫu trong 5 ngày qua và hôm nay
         if (queueTicketRepository.count() == 0) {
@@ -417,7 +668,7 @@ public class DataInitializer implements CommandLineRunner {
 
             // Hôm nay: 4 ca hoàn tất, 1 ca đang khám, 2 ca đang chờ
             sampleTickets.add(QueueTicket.builder()
-                    .ticketNumber("P101-001").ticketDate(today).patientName("Trần Hoài Nam").patientPhone("0977889900")
+                    .ticketNumber("P101-001").ticketDate(today).patientName("Trần Hoài Nam").patientPhone("0977112233")
                     .patientGender("Nam").patientYearOfBirth(2000).status("COMPLETED").isEmergency(false).hasAppointment(true)
                     .priorityScore(30).checkInTime(LocalTime.of(8, 5)).callTime(LocalTime.of(8, 20))
                     .startTime(LocalTime.of(8, 22)).endTime(LocalTime.of(8, 45)).estimatedWaitingMinutes(15)
@@ -428,14 +679,14 @@ public class DataInitializer implements CommandLineRunner {
                     .patientGender("Nữ").patientYearOfBirth(1952).status("COMPLETED").isEmergency(false).hasAppointment(false)
                     .priorityScore(20).checkInTime(LocalTime.of(8, 25)).callTime(LocalTime.of(8, 48))
                     .startTime(LocalTime.of(8, 50)).endTime(LocalTime.of(9, 15)).estimatedWaitingMinutes(23)
-                    .examinationRoom(room101).doctor(doctorHung).build());
+                    .examinationRoom(room102).doctor(doctorHoa).patient(patientLan).build());
 
             sampleTickets.add(QueueTicket.builder()
-                    .ticketNumber("P102-001").ticketDate(today).patientName("Phạm Văn Hùng").patientPhone("0988776655")
+                    .ticketNumber("P103-001").ticketDate(today).patientName("Phạm Văn Hùng").patientPhone("0988776655")
                     .patientGender("Nam").patientYearOfBirth(1980).status("COMPLETED").isEmergency(false).hasAppointment(true)
                     .priorityScore(30).checkInTime(LocalTime.of(8, 30)).callTime(LocalTime.of(8, 45))
                     .startTime(LocalTime.of(8, 46)).endTime(LocalTime.of(9, 10)).estimatedWaitingMinutes(15)
-                    .examinationRoom(room102).doctor(doctorHung).build());
+                    .examinationRoom(room103).build());
 
             sampleTickets.add(QueueTicket.builder()
                     .ticketNumber("P201-001").ticketDate(today).patientName("Bé Lê Tuấn Khang").patientPhone("0933221100")
@@ -457,7 +708,7 @@ public class DataInitializer implements CommandLineRunner {
                     .priorityScore(0).checkInTime(LocalTime.of(9, 25)).estimatedWaitingMinutes(15)
                     .examinationRoom(room101).doctor(doctorHung).build());
 
-            // Dữ liệu các ngày trước (để vẽ biểu đồ 7 ngày)
+            // Dữ liệu các ngày trước (để vẽ biểu đồ 7 ngày trên Dashboard)
             for (int i = 1; i <= 6; i++) {
                 LocalDate pastDate = today.minusDays(i);
                 int count = 5 + (i * 2) % 7;
@@ -489,14 +740,14 @@ public class DataInitializer implements CommandLineRunner {
             log.info("-> Đã khởi tạo danh sách vé khám mẫu cho hôm nay và các ngày trước phục vụ Dashboard!");
         }
 
-        // 2. Tạo các lịch hẹn mẫu để tính tỷ lệ huỷ lịch hẹn
+        // 2. Tạo các lịch hẹn mẫu
         if (appointmentRepository.count() == 0) {
             List<Appointment> sampleAppointments = new ArrayList<>();
 
             sampleAppointments.add(Appointment.builder()
                     .appointmentDate(today).estimatedStartTime(LocalTime.of(8, 0))
                     .reasonForVisit("Tái khám kiểm tra huyết áp định kỳ").status("COMPLETED")
-                    .patient(patientNam).doctor(doctorHung).build());
+                    .patient(patientLan).doctor(doctorHoa).build());
 
             sampleAppointments.add(Appointment.builder()
                     .appointmentDate(today).estimatedStartTime(LocalTime.of(10, 0))
