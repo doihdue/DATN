@@ -10,6 +10,8 @@ import com.demo.be.service.QueueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,7 @@ public class QueueServiceImpl implements QueueService {
     private final ExaminationRoomRepository examinationRoomRepository;
     private final DoctorRepository doctorRepository;
     private final PatientRepository patientRepository;
+    private final UserRepository userRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -587,6 +590,47 @@ public class QueueServiceImpl implements QueueService {
                 .waitingAheadCount(aheadCount)
                 .estimatedWaitingMinutes(waitMinutes)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MyTicketStatusResponse getMyActiveTicket(String phone) {
+        LocalDate today = LocalDate.now();
+        List<QueueTicket> tickets = new ArrayList<>();
+
+        // 1. Kiểm tra từ SecurityContext nếu người dùng đã đăng nhập
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+                String username = auth.getName();
+                tickets.addAll(queueTicketRepository.findTodayTicketsByUsername(today, username));
+                if (tickets.isEmpty()) {
+                    User user = userRepository.findByUsername(username).orElse(null);
+                    if (user != null && user.getPhoneNumber() != null && !user.getPhoneNumber().trim().isEmpty()) {
+                        tickets.addAll(queueTicketRepository.findTodayTicketsByPhone(today, user.getPhoneNumber().trim()));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Lỗi khi kiểm tra Authentication trong getMyActiveTicket: {}", e.getMessage());
+        }
+
+        // 2. Nếu chưa tìm thấy và có số điện thoại được truyền lên
+        if (tickets.isEmpty() && phone != null && !phone.trim().isEmpty()) {
+            tickets.addAll(queueTicketRepository.findTodayTicketsByPhone(today, phone.trim()));
+        }
+
+        if (tickets.isEmpty()) {
+            return null;
+        }
+
+        // Ưu tiên vé đang hoạt động (WAITING, CALLED, IN_PROGRESS)
+        QueueTicket target = tickets.stream()
+                .filter(t -> !"COMPLETED".equals(t.getStatus()) && !"CANCELLED".equals(t.getStatus()))
+                .findFirst()
+                .orElse(tickets.get(0));
+
+        return getMyTicketStatus(target.getTicketNumber());
     }
 
     private void broadcastQueueEvent(String eventType, QueueTicket ticket, String message) {

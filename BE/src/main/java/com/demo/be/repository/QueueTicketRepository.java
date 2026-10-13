@@ -54,4 +54,26 @@ public interface QueueTicketRepository extends JpaRepository<QueueTicket, Long> 
     );
 
     List<QueueTicket> findTop20ByTicketDateOrderByCheckInTimeDesc(LocalDate ticketDate);
+
+    List<QueueTicket> findByTicketDateBetween(LocalDate from, LocalDate to);
+
+    long countByTicketDateBetween(LocalDate from, LocalDate to);
+
+    long countByTicketDateBetweenAndStatus(LocalDate from, LocalDate to, String status);
+
+    List<QueueTicket> findByTicketDateBetweenAndStatus(LocalDate from, LocalDate to, String status);
+
+    @Query("SELECT q FROM QueueTicket q " +
+           "WHERE q.ticketDate = :today " +
+           "AND (:phone IS NOT NULL AND (q.patientPhone = :phone OR (q.patient IS NOT NULL AND q.patient.emergencyContactPhone = :phone))) " +
+           "ORDER BY q.id DESC")
+    List<QueueTicket> findTodayTicketsByPhone(@Param("today") LocalDate today, @Param("phone") String phone);
+
+    @Query("SELECT q FROM QueueTicket q " +
+           "WHERE q.ticketDate = :today " +
+           "AND q.patient IS NOT NULL " +
+           "AND q.patient.user IS NOT NULL " +
+           "AND q.patient.user.username = :username " +
+           "ORDER BY q.id DESC")
+    List<QueueTicket> findTodayTicketsByUsername(@Param("today") LocalDate today, @Param("username") String username);
 }

@@ -41,6 +41,16 @@ public class QueueController {
         return ResponseEntity.ok(ApiResponse.success(status, "Tra cứu phiếu khám thành công"));
     }
 
+    // 3b. Lấy phiếu khám đang hoạt động của người dùng (tự động theo tài khoản hoặc SĐT)
+    @GetMapping("/my-active-ticket")
+    public ResponseEntity<ApiResponse<MyTicketStatusResponse>> getMyActiveTicket(@RequestParam(required = false) String phone) {
+        MyTicketStatusResponse status = queueService.getMyActiveTicket(phone);
+        if (status == null) {
+            return ResponseEntity.ok(ApiResponse.success(null, "Không có phiếu khám nào trong ngày hôm nay"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(status, "Lấy thông tin phiếu khám thành công"));
+    }
+
     // 4. Lấy chi tiết hàng đợi của phòng khám (Dành cho Lễ tân và Bác sĩ)
     @GetMapping("/room/{roomId}")
     @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR', 'ADMIN')")

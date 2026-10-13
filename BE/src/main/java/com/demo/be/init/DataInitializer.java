@@ -31,6 +31,8 @@ public class DataInitializer implements CommandLineRunner {
     private final MedicineRepository medicineRepository;
     private final MedicineCategoryRepository medicineCategoryRepository;
     private final MedicalRecordRepository medicalRecordRepository;
+    private final QueueTicketRepository queueTicketRepository;
+    private final AppointmentRepository appointmentRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -189,6 +191,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 9. Khởi tạo bệnh án tiền sử mẫu cho Bệnh nhân Nam
         seedSampleMedicalRecordIfEmpty();
+
+        // 10. Khởi tạo vé khám mẫu & lịch hẹn mẫu cho Dashboard thống kê
+        seedSampleTicketsAndAppointmentsIfEmpty(room101, room102, room201);
 
         log.info("==> Dữ liệu mẫu Unicode NVARCHAR đã được khởi tạo thành công 100%!");
     }
@@ -397,5 +402,129 @@ public class DataInitializer implements CommandLineRunner {
                         .roomName(roomName)
                         .floor(floor)
                         .build()));
+    }
+
+    private void seedSampleTicketsAndAppointmentsIfEmpty(ExaminationRoom room101, ExaminationRoom room102, ExaminationRoom room201) {
+        if (queueTicketRepository.count() > 0 && appointmentRepository.count() > 0) return;
+
+        LocalDate today = LocalDate.now();
+        Doctor doctorHung = doctorRepository.findByEmployeeCode("DOC001").orElse(null);
+        Patient patientNam = patientRepository.findAll().stream().findFirst().orElse(null);
+
+        // 1. Tạo các vé khám mẫu trong 5 ngày qua và hôm nay
+        if (queueTicketRepository.count() == 0) {
+            List<QueueTicket> sampleTickets = new ArrayList<>();
+
+            // Hôm nay: 4 ca hoàn tất, 1 ca đang khám, 2 ca đang chờ
+            sampleTickets.add(QueueTicket.builder()
+                    .ticketNumber("P101-001").ticketDate(today).patientName("Trần Hoài Nam").patientPhone("0977889900")
+                    .patientGender("Nam").patientYearOfBirth(2000).status("COMPLETED").isEmergency(false).hasAppointment(true)
+                    .priorityScore(30).checkInTime(LocalTime.of(8, 5)).callTime(LocalTime.of(8, 20))
+                    .startTime(LocalTime.of(8, 22)).endTime(LocalTime.of(8, 45)).estimatedWaitingMinutes(15)
+                    .examinationRoom(room101).doctor(doctorHung).patient(patientNam).build());
+
+            sampleTickets.add(QueueTicket.builder()
+                    .ticketNumber("P101-002").ticketDate(today).patientName("Nguyễn Thị Lan").patientPhone("0912345678")
+                    .patientGender("Nữ").patientYearOfBirth(1952).status("COMPLETED").isEmergency(false).hasAppointment(false)
+                    .priorityScore(20).checkInTime(LocalTime.of(8, 25)).callTime(LocalTime.of(8, 48))
+                    .startTime(LocalTime.of(8, 50)).endTime(LocalTime.of(9, 15)).estimatedWaitingMinutes(23)
+                    .examinationRoom(room101).doctor(doctorHung).build());
+
+            sampleTickets.add(QueueTicket.builder()
+                    .ticketNumber("P102-001").ticketDate(today).patientName("Phạm Văn Hùng").patientPhone("0988776655")
+                    .patientGender("Nam").patientYearOfBirth(1980).status("COMPLETED").isEmergency(false).hasAppointment(true)
+                    .priorityScore(30).checkInTime(LocalTime.of(8, 30)).callTime(LocalTime.of(8, 45))
+                    .startTime(LocalTime.of(8, 46)).endTime(LocalTime.of(9, 10)).estimatedWaitingMinutes(15)
+                    .examinationRoom(room102).doctor(doctorHung).build());
+
+            sampleTickets.add(QueueTicket.builder()
+                    .ticketNumber("P201-001").ticketDate(today).patientName("Bé Lê Tuấn Khang").patientPhone("0933221100")
+                    .patientGender("Nam").patientYearOfBirth(2021).status("COMPLETED").isEmergency(false).hasAppointment(false)
+                    .priorityScore(20).checkInTime(LocalTime.of(8, 40)).callTime(LocalTime.of(8, 58))
+                    .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(9, 25)).estimatedWaitingMinutes(18)
+                    .examinationRoom(room201).build());
+
+            sampleTickets.add(QueueTicket.builder()
+                    .ticketNumber("P101-003").ticketDate(today).patientName("Vũ Quốc Bảo").patientPhone("0903456789")
+                    .patientGender("Nam").patientYearOfBirth(1995).status("IN_PROGRESS").isEmergency(false).hasAppointment(false)
+                    .priorityScore(0).checkInTime(LocalTime.of(9, 10)).callTime(LocalTime.of(9, 20))
+                    .startTime(LocalTime.of(9, 22)).estimatedWaitingMinutes(10)
+                    .examinationRoom(room101).doctor(doctorHung).build());
+
+            sampleTickets.add(QueueTicket.builder()
+                    .ticketNumber("P101-004").ticketDate(today).patientName("Đặng Thu Thảo").patientPhone("0944556677")
+                    .patientGender("Nữ").patientYearOfBirth(1998).status("WAITING").isEmergency(false).hasAppointment(false)
+                    .priorityScore(0).checkInTime(LocalTime.of(9, 25)).estimatedWaitingMinutes(15)
+                    .examinationRoom(room101).doctor(doctorHung).build());
+
+            // Dữ liệu các ngày trước (để vẽ biểu đồ 7 ngày)
+            for (int i = 1; i <= 6; i++) {
+                LocalDate pastDate = today.minusDays(i);
+                int count = 5 + (i * 2) % 7;
+                for (int j = 1; j <= count; j++) {
+                    LocalTime cIn = LocalTime.of(8, 10 + (j * 15) % 50);
+                    LocalTime cStart = cIn.plusMinutes(12 + (j * 3) % 15);
+                    LocalTime cEnd = cStart.plusMinutes(15);
+                    sampleTickets.add(QueueTicket.builder()
+                            .ticketNumber("P101-" + String.format("%03d", j))
+                            .ticketDate(pastDate)
+                            .patientName("Bệnh nhân ngày T-" + i + " #" + j)
+                            .patientPhone("0912000" + (100 + j))
+                            .patientGender(j % 2 == 0 ? "Nữ" : "Nam")
+                            .patientYearOfBirth(1985 + j)
+                            .status("COMPLETED")
+                            .priorityScore(0)
+                            .checkInTime(cIn)
+                            .callTime(cStart.minusMinutes(1))
+                            .startTime(cStart)
+                            .endTime(cEnd)
+                            .estimatedWaitingMinutes(15)
+                            .examinationRoom(j % 2 == 0 ? room102 : room101)
+                            .doctor(doctorHung)
+                            .build());
+                }
+            }
+
+            queueTicketRepository.saveAll(sampleTickets);
+            log.info("-> Đã khởi tạo danh sách vé khám mẫu cho hôm nay và các ngày trước phục vụ Dashboard!");
+        }
+
+        // 2. Tạo các lịch hẹn mẫu để tính tỷ lệ huỷ lịch hẹn
+        if (appointmentRepository.count() == 0) {
+            List<Appointment> sampleAppointments = new ArrayList<>();
+
+            sampleAppointments.add(Appointment.builder()
+                    .appointmentDate(today).estimatedStartTime(LocalTime.of(8, 0))
+                    .reasonForVisit("Tái khám kiểm tra huyết áp định kỳ").status("COMPLETED")
+                    .patient(patientNam).doctor(doctorHung).build());
+
+            sampleAppointments.add(Appointment.builder()
+                    .appointmentDate(today).estimatedStartTime(LocalTime.of(10, 0))
+                    .reasonForVisit("Đau đầu âm ỉ kèm chóng mặt").status("CONFIRMED")
+                    .patient(patientNam).doctor(doctorHung).build());
+
+            sampleAppointments.add(Appointment.builder()
+                    .appointmentDate(today).estimatedStartTime(LocalTime.of(14, 30))
+                    .reasonForVisit("Khám sức khỏe tổng quát").status("CANCELLED")
+                    .cancellationReason("Bận công tác đột xuất, dời sang tuần sau")
+                    .patient(patientNam).doctor(doctorHung).build());
+
+            for (int i = 1; i <= 6; i++) {
+                LocalDate pastDate = today.minusDays(i);
+                sampleAppointments.add(Appointment.builder()
+                        .appointmentDate(pastDate).estimatedStartTime(LocalTime.of(9, 0))
+                        .reasonForVisit("Khám định kỳ").status("COMPLETED")
+                        .doctor(doctorHung).build());
+
+                sampleAppointments.add(Appointment.builder()
+                        .appointmentDate(pastDate).estimatedStartTime(LocalTime.of(15, 0))
+                        .reasonForVisit("Khám ho và sốt").status(i % 3 == 0 ? "CANCELLED" : "COMPLETED")
+                        .cancellationReason(i % 3 == 0 ? "Bệnh nhân tự khỏi, không đến khám" : null)
+                        .doctor(doctorHung).build());
+            }
+
+            appointmentRepository.saveAll(sampleAppointments);
+            log.info("-> Đã khởi tạo các cuộc hẹn mẫu với trạng thái hoàn tất / huỷ lịch để tính tỷ lệ huỷ!");
+        }
     }
 }

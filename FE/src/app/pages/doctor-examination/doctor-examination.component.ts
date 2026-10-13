@@ -231,11 +231,18 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             this.patientHistory.set(null);
           }
           this.loadRoomTickets(t.examinationRoomId || 1);
+        } else {
+          this.currentTicket.set(null);
+          this.ticketId.set(null);
+          this.patientHistory.set(null);
         }
         this.loading.set(false);
       },
       error: () => {
-        this.fallbackToDisplayBoard();
+        this.currentTicket.set(null);
+        this.ticketId.set(null);
+        this.patientHistory.set(null);
+        this.loading.set(false);
       }
     });
   }
@@ -284,7 +291,8 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
           if (overview.waitingTickets) list.push(...overview.waitingTickets);
           this.roomTickets.set(list);
 
-          const activeTicket = overview.currentExaminingTicket || overview.currentCalledTicket || (overview.waitingTickets && overview.waitingTickets[0]);
+          // Chỉ nhận bệnh nhân đang được gọi hoặc đang trong ca khám tại phòng
+          const activeTicket = overview.currentExaminingTicket || overview.currentCalledTicket;
           if (activeTicket) {
             this.ticketId.set(activeTicket.id);
             this.currentTicket.set(activeTicket);
@@ -300,52 +308,18 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             return;
           }
         }
-        this.fallbackToDisplayBoard();
-      },
-      error: () => this.fallbackToDisplayBoard()
-    });
-  }
-
-  fallbackToDisplayBoard(): void {
-    this.queueService.getDisplayBoard().subscribe({
-      next: boardRes => {
-        if (boardRes.data && boardRes.data.length > 0) {
-          const room1 = boardRes.data.find(r => r.roomId === 1) || boardRes.data[0];
-          const ticketNum = room1?.currentExaminingTicketNumber || room1?.currentCalledTicketNumber;
-          if (ticketNum && ticketNum !== '--') {
-            this.queueService.getMyTicketStatus(ticketNum).subscribe({
-              next: statusRes => {
-                if (statusRes.data) {
-                  const s = statusRes.data;
-                  this.currentTicket.set({
-                    id: this.ticketId() || 1,
-                    ticketNumber: s.ticketNumber,
-                    ticketDate: s.ticketDate,
-                    patientName: s.patientName,
-                    patientPhone: '',
-                    isEmergency: false,
-                    hasAppointment: false,
-                    priorityScore: s.priorityScore,
-                    status: s.status as any,
-                    checkInTime: s.checkInTime || '',
-                    estimatedWaitingMinutes: s.estimatedWaitingMinutes,
-                    examinationRoomId: s.roomId || 1,
-                    roomNumber: s.roomNumber || '',
-                    roomName: s.roomName || '',
-                    doctorName: s.doctorName,
-                    specialtyName: s.specialtyName
-                  });
-                }
-                this.loading.set(false);
-              },
-              error: () => this.loading.set(false)
-            });
-            return;
-          }
-        }
+        // Phòng khám chưa có bệnh nhân nào được gọi vào
+        this.ticketId.set(null);
+        this.currentTicket.set(null);
+        this.patientHistory.set(null);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false)
+      error: () => {
+        this.ticketId.set(null);
+        this.currentTicket.set(null);
+        this.patientHistory.set(null);
+        this.loading.set(false);
+      }
     });
   }
 
@@ -497,6 +471,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   // Gửi hồ sơ khám bệnh về BE
   saveExamination(): void {
+    // 0. Bắt buộc phải có bệnh nhân trong ca khám
+    const currentTkt = this.currentTicket();
+    if (!currentTkt || !currentTkt.id) {
+      this.showAlert('Không thể lưu hồ sơ! Hiện tại phòng khám chưa có bệnh nhân nào. Vui lòng gọi số bệnh nhân hoặc chọn bệnh nhân từ hàng đợi trước khi hoàn tất ca khám.', 'danger');
+      return;
+    }
+
     this.validationErrors = {};
     const missingFields: string[] = [];
     let firstInvalidElementId: string | null = null;
@@ -558,13 +539,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const ticketId = this.ticketId() || this.currentTicket()?.id || undefined;
-    const patientId = this.currentTicket()?.patientId || this.patientHistory()?.patientId || 1;
+    const ticketId = currentTkt.id;
+    const patientId = currentTkt.patientId || this.patientHistory()?.patientId || undefined;
 
     // Chuẩn bị payload
     const req: CreateMedicalRecordRequest = {
       queueTicketId: ticketId,
-      patientId: patientId,
+      patientId: patientId as any,
       bloodPressure: this.bloodPressure ? this.bloodPressure.trim() : undefined,
       heartRate: this.heartRate || undefined,
       temperature: this.temperature || undefined,
