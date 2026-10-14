@@ -7,6 +7,7 @@ export interface QueueTicket {
   patientPhone: string;
   patientYearOfBirth?: number;
   patientDob?: string;
+  patientGender?: string;
   isEmergency: boolean;
   hasAppointment: boolean;
   priorityScore: number;
@@ -33,6 +34,7 @@ export interface CheckInRequest {
   patientPhone: string;
   patientDob?: string;
   patientYearOfBirth?: number;
+  patientGender?: string;
   examinationRoomId: number;
   doctorId?: number;
   appointmentId?: number;

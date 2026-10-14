@@ -33,3 +33,34 @@ export const roleGuard = (requiredRoles: string[]): CanActivateFn => {
     return true;
   };
 };
+
+/**
+ * Guard dành riêng cho trang Lấy số online & Tra cứu phiếu khám của Bệnh nhân.
+ * - Khách vãng lai (chưa đăng nhập) hoặc Bệnh nhân (ROLE_PATIENT): Được phép truy cập.
+ * - Nhân viên y tế (Lễ tân, Bác sĩ, Admin): Chuyển hướng ngay về đúng bàn làm việc tương ứng.
+ */
+export const patientOrGuestGuard: CanActivateFn = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    return true;
+  }
+
+  if (authService.hasRole('ADMIN')) {
+    router.navigate(['/dashboard']);
+    return false;
+  }
+
+  if (authService.hasRole('DOCTOR')) {
+    router.navigate(['/doctor/examination']);
+    return false;
+  }
+
+  if (authService.hasRole('STAFF')) {
+    router.navigate(['/staff/check-in']);
+    return false;
+  }
+
+  return true;
+};

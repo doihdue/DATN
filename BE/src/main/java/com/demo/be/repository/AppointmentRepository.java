@@ -14,6 +14,8 @@ import java.util.Optional;
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
 
+    // ===== Đặt lịch khám online =====
+
     Optional<Appointment> findByAppointmentCode(String appointmentCode);
 
     List<Appointment> findByPatientIdOrderByAppointmentDateDescEstimatedStartTimeDesc(Long patientId);
@@ -51,4 +53,18 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             @Param("doctorId") Long doctorId,
             @Param("keyword") String keyword
     );
+
+    // ===== Thống kê =====
+
+    List<Appointment> findByAppointmentDateBetween(LocalDate from, LocalDate to);
+
+    long countByAppointmentDateBetween(LocalDate from, LocalDate to);
+
+    long countByAppointmentDateBetweenAndStatus(LocalDate from, LocalDate to, String status);
+
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.appointmentDate = :date")
+    long countTodayAppointments(@Param("date") LocalDate date);
+
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.appointmentDate = :date AND a.status = :status")
+    long countTodayAppointmentsByStatus(@Param("date") LocalDate date, @Param("status") String status);
 }

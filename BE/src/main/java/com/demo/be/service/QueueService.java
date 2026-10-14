@@ -35,5 +35,7 @@ public interface QueueService {
 
     MyTicketStatusResponse getMyTicketStatus(String ticketNumber);
 
+    MyTicketStatusResponse getMyActiveTicket(String phone);
+
     QueueTicketResponse getTicketById(Long ticketId);
 }

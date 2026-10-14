@@ -36,6 +36,10 @@ public class QueueTicket {
     @Column(name = "patient_dob")
     private java.time.LocalDate patientDob;
 
+    @org.hibernate.annotations.Nationalized
+    @Column(name = "patient_gender", length = 20)
+    private String patientGender;
+
     @Column(name = "is_emergency")
     @Builder.Default
     private Boolean isEmergency = false;

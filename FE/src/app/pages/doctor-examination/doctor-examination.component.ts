@@ -15,6 +15,8 @@ import {
 } from '../../models/medical-record.model';
 import { MedicineCategory } from '../../models/medicine-category.model';
 import { QueueTicket } from '../../models/queue.model';
+import { ScheduleService } from '../../services/schedule.service';
+import { ExaminationRoom } from '../../models/schedule.model';
 
 interface PrescribedItemUI extends PrescriptionItemRequest {
   _medicineName: string;
@@ -38,6 +40,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   private readonly medicalService = inject(MedicalRecordService);
   private readonly categoryService = inject(MedicineCategoryService);
   private readonly queueService = inject(QueueService);
+  private readonly scheduleService = inject(ScheduleService);
   readonly authService = inject(AuthService);
 
   // Trạng thái phiếu khám & bệnh nhân
@@ -47,6 +50,12 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   submitting = signal<boolean>(false);
   alertMessage = signal<string | null>(null);
   alertType = signal<'success' | 'danger'>('success');
+
+  // Hàng đợi phòng khám & Đổi bệnh nhân
+  rooms = signal<ExaminationRoom[]>([]);
+  activeRoomId = signal<number>(1);
+  roomTickets = signal<QueueTicket[]>([]);
+  showQueueDrawer = signal<boolean>(false);
 
   // UC: Xem tiền sử bệnh
   patientHistory = signal<PatientMedicalHistoryResponse | null>(null);
@@ -115,6 +124,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   // In đơn thuốc & bệnh án
   completedRecord = signal<MedicalRecordResponse | null>(null);
   showPrintModal = signal<boolean>(false);
+  downloadingPdf = signal<boolean>(false);
 
   // Quản lý trạng thái lỗi validation của các trường nhập liệu
   validationErrors: Record<string, boolean> = {};
@@ -155,20 +165,35 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // 0. Đọc ngay từ router state hoặc sessionStorage (nếu vừa chuyển từ màn điều phối)
+    // Tải danh sách phòng khám
+    this.scheduleService.getAllRooms().subscribe({
+      next: res => {
+        if (res.data && res.data.length > 0) {
+          this.rooms.set(res.data);
+        }
+      }
+    });
+
+    // 0. Đọc từ router state (nếu vừa chuyển từ màn điều phối/gọi số)
     const stateTicket = history.state?.ticket;
-    if (stateTicket) {
+    if (stateTicket && stateTicket.status !== 'COMPLETED') {
       this.currentTicket.set(stateTicket);
       if (stateTicket.id) this.ticketId.set(stateTicket.id);
+      if (stateTicket.examinationRoomId) this.activeRoomId.set(stateTicket.examinationRoomId);
       if (stateTicket.patientId) this.loadPatientHistory(stateTicket.patientId);
     } else {
       try {
         const saved = sessionStorage.getItem('currentExaminingTicket');
         if (saved) {
           const t = JSON.parse(saved);
-          this.currentTicket.set(t);
-          if (t.id) this.ticketId.set(t.id);
-          if (t.patientId) this.loadPatientHistory(t.patientId);
+          if (t && t.status !== 'COMPLETED') {
+            this.currentTicket.set(t);
+            if (t.id) this.ticketId.set(t.id);
+            if (t.examinationRoomId) this.activeRoomId.set(t.examinationRoomId);
+            if (t.patientId) this.loadPatientHistory(t.patientId);
+          } else {
+            sessionStorage.removeItem('currentExaminingTicket');
+          }
         }
       } catch {}
     }
@@ -179,7 +204,8 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       if (idParam) {
         this.ticketId.set(+idParam);
         this.loadTicketInfo(+idParam);
-      } else if (!this.currentTicket()) {
+      } else {
+        // Luôn đồng bộ dữ liệu thời gian thực từ phòng khám hiện tại
         this.loadActiveExaminingTicket();
       }
     });
@@ -193,89 +219,107 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   loadTicketInfo(id: number): void {
     this.loading.set(true);
-    // 1. Gọi API lấy chính xác vé khám theo Ticket ID
     this.queueService.getTicketById(id).subscribe({
       next: res => {
         if (res.data) {
           const t: QueueTicket = res.data;
           this.currentTicket.set(t);
+          if (t.examinationRoomId) this.activeRoomId.set(t.examinationRoomId);
           if (t.patientId) {
             this.loadPatientHistory(t.patientId);
+          } else {
+            this.patientHistory.set(null);
           }
+          this.loadRoomTickets(t.examinationRoomId || 1);
+        } else {
+          this.currentTicket.set(null);
+          this.ticketId.set(null);
+          this.patientHistory.set(null);
         }
         this.loading.set(false);
       },
       error: () => {
-        // Fallback nếu gọi ID thất bại: lấy số vé đang khám từ display board
-        this.fallbackToDisplayBoard();
+        this.currentTicket.set(null);
+        this.ticketId.set(null);
+        this.patientHistory.set(null);
+        this.loading.set(false);
       }
     });
   }
 
-  loadActiveExaminingTicket(): void {
-    this.loading.set(true);
-    // Tra cứu danh sách ca khám hiện tại của phòng 1
-    this.queueService.getRoomQueue(1).subscribe({
+  loadRoomTickets(roomId?: number): void {
+    const rId = roomId || this.activeRoomId();
+    this.queueService.getRoomQueue(rId).subscribe({
       next: res => {
         if (res.data) {
           const overview = res.data;
-          const activeTicket = overview.currentExaminingTicket || overview.currentCalledTicket || (overview.waitingTickets && overview.waitingTickets[0]);
+          const list: QueueTicket[] = [];
+          if (overview.currentExaminingTicket) list.push(overview.currentExaminingTicket);
+          if (overview.currentCalledTicket) list.push(overview.currentCalledTicket);
+          if (overview.waitingTickets) list.push(...overview.waitingTickets);
+          this.roomTickets.set(list);
+        }
+      }
+    });
+  }
+
+  selectTicketToExamine(ticket: QueueTicket): void {
+    this.currentTicket.set(ticket);
+    this.ticketId.set(ticket.id);
+    try {
+      sessionStorage.setItem('currentExaminingTicket', JSON.stringify(ticket));
+    } catch {}
+    if (ticket.patientId) {
+      this.loadPatientHistory(ticket.patientId);
+    } else {
+      this.patientHistory.set(null);
+    }
+    this.showQueueDrawer.set(false);
+    this.showAlert(`Đã chuyển sang khám bệnh nhân: ${ticket.patientName} (#${ticket.ticketNumber})`, 'success');
+  }
+
+  loadActiveExaminingTicket(): void {
+    this.loading.set(true);
+    const roomId = this.activeRoomId();
+    this.queueService.getRoomQueue(roomId).subscribe({
+      next: res => {
+        if (res.data) {
+          const overview = res.data;
+          const list: QueueTicket[] = [];
+          if (overview.currentExaminingTicket) list.push(overview.currentExaminingTicket);
+          if (overview.currentCalledTicket) list.push(overview.currentCalledTicket);
+          if (overview.waitingTickets) list.push(...overview.waitingTickets);
+          this.roomTickets.set(list);
+
+          // Chỉ nhận bệnh nhân đang được gọi hoặc đang trong ca khám tại phòng
+          const activeTicket = overview.currentExaminingTicket || overview.currentCalledTicket;
           if (activeTicket) {
             this.ticketId.set(activeTicket.id);
             this.currentTicket.set(activeTicket);
+            try {
+              sessionStorage.setItem('currentExaminingTicket', JSON.stringify(activeTicket));
+            } catch {}
             if (activeTicket.patientId) {
               this.loadPatientHistory(activeTicket.patientId);
+            } else {
+              this.patientHistory.set(null);
             }
             this.loading.set(false);
             return;
           }
         }
-        this.fallbackToDisplayBoard();
-      },
-      error: () => this.fallbackToDisplayBoard()
-    });
-  }
-
-  fallbackToDisplayBoard(): void {
-    this.queueService.getDisplayBoard().subscribe({
-      next: boardRes => {
-        if (boardRes.data && boardRes.data.length > 0) {
-          const room1 = boardRes.data.find(r => r.roomId === 1) || boardRes.data[0];
-          const ticketNum = room1?.currentExaminingTicketNumber || room1?.currentCalledTicketNumber;
-          if (ticketNum && ticketNum !== '--') {
-            this.queueService.getMyTicketStatus(ticketNum).subscribe({
-              next: statusRes => {
-                if (statusRes.data) {
-                  const s = statusRes.data;
-                  this.currentTicket.set({
-                    id: this.ticketId() || 1,
-                    ticketNumber: s.ticketNumber,
-                    ticketDate: s.ticketDate,
-                    patientName: s.patientName,
-                    patientPhone: '',
-                    isEmergency: false,
-                    hasAppointment: false,
-                    priorityScore: s.priorityScore,
-                    status: s.status as any,
-                    checkInTime: s.checkInTime || '',
-                    estimatedWaitingMinutes: s.estimatedWaitingMinutes,
-                    examinationRoomId: s.roomId || 1,
-                    roomNumber: s.roomNumber || '',
-                    roomName: s.roomName || '',
-                    doctorName: s.doctorName,
-                    specialtyName: s.specialtyName
-                  });
-                }
-                this.loading.set(false);
-              },
-              error: () => this.loading.set(false)
-            });
-            return;
-          }
-        }
+        // Phòng khám chưa có bệnh nhân nào được gọi vào
+        this.ticketId.set(null);
+        this.currentTicket.set(null);
+        this.patientHistory.set(null);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false)
+      error: () => {
+        this.ticketId.set(null);
+        this.currentTicket.set(null);
+        this.patientHistory.set(null);
+        this.loading.set(false);
+      }
     });
   }
 
@@ -427,6 +471,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   // Gửi hồ sơ khám bệnh về BE
   saveExamination(): void {
+    // 0. Bắt buộc phải có bệnh nhân trong ca khám
+    const currentTkt = this.currentTicket();
+    if (!currentTkt || !currentTkt.id) {
+      this.showAlert('Không thể lưu hồ sơ! Hiện tại phòng khám chưa có bệnh nhân nào. Vui lòng gọi số bệnh nhân hoặc chọn bệnh nhân từ hàng đợi trước khi hoàn tất ca khám.', 'danger');
+      return;
+    }
+
     this.validationErrors = {};
     const missingFields: string[] = [];
     let firstInvalidElementId: string | null = null;
@@ -488,12 +539,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const patientId = this.currentTicket()?.patientId || this.patientHistory()?.patientId || 1;
+    const ticketId = currentTkt.id;
+    const patientId = currentTkt.patientId || this.patientHistory()?.patientId || undefined;
 
     // Chuẩn bị payload
     const req: CreateMedicalRecordRequest = {
-      queueTicketId: this.ticketId() || undefined,
-      patientId: patientId,
+      queueTicketId: ticketId,
+      patientId: patientId as any,
       bloodPressure: this.bloodPressure ? this.bloodPressure.trim() : undefined,
       heartRate: this.heartRate || undefined,
       temperature: this.temperature || undefined,
@@ -525,6 +577,9 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       next: res => {
         this.submitting.set(false);
         this.completedRecord.set(res.data || null);
+        try {
+          sessionStorage.removeItem('currentExaminingTicket');
+        } catch {}
         this.showAlert('Đã lưu hồ sơ bệnh án thành công và hoàn tất ca khám!', 'success');
         // Mở cửa sổ in ấn đơn thuốc / kết quả khám
         this.showPrintModal.set(true);
@@ -540,8 +595,106 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     window.print();
   }
 
+  // Xuất file PDF bằng JasperReports
+  downloadPdf(recordId?: number): void {
+    const id = recordId || this.completedRecord()?.id;
+    if (!id) {
+      this.showAlert('Không tìm thấy mã hồ sơ bệnh án để xuất PDF!', 'danger');
+      return;
+    }
+
+    this.downloadingPdf.set(true);
+    this.medicalService.exportMedicalRecordPdf(id).subscribe({
+      next: (blob: Blob) => {
+        this.downloadingPdf.set(false);
+        const fileUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = `phieu-kham-don-thuoc-${id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(fileUrl);
+        this.showAlert('Đã tải xuống file PDF phiếu khám & đơn thuốc thành công!', 'success');
+      },
+      error: async err => {
+        this.downloadingPdf.set(false);
+        console.error('Lỗi xuất PDF JasperReports:', err);
+        let errorMsg = 'Có lỗi khi tải file PDF từ máy chủ!';
+        if (err.error instanceof Blob) {
+          try {
+            const text = await err.error.text();
+            console.error('Backend error text:', text);
+            const json = JSON.parse(text);
+            if (json.message) errorMsg = json.message;
+          } catch (e) {
+            // ignore
+          }
+        } else if (err.error?.message) {
+          errorMsg = err.error.message;
+        }
+        this.showAlert(errorMsg, 'danger');
+      }
+    });
+  }
+
+  previewPdfInNewTab(recordId?: number): void {
+    const id = recordId || this.completedRecord()?.id;
+    if (!id) {
+      this.showAlert('Không tìm thấy mã hồ sơ bệnh án để mở xem PDF!', 'danger');
+      return;
+    }
+
+    this.downloadingPdf.set(true);
+    this.medicalService.exportMedicalRecordPdf(id).subscribe({
+      next: (blob: Blob) => {
+        this.downloadingPdf.set(false);
+        const fileUrl = window.URL.createObjectURL(blob);
+        window.open(fileUrl, '_blank');
+      },
+      error: async err => {
+        this.downloadingPdf.set(false);
+        console.error('Lỗi mở PDF JasperReports:', err);
+        let errorMsg = 'Có lỗi khi mở xem file PDF!';
+        if (err.error instanceof Blob) {
+          try {
+            const text = await err.error.text();
+            console.error('Backend error text:', text);
+            const json = JSON.parse(text);
+            if (json.message) errorMsg = json.message;
+          } catch (e) {
+            // ignore
+          }
+        } else if (err.error?.message) {
+          errorMsg = err.error.message;
+        }
+        this.showAlert(errorMsg, 'danger');
+      }
+    });
+  }
+
   finishAndReturnToQueue(): void {
     this.showPrintModal.set(false);
+    this.completedRecord.set(null);
+    try {
+      sessionStorage.removeItem('currentExaminingTicket');
+    } catch {}
+    // Xóa trắng form để chuẩn bị cho ca khám tiếp theo
+    this.symptoms = '';
+    this.preliminaryDiagnosis = '';
+    this.finalDiagnosis = '';
+    this.icd10Code = '';
+    this.notes = '';
+    this.bloodPressure = '';
+    this.heartRate = null;
+    this.temperature = null;
+    this.weight = null;
+    this.height = null;
+    this.vitalSignsNotes = '';
+    this.hasRevisit = false;
+    this.revisitDate = '';
+    this.revisitNotes = '';
+    this.prescribedItems = [];
     this.router.navigate(['/doctor/calling']);
   }
 
