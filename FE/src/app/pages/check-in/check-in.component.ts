@@ -7,6 +7,7 @@ import { ScheduleService } from '../../services/schedule.service';
 import { AuthService } from '../../services/auth.service';
 import { CheckInRequest, QueueTicket, PatientLookup } from '../../models/queue.model';
 import { ExaminationRoom } from '../../models/schedule.model';
+import { toIsoDate } from '../../utils/date.utils';
 
 @Component({
   selector: 'app-check-in',
@@ -1240,7 +1241,7 @@ export class CheckInComponent implements OnInit, OnDestroy {
   private searchDebounceTimer: any = null;
   private pollingTimer: any = null;
 
-  readonly todayString = new Date().toISOString().split('T')[0];
+  readonly todayString = toIsoDate(new Date());
 
   form: CheckInRequest = {
     patientName: '',

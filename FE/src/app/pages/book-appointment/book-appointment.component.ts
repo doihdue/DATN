@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -67,15 +67,15 @@ interface ScheduleDayGroup {
         <div class="filters-grid">
           <div class="form-group">
             <label class="form-label" for="from-date">Từ ngày</label>
-            <input id="from-date" type="date" class="form-control" [min]="today" [(ngModel)]="startDate" (change)="loadSchedules()" />
+            <input id="from-date" type="date" class="form-control" [min]="today" [(ngModel)]="startDate" (change)="onDateRangeChange()" />
           </div>
           <div class="form-group">
             <label class="form-label" for="to-date">Đến ngày</label>
-            <input id="to-date" type="date" class="form-control" [min]="startDate" [(ngModel)]="endDate" (change)="loadSchedules()" />
+            <input id="to-date" type="date" class="form-control" [min]="startDate" [(ngModel)]="endDate" (change)="onDateRangeChange()" />
           </div>
           <div class="form-group">
             <label class="form-label" for="doctor">Bác sĩ</label>
-            <select id="doctor" class="form-control" [ngModel]="doctorId()" (ngModelChange)="doctorId.set($event)">
+            <select id="doctor" class="form-control" [ngModel]="doctorId()" (ngModelChange)="selectDoctor($event)">
               <option [ngValue]="null">-- Tất cả bác sĩ --</option>
               @for (doc of doctors(); track doc.id) {
                 <option [ngValue]="doc.id">{{ doc.name }}</option>
@@ -86,15 +86,20 @@ interface ScheduleDayGroup {
       </section>
 
       <!-- Bước 3: Ca khám -->
-      <section class="step-card">
-        <h2 class="step-title"><span class="step-num">3</span> Chọn ca khám còn chỗ</h2>
+      <section class="step-card" #slotsSection>
+        <h2 class="step-title">
+          <span class="step-num">3</span> Chọn ca khám còn chỗ
+          @if (!loading() && filteredSchedules().length > 0) {
+            <span class="step-count">{{ filteredSchedules().length }} ca</span>
+          }
+        </h2>
 
         @if (loading()) {
           <div class="loading-state">
             <div class="spinner"></div>
             <p>Đang tìm ca khám còn chỗ...</p>
           </div>
-        } @else if (groupedSchedules().length === 0) {
+        } @else if (filteredSchedules().length === 0) {
           <div class="empty-state">
             <i class="bi bi-calendar-x"></i>
             <h3>Không còn ca khám trống</h3>
@@ -128,6 +133,47 @@ interface ScheduleDayGroup {
                 }
               </div>
             </div>
+          }
+
+          @if (totalPages() > 1) {
+            <nav class="pagination-footer" aria-label="Phân trang ca khám">
+              <div class="pagination-info">
+                <span>
+                  Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredSchedules().length }}</strong> ca khám
+                </span>
+                <div class="page-size-selector">
+                  <label for="pageSizeSelect">Số ca/trang:</label>
+                  <select id="pageSizeSelect" class="form-select-sm" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+                    @for (opt of pageSizeOptions; track opt) {
+                      <option [ngValue]="opt">{{ opt }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <div class="pagination-controls">
+                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Về trang đầu tiên" aria-label="Trang đầu">
+                  <i class="bi bi-chevron-double-left"></i>
+                </button>
+                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Trang trước" aria-label="Trang trước">
+                  <i class="bi bi-chevron-left"></i> <span class="nav-label">Trước</span>
+                </button>
+                <div class="page-numbers-group">
+                  @for (p of pagesList(); track p) {
+                    <button type="button" class="btn-page btn-page-num" [class.active]="currentPage() === p"
+                            [attr.aria-current]="currentPage() === p ? 'page' : null" (click)="goToPage(p)">
+                      {{ p }}
+                    </button>
+                  }
+                </div>
+                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Trang sau" aria-label="Trang sau">
+                  <span class="nav-label">Sau</span> <i class="bi bi-chevron-right"></i>
+                </button>
+                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Đến trang cuối cùng" aria-label="Trang cuối">
+                  <i class="bi bi-chevron-double-right"></i>
+                </button>
+              </div>
+            </nav>
           }
         }
       </section>
@@ -261,6 +307,35 @@ interface ScheduleDayGroup {
     .capacity-fill { height: 100%; background: var(--teal-500); }
     .btn-block { width: 100%; justify-content: center; margin-top: auto; }
 
+    .step-count {
+      margin-left: auto; font-size: .82rem; font-weight: 600; color: var(--primary-700);
+      background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-full); padding: .15rem .7rem;
+    }
+
+    /* Phân trang: cùng kiểu với trang Quản lý lịch làm việc */
+    .pagination-footer {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+      margin-top: 1.5rem; padding-top: 1rem; border-top: 1.5px solid var(--bg-subtle);
+    }
+    .pagination-info { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1.5rem; font-size: .88rem; color: var(--text-secondary); }
+    .pagination-info strong { color: var(--text-main); }
+    .page-size-selector { display: flex; align-items: center; gap: .5rem; font-size: .85rem; }
+    .form-select-sm {
+      padding: .35rem .65rem; border: 1.5px solid #cbd5e1; border-radius: 6px;
+      color: var(--text-main); font-weight: 700; background: #fff;
+    }
+    .pagination-controls { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+    .page-numbers-group { display: flex; gap: .3rem; }
+    .btn-page {
+      min-width: 34px; height: 34px; padding: 0 .5rem; border-radius: 8px; border: 1px solid #cbd5e1;
+      background: #fff; color: var(--text-secondary); font-weight: 700; font-size: .85rem; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: .25rem; transition: all .15s;
+    }
+    .btn-page:hover:not(:disabled) { background: var(--primary-50); border-color: var(--primary-600); color: var(--primary-600); }
+    .btn-page.active { background: var(--primary-600); border-color: var(--primary-600); color: #fff; box-shadow: 0 2px 8px rgba(2, 132, 199, .35); }
+    .btn-page:disabled { opacity: .45; cursor: not-allowed; background: var(--bg-main); border-color: var(--border-color); }
+    .btn-page-nav { padding: 0 .75rem; }
+
     .summary-list { display: grid; grid-template-columns: max-content 1fr; gap: .45rem 1rem; margin: 0 0 1rem; }
     .summary-list dt { color: var(--text-muted); font-size: .9rem; }
     .summary-list dd { margin: 0; font-weight: 600; color: var(--text-main); }
@@ -280,6 +355,9 @@ interface ScheduleDayGroup {
     @media (max-width: 600px) {
       .step-card { padding: 1rem; }
       .page-title { font-size: 1.4rem; }
+      .pagination-footer { justify-content: center; }
+      .btn-page-nav { padding: 0 .5rem; }
+      .nav-label { display: none; }
     }
   `]
 })
@@ -307,6 +385,12 @@ export class BookAppointmentComponent implements OnInit {
   readonly alertMessage = signal<string | null>(null);
   readonly alertType = signal<'success' | 'danger'>('success');
 
+  // Phân trang (lưới 3 cột nên số ca/trang là bội số của 3)
+  @ViewChild('slotsSection') private slotsSection?: ElementRef<HTMLElement>;
+  readonly pageSizeOptions = [6, 9, 12, 18];
+  readonly pageSize = signal(9);
+  readonly currentPage = signal(1);
+
   readonly isPatient = computed(() => this.authService.userRoles().includes('ROLE_PATIENT'));
 
   readonly doctors = computed(() => {
@@ -317,11 +401,38 @@ export class BookAppointmentComponent implements OnInit {
     return Array.from(map, ([id, name]) => ({ id, name }));
   });
 
-  readonly groupedSchedules = computed<ScheduleDayGroup[]>(() => {
+  readonly filteredSchedules = computed(() => {
     const doctorId = this.doctorId();
+    return doctorId ? this.schedules().filter(s => s.doctorId === doctorId) : this.schedules();
+  });
+
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredSchedules().length / this.pageSize())));
+
+  readonly pagedSchedules = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredSchedules().slice(start, start + this.pageSize());
+  });
+
+  readonly startIndex = computed(() =>
+    this.filteredSchedules().length === 0 ? 0 : (this.currentPage() - 1) * this.pageSize() + 1
+  );
+
+  readonly endIndex = computed(() => Math.min(this.currentPage() * this.pageSize(), this.filteredSchedules().length));
+
+  // Tối đa 5 nút số trang, trang hiện tại nằm giữa
+  readonly pagesList = computed(() => {
+    const total = this.totalPages();
+    const maxVisible = 5;
+    let start = Math.max(1, this.currentPage() - Math.floor(maxVisible / 2));
+    const end = Math.min(total, start + maxVisible - 1);
+    start = Math.max(1, end - maxVisible + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  });
+
+  // Nhóm các ca của trang hiện tại theo ngày (danh sách đã sắp xếp theo ngày/giờ từ server)
+  readonly groupedSchedules = computed<ScheduleDayGroup[]>(() => {
     const groups = new Map<string, WorkSchedule[]>();
-    for (const s of this.schedules()) {
-      if (doctorId && s.doctorId !== doctorId) continue;
+    for (const s of this.pagedSchedules()) {
       if (!groups.has(s.workDate)) groups.set(s.workDate, []);
       groups.get(s.workDate)!.push(s);
     }
@@ -338,7 +449,29 @@ export class BookAppointmentComponent implements OnInit {
   selectSpecialty(id: number | null): void {
     this.specialtyId.set(id);
     this.doctorId.set(null);
+    this.currentPage.set(1);
     this.loadSchedules();
+  }
+
+  selectDoctor(id: number | null): void {
+    this.doctorId.set(id);
+    this.currentPage.set(1);
+  }
+
+  onDateRangeChange(): void {
+    this.currentPage.set(1);
+    this.loadSchedules();
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages() || page === this.currentPage()) return;
+    this.currentPage.set(page);
+    this.slotsSection?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
   }
 
   loadSchedules(): void {
@@ -352,6 +485,9 @@ export class BookAppointmentComponent implements OnInit {
         this.schedules.set(res.data ?? []);
         if (this.doctorId() && !this.doctors().some(d => d.id === this.doctorId())) {
           this.doctorId.set(null);
+        }
+        if (this.currentPage() > this.totalPages()) {
+          this.currentPage.set(this.totalPages());
         }
         this.loading.set(false);
       },

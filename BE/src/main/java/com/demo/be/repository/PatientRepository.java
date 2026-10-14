@@ -12,7 +12,8 @@ import java.util.Optional;
 @Repository
 public interface PatientRepository extends JpaRepository<Patient, Long> {
 
-    @Query("SELECT p FROM Patient p WHERE p.emergencyContactPhone = :phone OR (p.user IS NOT NULL AND p.user.phoneNumber = :phone)")
+    // LEFT JOIN: "p.user.phoneNumber" sẽ sinh INNER JOIN và bỏ sót bệnh nhân vãng lai không có tài khoản
+    @Query("SELECT p FROM Patient p LEFT JOIN p.user u WHERE p.emergencyContactPhone = :phone OR u.phoneNumber = :phone")
     List<Patient> findByPhoneNumber(@Param("phone") String phone);
 
     @Query("SELECT p FROM Patient p WHERE LOWER(p.fullName) LIKE LOWER(CONCAT('%', :kw, '%')) " +
