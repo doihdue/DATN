@@ -11,6 +11,9 @@ import { DoctorExaminationComponent } from './pages/doctor-examination/doctor-ex
 import { MedicinesComponent } from './pages/medicines/medicines.component';
 import { CheckInComponent } from './pages/check-in/check-in.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { BookAppointmentComponent } from './pages/book-appointment/book-appointment.component';
+import { MyAppointmentsComponent } from './pages/my-appointments/my-appointments.component';
+import { AppointmentManagementComponent } from './pages/appointment-management/appointment-management.component';
 import { roleGuard, patientOrGuestGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -92,6 +95,12 @@ export const routes: Routes = [
     title: 'Bàn Điều phối Hàng đợi - MedQueue',
     canActivate: [roleGuard(['STAFF'])]
   },
+  {
+    path: 'staff/appointments',
+    component: AppointmentManagementComponent,
+    title: 'Quản lý lịch hẹn - MedQueue',
+    canActivate: [roleGuard(['STAFF'])]
+  },
 
   // ========================
   // PATIENT & Công khai
@@ -105,6 +114,19 @@ export const routes: Routes = [
     component: QueueTrackingComponent,
     title: 'Tra cứu phiếu khám - MedQueue',
     canActivate: [patientOrGuestGuard]
+  },
+  // Đặt lịch khám online: khách xem được ca trống, đặt lịch cần đăng nhập bệnh nhân
+  {
+    path: 'booking',
+    component: BookAppointmentComponent,
+    title: 'Đặt lịch khám - MedQueue',
+    canActivate: [patientOrGuestGuard]
+  },
+  {
+    path: 'my-appointments',
+    component: MyAppointmentsComponent,
+    title: 'Lịch hẹn của tôi - MedQueue',
+    canActivate: [roleGuard(['PATIENT'])]
   },
   {
     path: 'my-tickets',

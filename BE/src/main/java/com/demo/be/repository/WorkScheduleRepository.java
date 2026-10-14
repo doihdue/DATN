@@ -1,6 +1,8 @@
 package com.demo.be.repository;
 
 import com.demo.be.model.WorkSchedule;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, Long> {
@@ -36,6 +39,26 @@ public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, Long
             @Param("doctorId") Long doctorId,
             @Param("specialtyId") Long specialtyId,
             @Param("roomId") Long roomId
+    );
+
+    // Khoá dòng ca làm việc khi đặt/huỷ lịch để tránh đặt vượt số lượng tối đa khi nhiều người đặt cùng lúc
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ws FROM WorkSchedule ws WHERE ws.id = :id")
+    Optional<WorkSchedule> findByIdForUpdate(@Param("id") Long id);
+
+    // Các ca còn nhận đặt lịch (chưa huỷ, chưa đầy) trong khoảng ngày
+    @Query("SELECT ws FROM WorkSchedule ws " +
+           "WHERE ws.workDate BETWEEN :startDate AND :endDate " +
+           "AND ws.status = 'AVAILABLE' " +
+           "AND ws.currentBookedCount < ws.maxPatients " +
+           "AND (:doctorId IS NULL OR ws.doctor.id = :doctorId) " +
+           "AND (:specialtyId IS NULL OR ws.doctor.specialty.id = :specialtyId) " +
+           "ORDER BY ws.workDate ASC, ws.startTime ASC")
+    List<WorkSchedule> findBookableSchedules(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("doctorId") Long doctorId,
+            @Param("specialtyId") Long specialtyId
     );
 
     // Kiểm tra xung đột lịch của bác sĩ

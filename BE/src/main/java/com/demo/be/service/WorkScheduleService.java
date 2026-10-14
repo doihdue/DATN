@@ -19,6 +19,14 @@ public interface WorkScheduleService {
 
     WorkScheduleResponse getScheduleById(Long id);
 
+    // Các ca còn nhận đặt lịch online (còn chỗ, chưa huỷ, chưa kết thúc)
+    List<WorkScheduleResponse> getBookableSchedules(
+            LocalDate startDate,
+            LocalDate endDate,
+            Long doctorId,
+            Long specialtyId
+    );
+
     WorkScheduleResponse createSchedule(WorkScheduleRequest request);
 
     WorkScheduleResponse updateSchedule(Long id, WorkScheduleRequest request);

@@ -27,6 +27,9 @@ import { AuthService } from '../../services/auth.service';
             <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
               <i class="bi bi-house"></i> Trang chủ
             </a>
+            <a routerLink="/booking" routerLinkActive="active" class="nav-item">
+              <i class="bi bi-calendar-plus"></i> Đặt lịch khám
+            </a>
             <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" routerLinkActive="active" class="nav-item">
               <i class="bi bi-ticket-perforated"></i> Đăng ký lấy số
             </a>
@@ -69,6 +72,9 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
                 <i class="bi bi-house"></i> Trang chủ
               </a>
+              <a routerLink="/staff/appointments" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-journal-check"></i> Lịch hẹn
+              </a>
               <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-person-check-fill"></i> Tiếp đón &amp; Cấp số
               </a>
@@ -82,6 +88,12 @@ import { AuthService } from '../../services/auth.service';
             @if (authService.hasRole('PATIENT') && !authService.hasRole('ADMIN') && !authService.hasRole('DOCTOR') && !authService.hasRole('STAFF')) {
               <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
                 <i class="bi bi-house"></i> Trang chủ
+              </a>
+              <a routerLink="/booking" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar-plus"></i> Đặt lịch khám
+              </a>
+              <a routerLink="/my-appointments" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar2-heart"></i> Lịch hẹn của tôi
               </a>
               <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-ticket-perforated-fill"></i> Lấy số khám online

@@ -5,9 +5,11 @@ import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
+import com.demo.be.model.Appointment;
 import com.demo.be.model.Doctor;
 import com.demo.be.model.ExaminationRoom;
 import com.demo.be.model.WorkSchedule;
+import com.demo.be.repository.AppointmentRepository;
 import com.demo.be.repository.DoctorRepository;
 import com.demo.be.repository.ExaminationRoomRepository;
 import com.demo.be.repository.WorkScheduleRepository;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,6 +32,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
     private final WorkScheduleRepository workScheduleRepository;
     private final DoctorRepository doctorRepository;
     private final ExaminationRoomRepository examinationRoomRepository;
+    private final AppointmentRepository appointmentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,6 +55,24 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         WorkSchedule schedule = workScheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Lịch làm việc", "id", id));
         return mapToResponse(schedule);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkScheduleResponse> getBookableSchedules(
+            LocalDate startDate,
+            LocalDate endDate,
+            Long doctorId,
+            Long specialtyId
+    ) {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        return workScheduleRepository.findBookableSchedules(startDate, endDate, doctorId, specialtyId)
+                .stream()
+                // Bỏ các ca hôm nay đã kết thúc
+                .filter(ws -> !ws.getWorkDate().equals(today) || ws.getEndTime().isAfter(now))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -178,6 +200,18 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Lịch làm việc", "id", id));
 
         schedule.setStatus("CANCELLED");
+
+        // Huỷ theo các lịch hẹn online còn hiệu lực của ca này
+        List<Appointment> activeAppointments = appointmentRepository
+                .findByWorkScheduleIdAndStatusIn(id, List.of("PENDING", "CONFIRMED"));
+        for (Appointment appointment : activeAppointments) {
+            appointment.setStatus("CANCELLED");
+            appointment.setCancellationReason("Ca khám bị huỷ: " + reason);
+        }
+        appointmentRepository.saveAll(activeAppointments);
+        schedule.setCurrentBookedCount(Math.max(0,
+                (schedule.getCurrentBookedCount() != null ? schedule.getCurrentBookedCount() : 0) - activeAppointments.size()));
+
         WorkSchedule updated = workScheduleRepository.save(schedule);
         log.info("-> Đã hủy ca làm việc ID {}. Lý do: {}", id, reason);
         return mapToResponse(updated);

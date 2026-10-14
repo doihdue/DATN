@@ -329,6 +329,13 @@ interface QueueRoom {
               </div>
 
               <div class="action-card medical-card">
+                <div class="action-icon icon-blue"><i class="bi bi-calendar-check"></i></div>
+                <h3 class="action-title">Đặt Lịch Khám Online</h3>
+                <p class="action-desc">Chọn bác sĩ, chuyên khoa và khung giờ thuận tiện giúp hạn chế tối đa xếp hàng.</p>
+                <a routerLink="/booking" class="btn btn-outline btn-sm">Đặt lịch ngay <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card medical-card">
                 <div class="action-icon icon-teal"><i class="bi bi-clock-history"></i></div>
                 <h3 class="action-title">Phiếu Khám Của Tôi</h3>
                 <p class="action-desc">Xem tiến độ gọi số khám của bạn theo thời gian thực và thời gian dự kiến.</p>
