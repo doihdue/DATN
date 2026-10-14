@@ -6,6 +6,7 @@ import { SpecialtyService } from '../../services/specialty.service';
 import { AuthService } from '../../services/auth.service';
 import { ExaminationRoom, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
+import { toIsoDate } from '../../utils/date.utils';
 
 @Component({
   selector: 'app-schedules',
@@ -892,7 +893,7 @@ export class SchedulesComponent implements OnInit {
   readonly alertType = signal<'success' | 'danger'>('success');
 
   // Filters
-  filterStartDate = new Date().toISOString().substring(0, 10);
+  filterStartDate = toIsoDate(new Date());
   filterEndDate = '';
   filterRoomId: number | null = null;
   filterSpecialtyId: number | null = null;
@@ -967,7 +968,7 @@ export class SchedulesComponent implements OnInit {
   formData: WorkScheduleRequest = {
     doctorId: 0,
     examinationRoomId: 0,
-    workDate: new Date().toISOString().substring(0, 10),
+    workDate: toIsoDate(new Date()),
     shiftType: 'CA_SÁNG',
     startTime: '08:00',
     endTime: '12:00',
@@ -1053,7 +1054,7 @@ export class SchedulesComponent implements OnInit {
   }
 
   resetFilters(): void {
-    this.filterStartDate = new Date().toISOString().substring(0, 10);
+    this.filterStartDate = toIsoDate(new Date());
     this.filterEndDate = '';
     this.filterRoomId = null;
     this.filterSpecialtyId = null;
@@ -1065,7 +1066,7 @@ export class SchedulesComponent implements OnInit {
     this.formData = {
       doctorId: this.doctorList().length > 0 ? this.doctorList()[0].id : 0,
       examinationRoomId: this.rooms().length > 0 ? this.rooms()[0].id : 0,
-      workDate: new Date().toISOString().substring(0, 10),
+      workDate: toIsoDate(new Date()),
       shiftType: 'CA_SÁNG',
       startTime: '08:00',
       endTime: '12:00',

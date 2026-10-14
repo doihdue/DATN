@@ -17,6 +17,7 @@ import { MedicineCategory } from '../../models/medicine-category.model';
 import { QueueTicket } from '../../models/queue.model';
 import { ScheduleService } from '../../services/schedule.service';
 import { ExaminationRoom } from '../../models/schedule.model';
+import { toIsoDate } from '../../utils/date.utils';
 
 interface PrescribedItemUI extends PrescriptionItemRequest {
   _medicineName: string;
@@ -461,7 +462,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   setQuickRevisit(days: number): void {
     const d = new Date();
     d.setDate(d.getDate() + days);
-    this.revisitDate = d.toISOString().split('T')[0];
+    this.revisitDate = toIsoDate(d);
     this.hasRevisit = true;
     this.clearFieldError('revisitDate');
     if (!this.revisitNotes) {
