@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScheduleService } from '../../services/schedule.service';
 import { SpecialtyService } from '../../services/specialty.service';
+import { DoctorService } from '../../services/doctor.service';
 import { AuthService } from '../../services/auth.service';
 import { ExaminationRoom, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
@@ -875,6 +876,7 @@ import { toIsoDate } from '../../utils/date.utils';
 export class SchedulesComponent implements OnInit {
   private readonly scheduleService = inject(ScheduleService);
   private readonly specialtyService = inject(SpecialtyService);
+  private readonly doctorService = inject(DoctorService);
   readonly authService = inject(AuthService);
 
   readonly isAdmin = computed(() => this.authService.hasRole('ADMIN'));
@@ -990,6 +992,7 @@ export class SchedulesComponent implements OnInit {
   ngOnInit(): void {
     this.loadRooms();
     this.loadSpecialties();
+    this.loadDoctors();
     this.loadSchedules();
   }
 
@@ -1008,24 +1011,24 @@ export class SchedulesComponent implements OnInit {
       next: res => {
         if (res.success && res.data) {
           this.specialties.set(res.data);
-          // Thu thập danh sách bác sĩ từ từng chuyên khoa
-          const allDocs: any[] = [];
-          res.data.forEach(spec => {
-            this.specialtyService.getSpecialtyById(spec.id).subscribe({
-              next: detailRes => {
-                if (detailRes.success && detailRes.data) {
-                  detailRes.data.doctors.forEach(d => {
-                    allDocs.push({
-                      id: d.id,
-                      fullName: d.fullName,
-                      specialtyName: spec.name
-                    });
-                  });
-                  this.doctorList.set([...allDocs]);
-                }
-              }
-            });
-          });
+        }
+      }
+    });
+  }
+
+  // Danh sách bác sĩ để xếp ca (chỉ Admin), gồm cả bác sĩ chưa phân khoa, bỏ qua tài khoản đã khóa
+  loadDoctors(): void {
+    if (!this.isAdmin()) return;
+    this.doctorService.getDoctors().subscribe({
+      next: res => {
+        if (res.success && res.data) {
+          this.doctorList.set(res.data
+            .filter(d => d.status !== 'LOCKED')
+            .map(d => ({
+              id: d.id,
+              fullName: d.fullName,
+              specialtyName: d.specialtyName || 'Chưa phân khoa'
+            })));
         }
       }
     });

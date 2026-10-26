@@ -14,6 +14,8 @@ import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { BookAppointmentComponent } from './pages/book-appointment/book-appointment.component';
 import { MyAppointmentsComponent } from './pages/my-appointments/my-appointments.component';
 import { AppointmentManagementComponent } from './pages/appointment-management/appointment-management.component';
+import { DoctorsComponent } from './pages/doctors/doctors.component';
+import { StaffComponent } from './pages/staff/staff.component';
 import { roleGuard, patientOrGuestGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -37,6 +39,18 @@ export const routes: Routes = [
     path: 'admin/specialties',
     component: SpecialtiesComponent,
     title: 'Quản lý Chuyên khoa - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/doctors',
+    component: DoctorsComponent,
+    title: 'Quản lý Bác sĩ - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/staff',
+    component: StaffComponent,
+    title: 'Quản lý Lễ tân - MedQueue',
     canActivate: [roleGuard(['ADMIN'])]
   },
   {
