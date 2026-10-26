@@ -47,6 +47,12 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/admin/specialties" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-diagram-3"></i> Chuyên khoa
               </a>
+              <a routerLink="/admin/doctors" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-person-badge"></i> Bác sĩ
+              </a>
+              <a routerLink="/admin/staff" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-person-workspace"></i> Lễ tân
+              </a>
               <a routerLink="/admin/medicines" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-capsule"></i> Thuốc
               </a>

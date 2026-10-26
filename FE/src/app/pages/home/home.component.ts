@@ -141,6 +141,12 @@ interface QueueRoom {
                   <a routerLink="/admin/specialties" class="btn btn-outline btn-hero">
                     <i class="bi bi-diagram-3"></i> Quản Lý Chuyên Khoa
                   </a>
+                  <a routerLink="/admin/doctors" class="btn btn-outline btn-hero">
+                    <i class="bi bi-person-badge"></i> Quản Lý Bác Sĩ
+                  </a>
+                  <a routerLink="/admin/staff" class="btn btn-outline btn-hero">
+                    <i class="bi bi-person-workspace"></i> Quản Lý Lễ Tân
+                  </a>
                   <a routerLink="/admin/medicines" class="btn btn-outline btn-hero">
                     <i class="bi bi-capsule"></i> Quản Lý Dược Phẩm
                   </a>
@@ -409,6 +415,20 @@ interface QueueRoom {
                 <h3 class="action-title">Danh Mục Chuyên Khoa</h3>
                 <p class="action-desc">Quản lý chuyên khoa, cấu hình mô tả và chỉ định bác sĩ phụ trách từng chuyên khoa.</p>
                 <a routerLink="/admin/specialties" class="btn btn-outline btn-sm">Quản lý chuyên khoa <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card medical-card">
+                <div class="action-icon icon-indigo"><i class="bi bi-person-badge"></i></div>
+                <h3 class="action-title">Đội Ngũ Bác Sĩ</h3>
+                <p class="action-desc">Thêm bác sĩ mới, cấp tài khoản đăng nhập, phân bổ chuyên khoa và khóa/mở khóa tài khoản.</p>
+                <a routerLink="/admin/doctors" class="btn btn-outline btn-sm">Quản lý bác sĩ <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="action-card medical-card">
+                <div class="action-icon icon-teal"><i class="bi bi-person-workspace"></i></div>
+                <h3 class="action-title">Nhân Viên Lễ Tân</h3>
+                <p class="action-desc">Cấp tài khoản cho nhân viên tiếp đón &amp; điều phối hàng đợi, khóa/mở khóa và đặt lại mật khẩu.</p>
+                <a routerLink="/admin/staff" class="btn btn-outline btn-sm">Quản lý lễ tân <i class="bi bi-arrow-right"></i></a>
               </div>
 
               <div class="action-card medical-card">

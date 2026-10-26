@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { WorkSchedule } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
 import { Appointment } from '../../models/appointment.model';
-import { addDays, formatDayTitle, toIsoDate } from '../../utils/date.utils';
+import { formatDayTitle, toIsoDate } from '../../utils/date.utils';
 
 interface ScheduleDayGroup {
   date: string;
@@ -66,12 +66,8 @@ interface ScheduleDayGroup {
         <h2 class="step-title"><span class="step-num">2</span> Chọn thời gian và bác sĩ</h2>
         <div class="filters-grid">
           <div class="form-group">
-            <label class="form-label" for="from-date">Từ ngày</label>
-            <input id="from-date" type="date" class="form-control" [min]="today" [(ngModel)]="startDate" (change)="onDateRangeChange()" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="to-date">Đến ngày</label>
-            <input id="to-date" type="date" class="form-control" [min]="startDate" [(ngModel)]="endDate" (change)="onDateRangeChange()" />
+            <label class="form-label" for="work-date">Ngày khám</label>
+            <input id="work-date" type="date" class="form-control" [min]="today" [(ngModel)]="workDate" (change)="onDateChange()" />
           </div>
           <div class="form-group">
             <label class="form-label" for="doctor">Bác sĩ</label>
@@ -103,7 +99,7 @@ interface ScheduleDayGroup {
           <div class="empty-state">
             <i class="bi bi-calendar-x"></i>
             <h3>Không còn ca khám trống</h3>
-            <p>Hãy chọn chuyên khoa khác hoặc mở rộng khoảng ngày tìm kiếm.</p>
+            <p>Hãy chọn chuyên khoa khác hoặc chọn một ngày khám khác.</p>
           </div>
         } @else {
           @for (group of groupedSchedules(); track group.date) {
@@ -368,8 +364,7 @@ export class BookAppointmentComponent implements OnInit {
   readonly authService = inject(AuthService);
 
   readonly today = toIsoDate(new Date());
-  startDate = this.today;
-  endDate = toIsoDate(addDays(new Date(), 7));
+  workDate = this.today;
 
   readonly specialties = signal<Specialty[]>([]);
   readonly specialtyId = signal<number | null>(null);
@@ -458,7 +453,11 @@ export class BookAppointmentComponent implements OnInit {
     this.currentPage.set(1);
   }
 
-  onDateRangeChange(): void {
+  onDateChange(): void {
+    // Không cho để trống hoặc chọn ngày trong quá khứ
+    if (!this.workDate || this.workDate < this.today) {
+      this.workDate = this.today;
+    }
     this.currentPage.set(1);
     this.loadSchedules();
   }
@@ -477,8 +476,8 @@ export class BookAppointmentComponent implements OnInit {
   loadSchedules(): void {
     this.loading.set(true);
     this.appointmentService.getAvailableSchedules({
-      startDate: this.startDate,
-      endDate: this.endDate,
+      startDate: this.workDate,
+      endDate: this.workDate,
       specialtyId: this.specialtyId()
     }).subscribe({
       next: res => {
