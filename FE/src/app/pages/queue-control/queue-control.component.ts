@@ -72,10 +72,10 @@ import { RouterLink } from '@angular/router';
           }
         </div>
 
-        @if (selectedRoom(); as curRoom) {
+        @if (isDoctor() ? overview() : selectedRoom()) {
           <div class="room-filter-right">
             <span class="room-stat-badge">
-              <i class="bi bi-people-fill text-primary"></i> Đang chờ: <strong>{{ getRoomWaitingCount(curRoom.id) }}</strong> ca
+              <i class="bi bi-people-fill text-primary"></i> Đang chờ: <strong>{{ currentRoomWaitingCount() }}</strong> ca
             </span>
             <button type="button" class="btn-refresh-simple" (click)="fetchOverview(true)" title="Làm mới">
               <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i>
@@ -1738,27 +1738,27 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   }
 
   loadRooms(): void {
+    // Bác sĩ chỉ cần hàng đợi phòng mình trực; danh sách phòng chỉ tải khi cần chuyển phòng
+    if (this.isDoctor()) {
+      this.loadMyRoom(true);
+      return;
+    }
+
     this.scheduleService.getAllRooms().subscribe({
       next: res => {
         if (res.success && res.data && res.data.length > 0) {
           this.rooms.set(res.data);
-          if (!this.isDoctor()) {
-            this.selectedRoomId.set(res.data[0].id);
-            this.fetchOverview(true);
-          }
+          this.selectedRoomId.set(res.data[0].id);
+          this.fetchOverview(true);
           this.loadDisplayBoardCounts();
         }
       }
     });
-
-    if (this.isDoctor()) {
-      this.loadMyRoom();
-    }
   }
 
   // Bác sĩ luôn làm việc tại phòng mình có ca trực hôm nay, không được chọn phòng khác
-  private loadMyRoom(): void {
-    this.loading.set(true);
+  private loadMyRoom(showLoading: boolean): void {
+    if (showLoading) this.loading.set(true);
     this.queueService.getMyRoomQueue().subscribe({
       next: res => {
         if (res.success && res.data) {
@@ -1766,18 +1766,20 @@ export class QueueControlComponent implements OnInit, OnDestroy {
           this.overview.set(res.data);
           this.myRoomError.set(null);
         }
-        this.loading.set(false);
+        if (showLoading) this.loading.set(false);
       },
       error: err => {
         this.selectedRoomId.set(0);
         this.overview.set(null);
         this.myRoomError.set(err.error?.message || 'Hôm nay bạn không có ca trực tại phòng khám nào');
-        this.loading.set(false);
+        if (showLoading) this.loading.set(false);
       }
     });
   }
 
   loadDisplayBoardCounts(): void {
+    // Số người chờ của các phòng khác chỉ phục vụ quầy điều phối
+    if (this.isDoctor()) return;
     this.queueService.getDisplayBoard().subscribe({
       next: res => {
         if (res.success && res.data) {
@@ -1795,12 +1797,24 @@ export class QueueControlComponent implements OnInit, OnDestroy {
     return this.roomWaitingCounts()[roomId] || 0;
   }
 
+  // Bác sĩ đếm ngay trên hàng đợi phòng mình, không cần bảng tổng hợp các phòng
+  currentRoomWaitingCount(): number {
+    if (this.isDoctor()) {
+      return this.overview()?.waitingTickets?.length || 0;
+    }
+    return this.getRoomWaitingCount(this.selectedRoomId());
+  }
+
   selectRoom(roomId: number): void {
     this.selectedRoomId.set(roomId);
     this.fetchOverview(true);
   }
 
   fetchOverview(showLoading = true): void {
+    if (this.isDoctor()) {
+      this.loadMyRoom(showLoading);
+      return;
+    }
     if (showLoading) this.loading.set(true);
     this.queueService.getRoomQueue(this.selectedRoomId()).subscribe({
       next: res => {
@@ -1929,6 +1943,19 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   // --- Chuyển phòng khám (Transfer Ticket) ---
   openTransferModal(ticket: QueueTicket): void {
+    // Bác sĩ không tải danh sách phòng khi mở màn, chỉ tải lần đầu cần chuyển phòng
+    if (this.rooms().length === 0) {
+      this.scheduleService.getAllRooms().subscribe({
+        next: res => {
+          if (res.success && res.data && res.data.length > 0) {
+            this.rooms.set(res.data);
+            this.openTransferModal(ticket);
+          }
+        },
+        error: err => this.showAlert(err.error?.message || 'Không tải được danh sách phòng khám', 'danger')
+      });
+      return;
+    }
     this.activeTransferTicket.set(ticket);
     const availableRooms = this.rooms().filter(r => r.id !== ticket.examinationRoomId);
     this.targetRoomId = availableRooms.length > 0 ? availableRooms[0].id : 0;
