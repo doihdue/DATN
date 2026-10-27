@@ -274,6 +274,11 @@ public class DataInitializer implements CommandLineRunner {
         // 11. Khởi tạo vé khám mẫu & lịch hẹn mẫu cho Dashboard thống kê
         seedSampleTicketsAndAppointmentsIfEmpty(room101, room102, room103, room201, doctorHung, doctorHoa, patientNam, patientLan);
 
+        // 12. Mỗi lần khởi động: đảm bảo hôm nay có hàng đợi để test luồng gọi số (bác sĩ gọi, lễ tân điều phối)
+        initComprehensiveLabServices();
+        initSampleLabWorkflowTickets(LocalDate.now(), room101, room102, doctorHung, doctorHoa);
+        seedTodayQueueTicketsForTesting();
+
         log.info("==> Dữ liệu mẫu phong phú đã được khởi tạo thành công 100%!");
     }
 
@@ -927,6 +932,96 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             return labServiceRepository.save(s);
         });
+    }
+
+    /**
+     * Tạo hàng đợi của NGÀY HÔM NAY cho mọi phòng có ca trực: vài bệnh nhân chờ khám (có người cao tuổi,
+     * người đặt trước) và một bệnh nhân nhỡ lượt. Phòng nào hôm nay đã có từ 3 người chờ hoặc có người nhỡ lượt
+     * thì bỏ qua, nên khởi động lại backend không bị nhân đôi dữ liệu.
+     */
+    private void seedTodayQueueTicketsForTesting() {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        String[][] patients = {
+                {"Ngô Thị Hạnh", "Nữ", "1950", "0911000101"},
+                {"Trịnh Văn Toàn", "Nam", "1987", "0911000102"},
+                {"Lương Thị Thu", "Nữ", "1993", "0911000103"},
+                {"Bé Phan Gia Huy", "Nam", "2020", "0911000104"},
+                {"Đỗ Mạnh Cường", "Nam", "1979", "0911000105"},
+                {"Cao Thị Ngọc", "Nữ", "2001", "0911000106"},
+                {"Tạ Quang Vinh", "Nam", "1966", "0911000107"},
+        };
+        // {chỉ số bệnh nhân, trạng thái, điểm ưu tiên, cấp cứu, đặt trước, phút trước hiện tại, ghi chú}
+        Object[][] layout = {
+                {0, "WAITING", 30, false, false, 40, "Người cao tuổi, đau đầu chóng mặt"},
+                {1, "WAITING", 20, false, true, 35, "Đã đặt lịch online"},
+                {2, "WAITING", 0, false, false, 30, "Ho, sốt nhẹ 2 ngày"},
+                {3, "WAITING", 30, false, false, 25, "Trẻ nhỏ, sốt 38.5°C"},
+                {4, "WAITING", 0, false, false, 15, "Đau bụng vùng thượng vị"},
+                {5, "SKIPPED", 0, false, false, 50, "Đã gọi nhưng vắng mặt"},
+        };
+
+        int roomIndex = 0;
+        for (ExaminationRoom room : examinationRoomRepository.findAllByOrderByRoomNumberAsc()) {
+            Doctor doctor = workScheduleRepository.findByExaminationRoomIdAndWorkDate(room.getId(), today).stream()
+                    .filter(ws -> !"CANCELLED".equals(ws.getStatus()) && ws.getDoctor() != null)
+                    .sorted((a, b) -> {
+                        boolean aActive = a.getEndTime() == null || a.getEndTime().isAfter(now);
+                        boolean bActive = b.getEndTime() == null || b.getEndTime().isAfter(now);
+                        if (aActive != bActive) return aActive ? -1 : 1;
+                        return a.getStartTime().compareTo(b.getStartTime());
+                    })
+                    .map(WorkSchedule::getDoctor)
+                    .findFirst().orElse(null);
+            if (doctor == null) continue;
+
+            List<QueueTicket> todayTickets = queueTicketRepository
+                    .findByTicketDateAndExaminationRoomIdOrderByPriorityScoreDescCheckInTimeAsc(today, room.getId());
+            long waitingCount = todayTickets.stream().filter(t -> "WAITING".equals(t.getStatus())).count();
+            boolean hasSkipped = todayTickets.stream().anyMatch(t -> "SKIPPED".equals(t.getStatus()));
+            if (waitingCount >= 3 || hasSkipped) continue;
+
+            String prefix = room.getRoomNumber().replace(".", "").replace(" ", "").toUpperCase() + "-";
+            int seq = queueTicketRepository.findTicketNumbersByDateAndPrefix(today, prefix).stream()
+                    .map(n -> n.substring(prefix.length()))
+                    .filter(n -> n.matches("\\d+"))
+                    .mapToInt(Integer::parseInt)
+                    .max().orElse(0);
+
+            List<QueueTicket> tickets = new ArrayList<>();
+            for (int i = 0; i < layout.length; i++) {
+                Object[] row = layout[i];
+                // Xoay vòng danh sách tên để mỗi phòng có bệnh nhân khác nhau
+                String[] p = patients[((Integer) row[0] + roomIndex) % patients.length];
+                String status = (String) row[1];
+                boolean emergency = (Boolean) row[3];
+                LocalTime checkIn = now.minusMinutes((Integer) row[5]);
+                if (checkIn.isAfter(now)) checkIn = LocalTime.MIDNIGHT;
+
+                tickets.add(QueueTicket.builder()
+                        .ticketNumber(String.format("%s%03d", prefix, ++seq))
+                        .ticketDate(today)
+                        .patientName(p[0])
+                        .patientGender(p[1])
+                        .patientYearOfBirth(Integer.parseInt(p[2]))
+                        .patientPhone(p[3].substring(0, 8) + roomIndex + i)
+                        .status(status)
+                        .isEmergency(emergency)
+                        .hasAppointment((Boolean) row[4])
+                        .priorityScore((Integer) row[2] + (emergency ? 100 : 0))
+                        .checkInTime(checkIn)
+                        .callTime("SKIPPED".equals(status) ? checkIn.plusMinutes(10) : null)
+                        .estimatedWaitingMinutes(15 * (i + 1))
+                        .notes((String) row[6])
+                        .examinationRoom(room)
+                        .doctor(doctor)
+                        .build());
+            }
+            queueTicketRepository.saveAll(tickets);
+            roomIndex++;
+            log.info("-> Đã tạo {} vé hàng đợi hôm nay cho phòng {} (BS: {})", tickets.size(), room.getRoomNumber(), doctor.getFullName());
+        }
     }
 
     private void initSampleLabWorkflowTickets(LocalDate today, ExaminationRoom room101, ExaminationRoom room102,

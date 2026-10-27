@@ -19,6 +19,8 @@ public interface QueueService {
 
     QueueTicketResponse recallTicket(Long ticketId);
 
+    QueueTicketResponse requeueTicket(Long ticketId);
+
     QueueTicketResponse setEmergency(Long ticketId);
 
     QueueTicketResponse transferTicket(Long ticketId, Long targetRoomId, String reason);
@@ -30,6 +32,8 @@ public interface QueueService {
     List<PatientLookupResponse> searchPatients(String keyword);
 
     RoomQueueOverviewResponse getRoomQueueOverview(Long roomId);
+
+    RoomQueueOverviewResponse getMyRoomQueueOverview();
 
     List<ClinicDisplayBoardResponse> getClinicDisplayBoard();
 

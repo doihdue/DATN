@@ -22,7 +22,7 @@ import { RouterLink } from '@angular/router';
           </div>
           <h1 class="page-title">{{ isDoctor() ? 'Bàn Gọi Khám Phòng Khám' : 'Điều Phối Hàng Đợi Các Phòng Khám' }}</h1>
           <p class="page-subtitle">
-            {{ isDoctor() ? 'Gọi số khám, mời bệnh nhân vào phòng và bắt đầu ca khám bệnh' : 'Giám sát hàng đợi các phòng khám, điều chuyển phòng khi quá tải, gọi số và xử lý ưu tiên' }}
+            {{ isDoctor() ? 'Gọi số khám, mời bệnh nhân vào phòng và bắt đầu ca khám bệnh' : 'Giám sát hàng đợi các phòng khám, điều chuyển phòng khi quá tải, xử lý ưu tiên và người bệnh nhỡ lượt' }}
           </p>
         </div>
         @if (!isDoctor()) {
@@ -43,22 +43,33 @@ import { RouterLink } from '@angular/router';
           <label for="roomSelectControl" class="room-filter-label">
             <i class="bi bi-hospital text-primary"></i> Phòng khám:
           </label>
-          <select
-            id="roomSelectControl"
-            class="room-filter-select"
-            [ngModel]="selectedRoomId()"
-            (ngModelChange)="selectRoom($event)"
-          >
-            @for (floor of availableFloors(); track floor) {
-              <optgroup [label]="'🏢 Tầng ' + floor">
-                @for (room of getRoomsByFloor(floor); track room.id) {
-                  <option [ngValue]="room.id">
-                    {{ room.roomNumber }} - {{ room.roomName }}
-                  </option>
-                }
-              </optgroup>
-            }
-          </select>
+          @if (isDoctor()) {
+            <!-- Bác sĩ chỉ được gọi số tại phòng mình có ca trực hôm nay -->
+            <span class="room-filter-select">
+              @if (overview(); as ov) {
+                {{ ov.roomNumber }} - {{ ov.roomName }}
+              } @else {
+                Chưa có phòng trực
+              }
+            </span>
+          } @else {
+            <select
+              id="roomSelectControl"
+              class="room-filter-select"
+              [ngModel]="selectedRoomId()"
+              (ngModelChange)="selectRoom($event)"
+            >
+              @for (floor of availableFloors(); track floor) {
+                <optgroup [label]="'🏢 Tầng ' + floor">
+                  @for (room of getRoomsByFloor(floor); track room.id) {
+                    <option [ngValue]="room.id">
+                      {{ room.roomNumber }} - {{ room.roomName }}
+                    </option>
+                  }
+                </optgroup>
+              }
+            </select>
+          }
         </div>
 
         @if (selectedRoom(); as curRoom) {
@@ -96,6 +107,11 @@ import { RouterLink } from '@angular/router';
           <div class="spinner"></div>
           <p>Đang tải dữ liệu hàng đợi phòng khám...</p>
         </div>
+      } @else if (myRoomError()) {
+        <div class="loading-state">
+          <i class="bi bi-calendar-x text-muted" style="font-size: 2rem;"></i>
+          <p>{{ myRoomError() }}</p>
+        </div>
       } @else if (overview()) {
         <!-- Main Console Layout -->
         <div class="console-grid">
@@ -114,7 +130,8 @@ import { RouterLink } from '@angular/router';
               </div>
             </div>
 
-            <!-- Central Call Control -->
+            <!-- Central Call Control: chỉ bác sĩ trực phòng mới gọi số vào phòng khám -->
+            @if (isDoctor()) {
             <div class="call-action-box">
               <button
                 class="btn-call-next"
@@ -136,6 +153,14 @@ import { RouterLink } from '@angular/router';
                 </div>
               </button>
             </div>
+            } @else {
+              <div class="call-action-box">
+                <p class="text-muted small mb-0">
+                  <i class="bi bi-info-circle"></i> Bác sĩ trực phòng sẽ gọi số mời bệnh nhân vào khám.
+                  Quầy điều phối theo dõi hàng đợi, chuyển phòng, ưu tiên và xử lý người bệnh nhỡ lượt.
+                </p>
+              </div>
+            }
 
             <!-- Current States Panels -->
             <div class="status-panels-row">
@@ -160,14 +185,16 @@ import { RouterLink } from '@angular/router';
                           <span> • Năm sinh: {{ overview()!.currentCalledTicket!.patientYearOfBirth }}</span>
                         }
                       </div>
-                      <div class="panel-actions">
-                        <button class="btn btn-success btn-sm" (click)="startExam(overview()!.currentCalledTicket!.id)">
-                          <i class="bi bi-play-circle-fill"></i> Vào Khám
-                        </button>
-                        <button class="btn btn-outline-danger btn-sm" (click)="skipTicket(overview()!.currentCalledTicket!.id)">
-                          <i class="bi bi-skip-forward-fill"></i> Bỏ Qua (Vắng mặt)
-                        </button>
-                      </div>
+                      @if (isDoctor()) {
+                        <div class="panel-actions">
+                          <button class="btn btn-success btn-sm" (click)="startExam(overview()!.currentCalledTicket!.id)">
+                            <i class="bi bi-play-circle-fill"></i> Vào Khám
+                          </button>
+                          <button class="btn btn-outline-danger btn-sm" (click)="skipTicket(overview()!.currentCalledTicket!.id)">
+                            <i class="bi bi-skip-forward-fill"></i> Bỏ Qua (Vắng mặt)
+                          </button>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <div class="panel-empty">
@@ -194,19 +221,19 @@ import { RouterLink } from '@angular/router';
                       <div class="patient-info-sub">
                         <span>Bắt đầu lúc: {{ overview()!.currentExaminingTicket!.startTime }}</span>
                       </div>
-                      <div class="panel-actions">
-                        @if (isDoctor()) {
+                      @if (isDoctor()) {
+                        <div class="panel-actions">
                           <a [routerLink]="['/doctor/examination', overview()!.currentExaminingTicket!.id]" 
                              [state]="{ ticket: overview()!.currentExaminingTicket }"
                              (click)="onOpenExamination(overview()!.currentExaminingTicket!)" 
                              class="btn btn-primary btn-sm">
                             <i class="bi bi-file-earmark-medical-fill"></i> Bàn Khám &amp; Kê Đơn
                           </a>
-                        }
-                        <button class="btn btn-outline btn-sm" (click)="completeExam(overview()!.currentExaminingTicket!.id)">
-                          <i class="bi bi-check-circle-fill text-success"></i> Xong Nhanh
-                        </button>
-                      </div>
+                          <button class="btn btn-outline btn-sm" (click)="completeExam(overview()!.currentExaminingTicket!.id)">
+                            <i class="bi bi-check-circle-fill text-success"></i> Xong Nhanh
+                          </button>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <div class="panel-empty">
@@ -323,9 +350,13 @@ import { RouterLink } from '@angular/router';
                         </div>
                       </div>
                       <div class="row-actions">
-                        <button class="btn btn-sm btn-success" (click)="startExam(t.id)" title="Mời bệnh nhân vào phòng khám tiếp">
-                          <i class="bi bi-play-circle-fill"></i> Vào Khám (Đọc KQ)
-                        </button>
+                        @if (isDoctor()) {
+                          <button class="btn btn-sm btn-success" (click)="startExam(t.id)" title="Mời bệnh nhân vào phòng khám tiếp">
+                            <i class="bi bi-play-circle-fill"></i> Vào Khám (Đọc KQ)
+                          </button>
+                        } @else {
+                          <span class="text-xs text-muted">Chờ bác sĩ mời vào đọc kết quả</span>
+                        }
                       </div>
                     </div>
                   }
@@ -463,9 +494,15 @@ import { RouterLink } from '@angular/router';
                         }
                       </div>
                       <div class="row-actions">
-                        <button class="btn btn-sm btn-outline" (click)="recallTicket(t.id)" title="Gọi lại số này">
-                          <i class="bi bi-arrow-counterclockwise"></i> Gọi lại
-                        </button>
+                        @if (isDoctor()) {
+                          <button class="btn btn-sm btn-outline" (click)="recallTicket(t.id)" title="Gọi lại số này">
+                            <i class="bi bi-arrow-counterclockwise"></i> Gọi lại
+                          </button>
+                        } @else {
+                          <button class="btn btn-sm btn-outline" (click)="requeueTicket(t.id)" title="Người bệnh đã quay lại: xếp lên đầu hàng chờ để bác sĩ gọi lượt tiếp theo">
+                            <i class="bi bi-arrow-counterclockwise"></i> Đưa lại hàng đợi
+                          </button>
+                        }
                         <button class="btn btn-sm btn-outline-primary" (click)="openTransferModal(t)" title="Chuyển sang phòng khác">
                           <i class="bi bi-arrow-left-right"></i> Chuyển phòng
                         </button>
@@ -1612,7 +1649,7 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   readonly isStaff = computed(() => this.authService.hasRole('STAFF'));
 
   readonly rooms = signal<ExaminationRoom[]>([]);
-  readonly selectedRoomId = signal<number>(1);
+  readonly selectedRoomId = signal<number>(0);
   readonly selectedFloor = signal<number | null>(null);
 
   readonly selectedRoom = computed(() => {
@@ -1654,6 +1691,8 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   readonly loading = signal(true);
   readonly calling = signal(false);
+  // Thông báo khi bác sĩ không có ca trực hôm nay (không có phòng để gọi số)
+  readonly myRoomError = signal<string | null>(null);
 
   // Transfer Modal State
   readonly showTransferModal = signal(false);
@@ -1703,10 +1742,37 @@ export class QueueControlComponent implements OnInit, OnDestroy {
       next: res => {
         if (res.success && res.data && res.data.length > 0) {
           this.rooms.set(res.data);
-          this.selectedRoomId.set(res.data[0].id);
-          this.fetchOverview(true);
+          if (!this.isDoctor()) {
+            this.selectedRoomId.set(res.data[0].id);
+            this.fetchOverview(true);
+          }
           this.loadDisplayBoardCounts();
         }
+      }
+    });
+
+    if (this.isDoctor()) {
+      this.loadMyRoom();
+    }
+  }
+
+  // Bác sĩ luôn làm việc tại phòng mình có ca trực hôm nay, không được chọn phòng khác
+  private loadMyRoom(): void {
+    this.loading.set(true);
+    this.queueService.getMyRoomQueue().subscribe({
+      next: res => {
+        if (res.success && res.data) {
+          this.selectedRoomId.set(res.data.examinationRoomId);
+          this.overview.set(res.data);
+          this.myRoomError.set(null);
+        }
+        this.loading.set(false);
+      },
+      error: err => {
+        this.selectedRoomId.set(0);
+        this.overview.set(null);
+        this.myRoomError.set(err.error?.message || 'Hôm nay bạn không có ca trực tại phòng khám nào');
+        this.loading.set(false);
       }
     });
   }
@@ -1782,7 +1848,7 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   onOpenExamination(ticket: QueueTicket): void {
     try {
       sessionStorage.setItem('currentExaminingTicket', JSON.stringify(ticket));
-    } catch {}
+    } catch { }
   }
 
   completeExam(ticketId: number): void {
@@ -1815,6 +1881,17 @@ export class QueueControlComponent implements OnInit, OnDestroy {
         this.loadDisplayBoardCounts();
       },
       error: err => this.showAlert(err.error?.message || 'Lỗi khi gọi lại số', 'danger')
+    });
+  }
+
+  requeueTicket(ticketId: number): void {
+    this.queueService.requeueTicket(ticketId).subscribe({
+      next: res => {
+        this.showAlert(`Đã đưa số ${res.data?.ticketNumber} trở lại hàng đợi, bác sĩ sẽ gọi ở lượt tiếp theo`, 'success');
+        this.fetchOverview(false);
+        this.loadDisplayBoardCounts();
+      },
+      error: err => this.showAlert(err.error?.message || 'Lỗi khi đưa lại hàng đợi', 'danger')
     });
   }
 
