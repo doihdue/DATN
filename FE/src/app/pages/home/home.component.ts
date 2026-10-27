@@ -213,10 +213,6 @@ export class HomeComponent implements OnInit {
       next: res => {
         if (res.success && res.data && res.data.length > 0) {
           this.displayBoard.set(res.data);
-          if (!this.activeDoctorRoomId && res.data[0]) {
-            this.activeDoctorRoomId = res.data[0].roomId;
-            this.loadDoctorRoomQueue(res.data[0].roomId);
-          }
         } else {
           this.setupFallbackDisplayBoard();
         }
@@ -227,6 +223,22 @@ export class HomeComponent implements OnInit {
         this.isLoading.set(false);
       }
     });
+
+    // 1b. Bác sĩ: luôn làm việc tại phòng có ca trực hôm nay của mình
+    if (this.authService.hasRole('DOCTOR')) {
+      this.queueService.getMyRoomQueue().subscribe({
+        next: res => {
+          if (res.success && res.data) {
+            this.activeDoctorRoomId = res.data.examinationRoomId;
+            this.doctorRoomOverview.set(res.data);
+          }
+        },
+        error: () => {
+          this.activeDoctorRoomId = null;
+          this.doctorRoomOverview.set(null);
+        }
+      });
+    }
 
     // 2. If Patient, load active ticket today
     if (this.authService.hasRole('PATIENT')) {
@@ -263,12 +275,6 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  // Doctor changes active examining room
-  onDoctorRoomChange(roomId: number): void {
-    this.activeDoctorRoomId = Number(roomId);
-    this.loadDoctorRoomQueue(this.activeDoctorRoomId);
-  }
-
   private loadDoctorRoomQueue(roomId: number): void {
     this.queueService.getRoomQueue(roomId).subscribe({
       next: res => {
@@ -283,12 +289,8 @@ export class HomeComponent implements OnInit {
   // Doctor calls next patient from homepage
   callNextPatient(): void {
     if (!this.activeDoctorRoomId) {
-      if (this.displayBoard().length > 0) {
-        this.activeDoctorRoomId = this.displayBoard()[0].roomId;
-      } else {
-        alert('Vui lòng chọn phòng khám trước khi gọi số!');
-        return;
-      }
+      alert('Hôm nay bạn không có ca trực tại phòng khám nào nên không thể gọi số!');
+      return;
     }
 
     this.isCallingNext.set(true);
@@ -478,7 +480,6 @@ export class HomeComponent implements OnInit {
     ];
 
     this.displayBoard.set(fallback);
-    this.activeDoctorRoomId = fallback[0].roomId;
   }
 
   private setupFallbackRecentTickets(): void {

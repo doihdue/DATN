@@ -310,11 +310,12 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   loadActiveExaminingTicket(): void {
     this.loading.set(true);
-    const roomId = this.activeRoomId();
-    this.queueService.getRoomQueue(roomId).subscribe({
+    // Luôn lấy theo phòng bác sĩ có ca trực hôm nay (không mặc định phòng đầu tiên)
+    this.queueService.getMyRoomQueue().subscribe({
       next: res => {
         if (res.data) {
           const overview = res.data;
+          this.activeRoomId.set(overview.examinationRoomId);
           const list: QueueTicket[] = [];
           if (overview.currentExaminingTicket) list.push(overview.currentExaminingTicket);
           if (overview.currentCalledTicket) list.push(overview.currentCalledTicket);
