@@ -37,24 +37,40 @@ import { RouterLink } from '@angular/router';
         }
       </div>
 
-      <!-- Room Selector Strip with Load Count -->
-      <div class="room-selector-bar">
-        <span class="selector-label"><i class="bi bi-hospital"></i> Phòng Khám:</span>
-        <div class="room-pills">
-          @for (room of rooms(); track room.id) {
-            <button
-              class="room-pill-btn"
-              [class.active]="selectedRoomId() === room.id"
-              (click)="selectRoom(room.id)"
-            >
-              <span class="pill-number">{{ room.roomNumber }}</span>
-              <span class="pill-name">{{ room.roomName }}</span>
-              <span class="pill-load" [class.high-load]="getRoomWaitingCount(room.id) >= 5">
-                {{ getRoomWaitingCount(room.id) }} chờ
-              </span>
-            </button>
-          }
+      <!-- Clean Simple Room Filter Bar -->
+      <div class="room-filter-bar">
+        <div class="room-filter-left">
+          <label for="roomSelectControl" class="room-filter-label">
+            <i class="bi bi-hospital text-primary"></i> Phòng khám:
+          </label>
+          <select
+            id="roomSelectControl"
+            class="room-filter-select"
+            [ngModel]="selectedRoomId()"
+            (ngModelChange)="selectRoom($event)"
+          >
+            @for (floor of availableFloors(); track floor) {
+              <optgroup [label]="'🏢 Tầng ' + floor">
+                @for (room of getRoomsByFloor(floor); track room.id) {
+                  <option [ngValue]="room.id">
+                    {{ room.roomNumber }} - {{ room.roomName }}
+                  </option>
+                }
+              </optgroup>
+            }
+          </select>
         </div>
+
+        @if (selectedRoom(); as curRoom) {
+          <div class="room-filter-right">
+            <span class="room-stat-badge">
+              <i class="bi bi-people-fill text-primary"></i> Đang chờ: <strong>{{ getRoomWaitingCount(curRoom.id) }}</strong> ca
+            </span>
+            <button type="button" class="btn-refresh-simple" (click)="fetchOverview(true)" title="Làm mới">
+              <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i>
+            </button>
+          </div>
+        }
       </div>
 
       <!-- Alerts (Top-Right Floating Toast) -->
@@ -209,26 +225,52 @@ import { RouterLink } from '@angular/router';
             <div class="queue-tabs">
               <button
                 class="tab-btn"
+                [class.active]="activeTab === 'RESULTS_READY'"
+                (click)="activeTab = 'RESULTS_READY'"
+                title="Bệnh nhân đã có kết quả cận lâm sàng / xét nghiệm"
+              >
+                <i class="bi bi-file-earmark-check-fill text-success"></i>
+                <span class="tab-text">Có KQ CLS</span>
+                <span class="tab-count count-results-ready num">{{ overview()?.resultsReadyTickets?.length || 0 }}</span>
+              </button>
+              <button
+                class="tab-btn"
                 [class.active]="activeTab === 'WAITING'"
                 (click)="activeTab = 'WAITING'"
+                title="Bệnh nhân chờ khám lần đầu"
               >
-                <i class="bi bi-hourglass-split"></i> Đang Chờ
-                <span class="tab-count num">{{ overview()?.waitingTickets?.length || 0 }}</span>
+                <i class="bi bi-hourglass-split text-primary"></i>
+                <span class="tab-text">Chờ khám</span>
+                <span class="tab-count count-waiting num">{{ overview()?.waitingTickets?.length || 0 }}</span>
+              </button>
+              <button
+                class="tab-btn"
+                [class.active]="activeTab === 'WAITING_FOR_RESULTS'"
+                (click)="activeTab = 'WAITING_FOR_RESULTS'"
+                title="Bệnh nhân đang làm xét nghiệm cận lâm sàng"
+              >
+                <i class="bi bi-clock-history text-warning"></i>
+                <span class="tab-text">Đang làm XN</span>
+                <span class="tab-count count-waiting-lab num">{{ overview()?.waitingForResultsTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'SKIPPED'"
                 (click)="activeTab = 'SKIPPED'"
+                title="Bệnh nhân bị nhỡ lượt gọi"
               >
-                <i class="bi bi-arrow-repeat"></i> Bị Nhỡ Lượt
+                <i class="bi bi-arrow-repeat text-danger"></i>
+                <span class="tab-text">Nhỡ lượt</span>
                 <span class="tab-count count-skipped num">{{ overview()?.skippedTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'COMPLETED'"
                 (click)="activeTab = 'COMPLETED'"
+                title="Bệnh nhân đã hoàn tất khám"
               >
-                <i class="bi bi-check2-all"></i> Đã Khám
+                <i class="bi bi-check2-all text-secondary"></i>
+                <span class="tab-text">Đã khám</span>
                 <span class="tab-count count-completed num">{{ overview()?.completedTickets?.length || 0 }}</span>
               </button>
             </div>
@@ -248,6 +290,48 @@ import { RouterLink } from '@angular/router';
                 }
               </div>
             </div>
+
+            <!-- Tab Content 0: RESULTS_READY (Ưu tiên số 1) -->
+            @if (activeTab === 'RESULTS_READY') {
+              <div class="tab-content-list">
+                @if (filteredResultsReadyTickets().length === 0) {
+                  <div class="empty-list-state">
+                    <i class="bi bi-file-earmark-medical text-muted"></i>
+                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện chưa có bệnh nhân nào có kết quả cận lâm sàng' }}</p>
+                  </div>
+                } @else {
+                  @for (t of filteredResultsReadyTickets(); track t.id; let idx = $index) {
+                    <div class="ticket-row-card results-ready-row">
+                      <div class="row-order">
+                        <span class="order-idx num">#{{ idx + 1 }}</span>
+                        <span class="row-ticket-num num text-success">{{ t.ticketNumber }}</span>
+                      </div>
+                      <div class="row-patient-details">
+                        <div class="row-patient-name">
+                          <strong>{{ t.patientName }}</strong>
+                          <span class="badge badge-results-ready"><i class="bi bi-check2-circle"></i> ĐÃ CÓ KẾT QUẢ CLS</span>
+                          @if (t.isEmergency) {
+                            <span class="badge badge-emergency"><i class="bi bi-exclamation-octagon-fill"></i> CẤP CỨU</span>
+                          }
+                        </div>
+                        <div class="row-patient-meta">
+                          <span>SĐT: {{ t.patientPhone }}</span>
+                          @if (t.patientDob) {
+                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                          }
+                          <span class="text-success font-semibold">• Sẵn sàng đọc kết quả &amp; kê đơn</span>
+                        </div>
+                      </div>
+                      <div class="row-actions">
+                        <button class="btn btn-sm btn-success" (click)="startExam(t.id)" title="Mời bệnh nhân vào phòng khám tiếp">
+                          <i class="bi bi-play-circle-fill"></i> Vào Khám (Đọc KQ)
+                        </button>
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
 
             <!-- Tab Content 1: WAITING -->
             @if (activeTab === 'WAITING') {
@@ -305,6 +389,43 @@ import { RouterLink } from '@angular/router';
                         <button class="btn btn-sm btn-outline-muted" (click)="openCancelModal(t)" title="Hủy số khám nếu người bệnh xin về">
                           <i class="bi bi-x-circle"></i> Hủy
                         </button>
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
+
+            <!-- Tab Content: WAITING_FOR_RESULTS (Đang làm xét nghiệm) -->
+            @if (activeTab === 'WAITING_FOR_RESULTS') {
+              <div class="tab-content-list">
+                @if (filteredWaitingForResultsTickets().length === 0) {
+                  <div class="empty-list-state">
+                    <i class="bi bi-hourglass-bottom text-muted"></i>
+                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện không có bệnh nhân nào đang làm xét nghiệm' }}</p>
+                  </div>
+                } @else {
+                  @for (t of filteredWaitingForResultsTickets(); track t.id; let idx = $index) {
+                    <div class="ticket-row-card waiting-lab-row">
+                      <div class="row-order">
+                        <span class="order-idx num">#{{ idx + 1 }}</span>
+                        <span class="row-ticket-num num text-warning">{{ t.ticketNumber }}</span>
+                      </div>
+                      <div class="row-patient-details">
+                        <div class="row-patient-name">
+                          <strong>{{ t.patientName }}</strong>
+                          <span class="badge badge-waiting-lab"><i class="bi bi-clock-history"></i> ĐANG CHỜ PHÒNG LAB</span>
+                        </div>
+                        <div class="row-patient-meta">
+                          <span>SĐT: {{ t.patientPhone }}</span>
+                          @if (t.patientDob) {
+                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                          }
+                          <span class="text-warning">• Bệnh nhân đang di chuyển sang phòng xét nghiệm</span>
+                        </div>
+                      </div>
+                      <div class="row-actions">
+                        <span class="text-xs text-muted">Đang xử lý kết quả</span>
                       </div>
                     </div>
                   }
@@ -627,86 +748,119 @@ import { RouterLink } from '@angular/router';
       align-items: center;
     }
 
-    /* Room Selector Bar */
-    .room-selector-bar {
+    /* Clean Simple Room Filter Bar */
+    .room-filter-bar {
       background-color: #ffffff;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-color);
-      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 0.6rem 1rem;
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 1rem;
       margin-bottom: 1.25rem;
-      box-shadow: var(--shadow-xs);
-      flex-wrap: wrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
-    .selector-label {
-      font-size: 0.875rem;
+    .room-filter-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+    }
+
+    .room-filter-label {
+      font-size: 0.9rem;
       font-weight: 700;
-      color: var(--text-secondary);
+      color: #334155;
       display: flex;
       align-items: center;
       gap: 0.4rem;
       white-space: nowrap;
+      margin: 0;
     }
 
-    .room-pills {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .room-pill-btn {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.45rem 0.95rem;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-color);
-      background-color: var(--bg-main);
-      color: var(--text-secondary);
-      cursor: pointer;
-      font-size: 0.85rem;
+    .room-filter-select {
+      max-width: 420px;
+      width: 100%;
+      height: 38px;
+      padding: 0 0.85rem;
+      font-size: 0.9rem;
       font-weight: 600;
+      color: #0f172a;
+      background-color: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
       transition: all 0.15s ease;
     }
 
-    .room-pill-btn:hover {
-      border-color: var(--primary-300);
-      background-color: var(--primary-50);
-      color: var(--primary-700);
+    .room-filter-select:hover {
+      background-color: #ffffff;
+      border-color: #94a3b8;
     }
 
-    .room-pill-btn.active {
-      background-color: var(--primary-600);
-      border-color: var(--primary-600);
-      color: #ffffff;
-      box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+    .room-filter-select:focus {
+      background-color: #ffffff;
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
     }
 
-    .pill-number {
-      font-weight: 800;
-      letter-spacing: 0.02em;
+    .room-filter-right {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
     }
 
-    .pill-load {
-      font-size: 0.725rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-      background: rgba(0, 0, 0, 0.06);
+    .room-stat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      background: #f1f5f9;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #334155;
+      font-weight: 500;
+      white-space: nowrap;
     }
 
-    .room-pill-btn.active .pill-load {
-      background: rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-    }
-
-    .pill-load.high-load {
-      background: #fee2e2;
-      color: #b91c1c;
+    .room-stat-badge strong {
+      color: #0284c7;
       font-weight: 700;
     }
+
+    .btn-refresh-simple {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 0.9rem;
+    }
+
+    .btn-refresh-simple:hover {
+      background: #f0f9ff;
+      border-color: #0284c7;
+      color: #0284c7;
+    }
+
+    .spin-active {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
 
     /* Console Grid */
     .console-grid {
@@ -954,39 +1108,96 @@ import { RouterLink } from '@angular/router';
 
     .queue-tabs {
       display: flex;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border-color);
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0.35rem;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .queue-tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .tab-btn {
-      flex: 1;
-      padding: 0.75rem 0.5rem;
-      background: none;
+      flex: 1 0 auto;
+      white-space: nowrap;
+      padding: 0.45rem 0.65rem;
+      background: transparent;
       border: none;
-      border-bottom: 2px solid transparent;
-      font-size: 0.825rem;
-      font-weight: 700;
-      color: var(--text-secondary);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 0.35rem;
-      transition: all 0.15s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+
+    .tab-btn:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.7);
+      color: #1e293b;
     }
 
     .tab-btn.active {
-      color: var(--primary-700);
-      border-bottom-color: var(--primary-700);
       background: #ffffff;
+      color: #0f172a;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .tab-text {
+      white-space: nowrap;
     }
 
     .tab-count {
-      font-size: 0.725rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 0.35rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1;
       background: #e2e8f0;
-      color: #334155;
+      color: #475569;
+    }
+
+    .tab-count.count-results-ready {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .tab-btn.active .tab-count.count-results-ready {
+      background: #16a34a;
+      color: #ffffff;
+    }
+
+    .tab-count.count-waiting {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+
+    .tab-btn.active .tab-count.count-waiting {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
+    .tab-count.count-waiting-lab {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .tab-btn.active .tab-count.count-waiting-lab {
+      background: #f59e0b;
+      color: #ffffff;
     }
 
     .tab-count.count-skipped {
@@ -994,9 +1205,14 @@ import { RouterLink } from '@angular/router';
       color: #b91c1c;
     }
 
+    .tab-btn.active .tab-count.count-skipped {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
     .tab-count.count-completed {
-      background: #dcfce7;
-      color: #15803d;
+      background: #f1f5f9;
+      color: #64748b;
     }
 
     .list-search-bar {
@@ -1106,6 +1322,52 @@ import { RouterLink } from '@angular/router';
       font-weight: 800;
       padding: 0.1rem 0.4rem;
       border-radius: var(--radius-xs);
+    }
+
+    .badge-results-ready {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid #86efac;
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    }
+
+    .badge-waiting-lab {
+      background: #fef3c7;
+      color: #b45309;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid #fde68a;
+    }
+
+    .results-ready-row {
+      border-left: 4px solid #16a34a !important;
+      background: #f0fdf4 !important;
+    }
+
+    .waiting-lab-row {
+      border-left: 4px solid #f59e0b !important;
+      background: #fffbeb !important;
+    }
+
+    .count-results-ready {
+      background: #16a34a !important;
+      color: #ffffff !important;
+    }
+
+    .count-waiting-lab {
+      background: #f59e0b !important;
+      color: #ffffff !important;
     }
 
     .badge-priority {
@@ -1351,6 +1613,43 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   readonly rooms = signal<ExaminationRoom[]>([]);
   readonly selectedRoomId = signal<number>(1);
+  readonly selectedFloor = signal<number | null>(null);
+
+  readonly selectedRoom = computed(() => {
+    return this.rooms().find(r => r.id === this.selectedRoomId()) || null;
+  });
+
+  readonly availableFloors = computed(() => {
+    const list = this.rooms().map(r => r.floor);
+    return Array.from(new Set(list)).sort((a, b) => a - b);
+  });
+
+  getRoomsByFloor(floor: number): ExaminationRoom[] {
+    return this.rooms().filter(r => r.floor === floor);
+  }
+
+  prevRoom(): void {
+    const all = this.rooms();
+    if (all.length === 0) return;
+    const currIdx = all.findIndex(r => r.id === this.selectedRoomId());
+    if (currIdx > 0) {
+      this.selectRoom(all[currIdx - 1].id);
+    } else {
+      this.selectRoom(all[all.length - 1].id);
+    }
+  }
+
+  nextRoom(): void {
+    const all = this.rooms();
+    if (all.length === 0) return;
+    const currIdx = all.findIndex(r => r.id === this.selectedRoomId());
+    if (currIdx < all.length - 1) {
+      this.selectRoom(all[currIdx + 1].id);
+    } else {
+      this.selectRoom(all[0].id);
+    }
+  }
+
   readonly overview = signal<RoomQueueOverview | null>(null);
 
   readonly loading = signal(true);
@@ -1377,7 +1676,7 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   readonly alertMessage = signal<string | null>(null);
   readonly alertType = signal<'success' | 'danger'>('success');
 
-  activeTab: 'WAITING' | 'SKIPPED' | 'COMPLETED' = 'WAITING';
+  activeTab: 'WAITING' | 'RESULTS_READY' | 'WAITING_FOR_RESULTS' | 'SKIPPED' | 'COMPLETED' = 'WAITING';
   listSearchQuery: string = '';
 
   private pollingTimer: any = null;
@@ -1631,6 +1930,28 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   filteredSkippedTickets(): QueueTicket[] {
     const tickets = this.overview()?.skippedTickets || [];
+    const q = this.listSearchQuery.trim().toLowerCase();
+    if (!q) return tickets;
+    return tickets.filter(t =>
+      t.ticketNumber.toLowerCase().includes(q) ||
+      t.patientName.toLowerCase().includes(q) ||
+      (t.patientPhone && t.patientPhone.includes(q))
+    );
+  }
+
+  filteredResultsReadyTickets(): QueueTicket[] {
+    const tickets = this.overview()?.resultsReadyTickets || [];
+    const q = this.listSearchQuery.trim().toLowerCase();
+    if (!q) return tickets;
+    return tickets.filter(t =>
+      t.ticketNumber.toLowerCase().includes(q) ||
+      t.patientName.toLowerCase().includes(q) ||
+      (t.patientPhone && t.patientPhone.includes(q))
+    );
+  }
+
+  filteredWaitingForResultsTickets(): QueueTicket[] {
+    const tickets = this.overview()?.waitingForResultsTickets || [];
     const q = this.listSearchQuery.trim().toLowerCase();
     if (!q) return tickets;
     return tickets.filter(t =>

@@ -33,12 +33,13 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     private final UserRepository userRepository;
     private final QueueTicketRepository queueTicketRepository;
     private final MedicineRepository medicineRepository;
+    private final LabOrderRepository labOrderRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
     @Transactional
     public MedicalRecordResponse createMedicalRecord(CreateMedicalRecordRequest request) {
-        log.info("Bác sĩ đang tạo hồ sơ bệnh án cho bệnh nhân ID: {}", request.getPatientId());
+        log.info("Bác sĩ đang lưu/hoàn tất hồ sơ bệnh án cho bệnh nhân ID: {}", request.getPatientId());
 
         // 1. Xác định Bác sĩ phụ trách
         Doctor doctor = resolveDoctor(request.getDoctorId());
@@ -96,33 +97,54 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             throw new ResourceNotFoundException("Bệnh nhân", "id", request.getPatientId() != null ? request.getPatientId() : 0);
         }
 
-        // 3. Khởi tạo Hồ sơ bệnh án
-        MedicalRecord record = MedicalRecord.builder()
-                .patient(patient)
-                .doctor(doctor)
-                .queueTicket(queueTicket)
-                .bloodPressure(request.getBloodPressure())
-                .heartRate(request.getHeartRate())
-                .temperature(request.getTemperature())
-                .weight(request.getWeight())
-                .height(request.getHeight())
-                .vitalSigns(request.getVitalSigns())
-                .symptoms(request.getSymptoms())
-                .preliminaryDiagnosis(request.getPreliminaryDiagnosis())
-                .finalDiagnosis(request.getFinalDiagnosis())
-                .icd10Code(request.getIcd10Code())
-                .notes(request.getNotes())
-                .revisitDate(request.getRevisitDate())
-                .revisitNotes(request.getRevisitNotes())
-                .build();
+        // 3. Khởi tạo hoặc Cập nhật Hồ sơ bệnh án (hỗ trợ Pha 2 hoàn tất ca khám)
+        MedicalRecord record = null;
+        if (request.getRecordId() != null) {
+            record = medicalRecordRepository.findById(request.getRecordId()).orElse(null);
+        }
+        if (record == null && queueTicket != null) {
+            record = medicalRecordRepository.findByQueueTicketId(queueTicket.getId()).orElse(null);
+        }
+
+        if (record == null) {
+            record = MedicalRecord.builder()
+                    .patient(patient)
+                    .doctor(doctor)
+                    .queueTicket(queueTicket)
+                    .build();
+        }
+
+        if (doctor != null && record.getDoctor() == null) record.setDoctor(doctor);
+        if (patient != null && record.getPatient() == null) record.setPatient(patient);
+        if (queueTicket != null && record.getQueueTicket() == null) record.setQueueTicket(queueTicket);
+
+        record.setBloodPressure(request.getBloodPressure());
+        record.setHeartRate(request.getHeartRate());
+        record.setTemperature(request.getTemperature());
+        record.setWeight(request.getWeight());
+        record.setHeight(request.getHeight());
+        record.setVitalSigns(request.getVitalSigns());
+        record.setSymptoms(request.getSymptoms());
+        record.setPreliminaryDiagnosis(request.getPreliminaryDiagnosis());
+        record.setFinalDiagnosis(request.getFinalDiagnosis());
+        record.setIcd10Code(request.getIcd10Code());
+        record.setNotes(request.getNotes());
+        record.setRevisitDate(request.getRevisitDate());
+        record.setRevisitNotes(request.getRevisitNotes());
 
         // 4. Xử lý Kê đơn thuốc (Extend Use Case)
         if (request.getPrescriptionItems() != null && !request.getPrescriptionItems().isEmpty()) {
-            Prescription prescription = Prescription.builder()
-                    .medicalRecord(record)
-                    .doctorAdvice(request.getPrescriptionAdvice())
-                    .items(new ArrayList<>())
-                    .build();
+            Prescription prescription = record.getPrescription();
+            if (prescription == null) {
+                prescription = Prescription.builder()
+                        .medicalRecord(record)
+                        .doctorAdvice(request.getPrescriptionAdvice())
+                        .items(new ArrayList<>())
+                        .build();
+            } else {
+                prescription.setDoctorAdvice(request.getPrescriptionAdvice());
+                prescription.getItems().clear();
+            }
 
             for (PrescriptionItemRequest itemReq : request.getPrescriptionItems()) {
                 Medicine medicine = medicineRepository.findById(itemReq.getMedicineId())
@@ -145,6 +167,11 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         }
 
         MedicalRecord saved = medicalRecordRepository.save(record);
+
+        // Nạp kèm danh sách LabOrders nếu có
+        List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(saved.getId());
+        saved.setLabOrders(labOrders);
+
         log.info("-> Đã lưu thành công hồ sơ bệnh án ID: {} kèm đơn thuốc {}", 
                 saved.getId(), 
                 saved.getPrescription() != null ? "có " + saved.getPrescription().getItems().size() + " loại thuốc" : "không kê đơn");
@@ -157,6 +184,8 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     public MedicalRecordResponse getMedicalRecordById(Long id) {
         MedicalRecord record = medicalRecordRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ bệnh án", "id", id));
+        List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(record.getId());
+        record.setLabOrders(labOrders);
         return MedicalRecordResponse.fromEntity(record);
     }
 
@@ -165,6 +194,8 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     public MedicalRecordResponse getMedicalRecordByTicketId(Long ticketId) {
         MedicalRecord record = medicalRecordRepository.findByQueueTicketIdWithDetails(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ bệnh án gắn với phiếu", "ticketId", ticketId));
+        List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(record.getId());
+        record.setLabOrders(labOrders);
         return MedicalRecordResponse.fromEntity(record);
     }
 
@@ -200,6 +231,16 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         return medicalRecordRepository.findByDoctorIdOrderByCreatedAtDesc(doctorId).stream()
                 .map(MedicalRecordResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MedicalRecordResponse> getMyDoctorRecords() {
+        Doctor doctor = resolveDoctor(null);
+        if (doctor == null) {
+            throw new ResourceNotFoundException("Không tìm thấy thông tin bác sĩ từ tài khoản hiện tại");
+        }
+        return getRecordsByDoctorId(doctor.getId());
     }
 
     private Doctor resolveDoctor(Long requestedDoctorId) {

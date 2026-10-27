@@ -1,6 +1,8 @@
 package com.demo.be.service;
 
+import com.demo.be.dto.request.BatchWorkScheduleRequest;
 import com.demo.be.dto.request.WorkScheduleRequest;
+import com.demo.be.dto.response.BatchWorkScheduleResponse;
 import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
 
@@ -28,6 +30,8 @@ public interface WorkScheduleService {
     );
 
     WorkScheduleResponse createSchedule(WorkScheduleRequest request);
+
+    BatchWorkScheduleResponse createBatchSchedules(BatchWorkScheduleRequest request);
 
     WorkScheduleResponse updateSchedule(Long id, WorkScheduleRequest request);
 

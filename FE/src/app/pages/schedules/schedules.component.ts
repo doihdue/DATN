@@ -5,7 +5,7 @@ import { ScheduleService } from '../../services/schedule.service';
 import { SpecialtyService } from '../../services/specialty.service';
 import { DoctorService } from '../../services/doctor.service';
 import { AuthService } from '../../services/auth.service';
-import { ExaminationRoom, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
+import { ExaminationRoom, WorkSchedule, WorkScheduleRequest, BatchWorkScheduleRequest, BatchWorkScheduleResponse } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
 import { toIsoDate } from '../../utils/date.utils';
 
@@ -20,13 +20,13 @@ import { toIsoDate } from '../../utils/date.utils';
         <div class="header-left">
           <div class="header-badge">
             <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
-            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : 'Lịch Trực Ca Bác Sĩ' }}
+            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : (authService.isLabTech() ? 'Lịch Trực Ca & Phân Công' : 'Lịch Trực Ca Bác Sĩ') }}
           </div>
-          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc Bác Sĩ' : 'Danh Sách Ca Làm Việc & Trực Khám' }}</h1>
+          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc' : (authService.isLabTech() ? 'Lịch Phân Công Ca Trực' : 'Danh Sách Ca Làm Việc & Trực Khám') }}</h1>
           <p class="page-subtitle">
             {{ isAdmin() 
               ? 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' 
-              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân đã tiếp nhận' }}
+              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
           </p>
         </div>
         @if (isAdmin()) {
@@ -289,74 +289,188 @@ import { toIsoDate } from '../../utils/date.utils';
               </h2>
               <button class="modal-close-btn" (click)="closeModal()">×</button>
             </div>
-            <div class="modal-body">
-              <div class="conflict-alert-box">
-                <i class="bi bi-shield-check"></i>
-                <small>Hệ thống tự động phát hiện xung đột: Ngăn chặn 1 bác sĩ trùng giờ ở 2 nơi, hoặc 2 bác sĩ trùng giờ trong cùng 1 phòng khám.</small>
-              </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label required">Bác sĩ phụ trách</label>
-                  <select [(ngModel)]="formData.doctorId" class="form-control" required>
-                    <option [ngValue]="null">-- Chọn bác sĩ --</option>
-                    @for (doc of doctorList(); track doc.id) {
-                      <option [ngValue]="doc.id">{{ doc.fullName }} ({{ doc.specialtyName }})</option>
-                    }
-                  </select>
+            @if (batchResult()) {
+              <!-- Summary Report after Batch Execution -->
+              <div class="modal-body">
+                <div class="batch-result-header">
+                  <div class="result-icon" [ngClass]="batchResult()!.successCount > 0 ? 'icon-success' : 'icon-warning'">
+                    <i class="bi" [ngClass]="batchResult()!.successCount > 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+                  </div>
+                  <h3 class="result-title">Kết Quả Đăng Ký Lịch Làm Việc</h3>
+                  <p class="result-desc">Tổng số ngày theo lịch: <strong>{{ batchResult()!.totalRequested }} ngày</strong></p>
                 </div>
-                <div class="form-group flex-1">
-                  <label class="form-label required">Phòng khám điều trị</label>
-                  <select [(ngModel)]="formData.examinationRoomId" class="form-control" required>
-                    <option [ngValue]="null">-- Chọn phòng khám --</option>
-                    @for (room of rooms(); track room.id) {
-                      <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }} (Tầng {{ room.floor }})</option>
-                    }
-                  </select>
-                </div>
-              </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label required">Ngày làm việc</label>
-                  <input type="date" [(ngModel)]="formData.workDate" class="form-control" required />
+                <div class="result-stats-row">
+                  <div class="result-stat-box stat-box-green">
+                    <span class="result-number">{{ batchResult()!.successCount }}</span>
+                    <span class="result-label">Ca trực tạo thành công</span>
+                  </div>
+                  <div class="result-stat-box stat-box-amber">
+                    <span class="result-number">{{ batchResult()!.conflictCount }}</span>
+                    <span class="result-label">Ngày bị trùng lịch (Đã bỏ qua)</span>
+                  </div>
                 </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">Loại ca trực</label>
-                  <select [(ngModel)]="formData.shiftType" class="form-control">
-                    <option value="CA_SÁNG">Ca Sáng (07:30 - 12:00)</option>
-                    <option value="CA_CHIỀU">Ca Chiều (13:30 - 17:30)</option>
-                    <option value="CA_TỐI">Ca Tối (18:00 - 21:00)</option>
-                    <option value="TỰ_DO">Khung giờ tùy chỉnh</option>
-                  </select>
-                </div>
-              </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label required">Giờ bắt đầu</label>
-                  <input type="time" [(ngModel)]="formData.startTime" class="form-control" required />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label required">Giờ kết thúc</label>
-                  <input type="time" [(ngModel)]="formData.endTime" class="form-control" required />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label required">Số bệnh nhân tối đa</label>
-                  <input type="number" [(ngModel)]="formData.maxPatients" min="1" max="100" class="form-control" required />
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
-              <button class="btn btn-primary" [disabled]="submitting() || !isFormValid()" (click)="saveSchedule()">
-                @if (submitting()) {
-                  <span class="spinner-sm"></span> Đang kiểm tra & lưu...
-                } @else {
-                  <i class="bi bi-check-circle"></i> Xác Nhận Xếp Ca
+                @if (batchResult()!.conflictMessages.length > 0) {
+                  <div class="conflict-list-container">
+                    <h4 class="conflict-list-title"><i class="bi bi-info-circle-fill"></i> Chi tiết các ngày bị trùng lịch đã được bỏ qua:</h4>
+                    <ul class="conflict-ul">
+                      @for (msg of batchResult()!.conflictMessages; track msg) {
+                        <li><i class="bi bi-exclamation-circle text-amber"></i> {{ msg }}</li>
+                      }
+                    </ul>
+                  </div>
                 }
-              </button>
-            </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-primary" (click)="closeBatchResult()">
+                  <i class="bi bi-check-lg"></i> Hoàn Tất & Xem Danh Sách
+                </button>
+              </div>
+            } @else {
+              <!-- Form input -->
+              <div class="modal-body">
+                <div class="conflict-alert-box">
+                  <i class="bi bi-shield-check"></i>
+                  <small>Hệ thống tự động phát hiện xung đột: Ngăn chặn 1 bác sĩ trùng giờ ở 2 nơi, hoặc 2 bác sĩ trùng giờ trong cùng 1 phòng khám.</small>
+                </div>
+
+                <!-- Mode Switcher Tabs -->
+                <div class="mode-tabs">
+                  <button
+                    type="button"
+                    class="mode-tab-btn"
+                    [class.active]="scheduleMode === 'SINGLE'"
+                    (click)="setScheduleMode('SINGLE')"
+                  >
+                    <i class="bi bi-calendar-event"></i> 1 Ngày Cụ Thể
+                  </button>
+                  <button
+                    type="button"
+                    class="mode-tab-btn"
+                    [class.active]="scheduleMode === 'BATCH'"
+                    (click)="setScheduleMode('BATCH')"
+                  >
+                    <i class="bi bi-calendar-range-fill"></i> Định Kỳ / Nhiều Ngày
+                  </button>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Bác sĩ phụ trách</label>
+                    <select [(ngModel)]="activeDoctorId" class="form-control" required>
+                      <option [ngValue]="null">-- Chọn bác sĩ --</option>
+                      @for (doc of doctorList(); track doc.id) {
+                        <option [ngValue]="doc.id">{{ doc.fullName }} ({{ doc.specialtyName }})</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Phòng khám điều trị</label>
+                    <select [(ngModel)]="activeRoomId" class="form-control" required>
+                      <option [ngValue]="null">-- Chọn phòng khám --</option>
+                      @for (room of rooms(); track room.id) {
+                        <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }} (Tầng {{ room.floor }})</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                @if (scheduleMode === 'SINGLE') {
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label class="form-label required">Ngày làm việc</label>
+                      <input type="date" [(ngModel)]="formData.workDate" class="form-control" required />
+                    </div>
+                    <div class="form-group flex-1">
+                      <label class="form-label">Khung ca trực mẫu</label>
+                      <select [ngModel]="activeShiftType" (ngModelChange)="onShiftTypeChange($event)" class="form-control">
+                        <option value="CA_SÁNG">Ca Sáng (07:30 - 12:00)</option>
+                        <option value="CA_CHIỀU">Ca Chiều (13:30 - 17:30)</option>
+                        <option value="CA_TỐI">Ca Tối (18:00 - 21:00)</option>
+                        <option value="TỰ_DO">Khung giờ tùy chỉnh</option>
+                      </select>
+                    </div>
+                  </div>
+                } @else {
+                  <!-- BATCH DATE RANGE & RECURRING DAYS -->
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label class="form-label required"><i class="bi bi-calendar3"></i> Từ ngày</label>
+                      <input type="date" [(ngModel)]="batchData.startDate" class="form-control" required />
+                    </div>
+                    <div class="form-group flex-1">
+                      <label class="form-label required"><i class="bi bi-calendar3"></i> Đến ngày</label>
+                      <input type="date" [(ngModel)]="batchData.endDate" class="form-control" required />
+                    </div>
+                    <div class="form-group flex-1">
+                      <label class="form-label">Khung ca trực mẫu</label>
+                      <select [ngModel]="activeShiftType" (ngModelChange)="onShiftTypeChange($event)" class="form-control">
+                        <option value="CA_SÁNG">Ca Sáng (07:30 - 12:00)</option>
+                        <option value="CA_CHIỀU">Ca Chiều (13:30 - 17:30)</option>
+                        <option value="CA_TỐI">Ca Tối (18:00 - 21:00)</option>
+                        <option value="TỰ_DO">Khung giờ tùy chỉnh</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Days of Week Selector -->
+                  <div class="days-selector-card">
+                    <div class="days-header-row">
+                      <label class="form-label required mb-0">Áp dụng vào các thứ trong tuần:</label>
+                      <div class="days-shortcuts">
+                        <button type="button" class="btn-shortcut" (click)="selectWorkdays()">T2 - T6 (Hành chính)</button>
+                        <button type="button" class="btn-shortcut" (click)="selectAllDays()">Cả tuần</button>
+                        <button type="button" class="btn-shortcut" (click)="selectWeekend()">T7 & CN</button>
+                      </div>
+                    </div>
+                    <div class="days-pills">
+                      @for (day of daysOfWeekOptions; track day.value) {
+                        <button
+                          type="button"
+                          class="day-pill"
+                          [class.active]="isDaySelected(day.value)"
+                          (click)="toggleDay(day.value)"
+                        >
+                          {{ day.label }}
+                        </button>
+                      }
+                    </div>
+                    <div class="days-helper-text">
+                      <i class="bi bi-info-circle"></i>
+                      Đã chọn {{ batchData.daysOfWeek.length }} ngày/tuần. Hệ thống sẽ tự động tạo ca trực cho các thứ này trong khoảng ngày trên.
+                    </div>
+                  </div>
+                }
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Giờ bắt đầu</label>
+                    <input type="time" [(ngModel)]="activeStartTime" class="form-control" required />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Giờ kết thúc</label>
+                    <input type="time" [(ngModel)]="activeEndTime" class="form-control" required />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Bệnh nhân tối đa / ca</label>
+                    <input type="number" [(ngModel)]="activeMaxPatients" min="1" max="100" class="form-control" required />
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
+                <button class="btn btn-primary" [disabled]="submitting() || !isFormValid()" (click)="saveSchedule()">
+                  @if (submitting()) {
+                    <span class="spinner-sm"></span> Đang kiểm tra & tạo lịch...
+                  } @else {
+                    <i class="bi bi-check-circle"></i> {{ scheduleMode === 'SINGLE' ? 'Xác Nhận Xếp Ca' : 'Xác Nhận Xếp Lịch Hàng Loạt' }}
+                  }
+                </button>
+              </div>
+            }
           </div>
         </div>
       }
@@ -871,6 +985,252 @@ import { toIsoDate } from '../../utils/date.utils';
     .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
     .alert-danger { background: #fff1f2; color: #9f1239; border: 1px solid #fecdd3; }
     .alert-close { margin-left: auto; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: inherit; }
+
+    /* Mode Switcher Tabs */
+    .mode-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #f1f5f9;
+      padding: 0.35rem;
+      border-radius: var(--radius-lg);
+      margin-bottom: 1.25rem;
+    }
+
+    .mode-tab-btn {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius-md);
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .mode-tab-btn:hover:not(.active) {
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .mode-tab-btn.active {
+      background: #ffffff;
+      color: var(--primary-700);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Days of Week Selector */
+    .days-selector-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-md);
+      padding: 1rem 1.15rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .days-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .mb-0 { margin-bottom: 0 !important; }
+
+    .days-shortcuts {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-shortcut {
+      font-size: 0.78rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-shortcut:hover {
+      border-color: #0284c7;
+      color: #0284c7;
+      background: #f0f9ff;
+    }
+
+    .days-pills {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.65rem;
+    }
+
+    .day-pill {
+      min-width: 65px;
+      height: 38px;
+      padding: 0 0.5rem;
+      border-radius: 8px;
+      border: 1.5px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .day-pill:hover:not(.active) {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    .day-pill.active {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+    }
+
+    .days-helper-text {
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Batch Result Summary View */
+    .batch-result-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      margin: 0 auto 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+    }
+
+    .icon-success {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .icon-warning {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .result-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 0.25rem;
+    }
+
+    .result-desc {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .result-stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-stat-box {
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .stat-box-green {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+    }
+
+    .stat-box-green .result-number {
+      color: #059669;
+    }
+
+    .stat-box-amber {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+    }
+
+    .stat-box-amber .result-number {
+      color: #d97706;
+    }
+
+    .result-number {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .result-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .conflict-list-container {
+      background: #fafaf9;
+      border: 1px solid #e7e5e4;
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .conflict-list-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #b45309;
+      margin: 0 0 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .conflict-ul {
+      margin: 0;
+      padding-left: 1rem;
+      font-size: 0.82rem;
+      color: #44403c;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .text-amber {
+      color: #d97706;
+    }
   `]
 })
 export class SchedulesComponent implements OnInit {
@@ -967,15 +1327,98 @@ export class SchedulesComponent implements OnInit {
     this.currentPage.set(1);
   }
 
+  // Mode selection: SINGLE vs BATCH
+  scheduleMode: 'SINGLE' | 'BATCH' = 'SINGLE';
+
+  // Shared active form properties
+  activeDoctorId: number | null = null;
+  activeRoomId: number | null = null;
+  activeShiftType = 'CA_SÁNG';
+  activeStartTime = '07:30';
+  activeEndTime = '12:00';
+  activeMaxPatients = 20;
+
   formData: WorkScheduleRequest = {
     doctorId: 0,
     examinationRoomId: 0,
     workDate: toIsoDate(new Date()),
     shiftType: 'CA_SÁNG',
-    startTime: '08:00',
+    startTime: '07:30',
     endTime: '12:00',
     maxPatients: 20
   };
+
+  batchData: BatchWorkScheduleRequest = {
+    doctorId: 0,
+    examinationRoomId: 0,
+    startDate: new Date().toISOString().substring(0, 10),
+    endDate: '',
+    daysOfWeek: [1, 2, 3, 4, 5],
+    shiftType: 'CA_SÁNG',
+    startTime: '07:30',
+    endTime: '12:00',
+    maxPatients: 20
+  };
+
+  readonly daysOfWeekOptions = [
+    { label: 'Thứ 2', value: 1 },
+    { label: 'Thứ 3', value: 2 },
+    { label: 'Thứ 4', value: 3 },
+    { label: 'Thứ 5', value: 4 },
+    { label: 'Thứ 6', value: 5 },
+    { label: 'Thứ 7', value: 6 },
+    { label: 'Chủ Nhật', value: 7 }
+  ];
+
+  readonly batchResult = signal<BatchWorkScheduleResponse | null>(null);
+
+  setScheduleMode(mode: 'SINGLE' | 'BATCH'): void {
+    this.scheduleMode = mode;
+  }
+
+  isDaySelected(day: number): boolean {
+    return this.batchData.daysOfWeek.includes(day);
+  }
+
+  toggleDay(day: number): void {
+    const idx = this.batchData.daysOfWeek.indexOf(day);
+    if (idx >= 0) {
+      if (this.batchData.daysOfWeek.length > 1) {
+        this.batchData.daysOfWeek.splice(idx, 1);
+      } else {
+        this.showAlert('Phải chọn ít nhất 1 ngày trong tuần!', 'danger');
+      }
+    } else {
+      this.batchData.daysOfWeek.push(day);
+      this.batchData.daysOfWeek.sort((a, b) => a - b);
+    }
+  }
+
+  selectWorkdays(): void {
+    this.batchData.daysOfWeek = [1, 2, 3, 4, 5];
+  }
+
+  selectAllDays(): void {
+    this.batchData.daysOfWeek = [1, 2, 3, 4, 5, 6, 7];
+  }
+
+  selectWeekend(): void {
+    this.batchData.daysOfWeek = [6, 7];
+  }
+
+  onShiftTypeChange(shift: string): void {
+    this.activeShiftType = shift;
+    if (shift === 'CA_SÁNG') {
+      this.activeStartTime = '07:30';
+      this.activeEndTime = '12:00';
+    } else if (shift === 'CA_CHIỀU') {
+      this.activeStartTime = '13:30';
+      this.activeEndTime = '17:30';
+    } else if (shift === 'CA_TỐI') {
+      this.activeStartTime = '18:00';
+      this.activeEndTime = '21:00';
+    }
+  }
 
   get totalAvailableSlots(): () => number {
     return () => this.schedules()
@@ -1066,83 +1509,176 @@ export class SchedulesComponent implements OnInit {
   }
 
   openAddModal(): void {
+    this.batchResult.set(null);
+    this.scheduleMode = 'SINGLE';
+
+    const defaultDoctorId = this.doctorList().length > 0 ? this.doctorList()[0].id : null;
+    const defaultRoomId = this.rooms().length > 0 ? this.rooms()[0].id : null;
+
+    this.activeDoctorId = defaultDoctorId;
+    this.activeRoomId = defaultRoomId;
+    this.activeShiftType = 'CA_SÁNG';
+    this.activeStartTime = '07:30';
+    this.activeEndTime = '12:00';
+    this.activeMaxPatients = 20;
+
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const twoWeeksLater = new Date();
+    twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+    const twoWeeksStr = twoWeeksLater.toISOString().substring(0, 10);
+
     this.formData = {
-      doctorId: this.doctorList().length > 0 ? this.doctorList()[0].id : 0,
-      examinationRoomId: this.rooms().length > 0 ? this.rooms()[0].id : 0,
-      workDate: toIsoDate(new Date()),
+      doctorId: defaultDoctorId || 0,
+      examinationRoomId: defaultRoomId || 0,
+      workDate: todayStr,
       shiftType: 'CA_SÁNG',
-      startTime: '08:00',
+      startTime: '07:30',
       endTime: '12:00',
       maxPatients: 20
     };
+
+    this.batchData = {
+      doctorId: defaultDoctorId || 0,
+      examinationRoomId: defaultRoomId || 0,
+      startDate: todayStr,
+      endDate: twoWeeksStr,
+      daysOfWeek: [1, 2, 3, 4, 5],
+      shiftType: 'CA_SÁNG',
+      startTime: '07:30',
+      endTime: '12:00',
+      maxPatients: 20
+    };
+
     this.showModal.set(true);
   }
 
   closeModal(): void {
     this.showModal.set(false);
+    this.batchResult.set(null);
+  }
+
+  closeBatchResult(): void {
+    this.closeModal();
+    this.loadSchedules();
   }
 
   isFormValid(): boolean {
-    return !!(
-      this.formData.doctorId &&
-      this.formData.examinationRoomId &&
-      this.formData.workDate &&
-      this.formData.startTime &&
-      this.formData.endTime &&
-      this.formData.maxPatients > 0
-    );
+    if (!this.activeDoctorId || !this.activeRoomId) return false;
+    if (!this.activeStartTime || !this.activeEndTime || this.activeMaxPatients <= 0) return false;
+
+    if (this.scheduleMode === 'SINGLE') {
+      return !!this.formData.workDate;
+    } else {
+      return !!(this.batchData.startDate && this.batchData.endDate && this.batchData.daysOfWeek.length > 0);
+    }
   }
 
   saveSchedule(): void {
-    if (!this.formData.doctorId) {
+    if (!this.activeDoctorId) {
       this.showAlert('Vui lòng chọn bác sĩ phụ trách ca trực!', 'danger');
       return;
     }
 
-    if (!this.formData.examinationRoomId) {
+    if (!this.activeRoomId) {
       this.showAlert('Vui lòng chọn phòng khám!', 'danger');
       return;
     }
 
-    if (!this.formData.workDate) {
-      this.showAlert('Vui lòng chọn ngày làm việc!', 'danger');
+    if (!this.activeStartTime || !this.activeEndTime) {
+      this.showAlert('Vui lòng nhập đầy đủ giờ bắt đầu và giờ kết thúc!', 'danger');
       return;
     }
 
-    if (!this.formData.startTime) {
-      this.showAlert('Vui lòng chọn giờ bắt đầu ca trực!', 'danger');
-      return;
-    }
-
-    if (!this.formData.endTime) {
-      this.showAlert('Vui lòng chọn giờ kết thúc ca trực!', 'danger');
-      return;
-    }
-
-    if (this.formData.startTime >= this.formData.endTime) {
+    if (this.activeStartTime >= this.activeEndTime) {
       this.showAlert('Giờ kết thúc ca trực phải sau giờ bắt đầu!', 'danger');
       return;
     }
 
-    if (!this.formData.maxPatients || this.formData.maxPatients <= 0) {
+    if (!this.activeMaxPatients || this.activeMaxPatients <= 0) {
       this.showAlert('Số lượng bệnh nhân tiếp nhận tối đa phải lớn hơn 0!', 'danger');
       return;
     }
 
     this.submitting.set(true);
-    this.scheduleService.createSchedule(this.formData).subscribe({
-      next: () => {
-        this.showAlert('Đăng ký ca làm việc thành công!', 'success');
+
+    if (this.scheduleMode === 'SINGLE') {
+      if (!this.formData.workDate) {
+        this.showAlert('Vui lòng chọn ngày làm việc!', 'danger');
         this.submitting.set(false);
-        this.closeModal();
-        this.loadSchedules();
-      },
-      error: err => {
-        // Hiển thị lỗi xung đột lịch rất rõ ràng cho người dùng
-        this.showAlert(err.error?.message || 'Lỗi khi xếp ca trực. Vui lòng kiểm tra lại giờ làm việc.', 'danger');
-        this.submitting.set(false);
+        return;
       }
-    });
+
+      this.formData.doctorId = this.activeDoctorId;
+      this.formData.examinationRoomId = this.activeRoomId;
+      this.formData.shiftType = this.activeShiftType;
+      this.formData.startTime = this.activeStartTime;
+      this.formData.endTime = this.activeEndTime;
+      this.formData.maxPatients = this.activeMaxPatients;
+
+      this.scheduleService.createSchedule(this.formData).subscribe({
+        next: () => {
+          this.showAlert('Đăng ký ca làm việc thành công!', 'success');
+          this.submitting.set(false);
+          this.closeModal();
+          this.loadSchedules();
+        },
+        error: err => {
+          this.showAlert(err.error?.message || 'Lỗi khi xếp ca trực. Vui lòng kiểm tra lại giờ làm việc.', 'danger');
+          this.submitting.set(false);
+        }
+      });
+    } else {
+      // BATCH MODE
+      if (!this.batchData.startDate || !this.batchData.endDate) {
+        this.showAlert('Vui lòng chọn khoảng thời gian (Từ ngày - Đến ngày)!', 'danger');
+        this.submitting.set(false);
+        return;
+      }
+
+      if (this.batchData.startDate > this.batchData.endDate) {
+        this.showAlert('Ngày bắt đầu không được sau ngày kết thúc!', 'danger');
+        this.submitting.set(false);
+        return;
+      }
+
+      if (this.batchData.daysOfWeek.length === 0) {
+        this.showAlert('Vui lòng chọn ít nhất 1 thứ trong tuần để xếp lịch!', 'danger');
+        this.submitting.set(false);
+        return;
+      }
+
+      this.batchData.doctorId = this.activeDoctorId;
+      this.batchData.examinationRoomId = this.activeRoomId;
+      this.batchData.shiftType = this.activeShiftType;
+      this.batchData.startTime = this.activeStartTime;
+      this.batchData.endTime = this.activeEndTime;
+      this.batchData.maxPatients = this.activeMaxPatients;
+
+      this.scheduleService.createBatchSchedules(this.batchData).subscribe({
+        next: res => {
+          this.submitting.set(false);
+          if (res.success && res.data) {
+            const data = res.data;
+            if (data.conflictCount === 0 && data.successCount > 0) {
+              this.showAlert(`Đã đăng ký thành công toàn bộ ${data.successCount} ca trực trong kỳ!`, 'success');
+              this.closeModal();
+              this.loadSchedules();
+            } else {
+              this.batchResult.set(data);
+              this.loadSchedules();
+            }
+          } else {
+            this.showAlert('Đăng ký lịch định kỳ thành công!', 'success');
+            this.closeModal();
+            this.loadSchedules();
+          }
+        },
+        error: err => {
+          this.showAlert(err.error?.message || 'Lỗi khi đăng ký lịch làm việc định kỳ.', 'danger');
+          this.submitting.set(false);
+        }
+      });
+    }
   }
 
   cancelSchedule(item: WorkSchedule): void {

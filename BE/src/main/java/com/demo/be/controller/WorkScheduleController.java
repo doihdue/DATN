@@ -1,7 +1,9 @@
 package com.demo.be.controller;
 
+import com.demo.be.dto.request.BatchWorkScheduleRequest;
 import com.demo.be.dto.request.WorkScheduleRequest;
 import com.demo.be.dto.response.ApiResponse;
+import com.demo.be.dto.response.BatchWorkScheduleResponse;
 import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
 import com.demo.be.service.WorkScheduleService;
@@ -55,6 +57,16 @@ public class WorkScheduleController {
         WorkScheduleResponse created = workScheduleService.createSchedule(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(created, "Tạo ca làm việc mới thành công"));
+    }
+
+    @PostMapping("/admin/work-schedules/batch")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<BatchWorkScheduleResponse>> createBatchSchedules(
+            @Valid @RequestBody BatchWorkScheduleRequest request
+    ) {
+        BatchWorkScheduleResponse response = workScheduleService.createBatchSchedules(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Đăng ký ca làm việc định kỳ thành công"));
     }
 
     @PutMapping("/admin/work-schedules/{id}")

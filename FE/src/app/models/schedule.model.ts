@@ -38,3 +38,24 @@ export interface WorkScheduleRequest {
   maxPatients: number;
   status?: string;
 }
+
+export interface BatchWorkScheduleRequest {
+  doctorId: number;
+  examinationRoomId: number;
+  startDate: string;
+  endDate: string;
+  daysOfWeek: number[]; // 1=Thứ 2, ..., 7=Chủ nhật
+  shiftType?: string;
+  startTime: string;
+  endTime: string;
+  maxPatients: number;
+  status?: string;
+}
+
+export interface BatchWorkScheduleResponse {
+  totalRequested: number;
+  successCount: number;
+  conflictCount: number;
+  createdSchedules: WorkSchedule[];
+  conflictMessages: string[];
+}

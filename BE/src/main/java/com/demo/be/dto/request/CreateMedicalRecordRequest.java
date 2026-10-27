@@ -15,6 +15,9 @@ import java.util.List;
 @Builder
 public class CreateMedicalRecordRequest {
 
+    // Mã hồ sơ bệnh án (nếu đang cập nhật hồ sơ đã lưu tạm ở Pha 1)
+    private Long recordId;
+
     // Liên kết ca khám
     private Long queueTicketId;
 
@@ -44,8 +47,7 @@ public class CreateMedicalRecordRequest {
 
     private String preliminaryDiagnosis; // Chẩn đoán sơ bộ
 
-    @NotBlank(message = "Chẩn đoán xác định không được để trống")
-    private String finalDiagnosis; // Chẩn đoán xác định
+    private String finalDiagnosis; // Chẩn đoán xác định (điền khi hoàn tất ca khám)
 
     private String icd10Code; // Mã ICD-10
 

@@ -1,3 +1,4 @@
+import { LabOrder } from './lab.model';
 export type { Medicine } from './medicine.model';
 
 export interface PrescriptionItemRequest {
@@ -34,6 +35,7 @@ export interface PrescriptionResponse {
 }
 
 export interface CreateMedicalRecordRequest {
+  recordId?: number; // Cập nhật hồ sơ lưu tạm ở Pha 1
   queueTicketId?: number;
   patientId: number;
   doctorId?: number;
@@ -50,7 +52,7 @@ export interface CreateMedicalRecordRequest {
   // Triệu chứng & Chẩn đoán
   symptoms: string;
   preliminaryDiagnosis?: string;
-  finalDiagnosis: string;
+  finalDiagnosis?: string;
   icd10Code?: string;
   notes?: string;
 
@@ -94,7 +96,7 @@ export interface MedicalRecordResponse {
 
   symptoms: string;
   preliminaryDiagnosis?: string;
-  finalDiagnosis: string;
+  finalDiagnosis?: string;
   icd10Code?: string;
   notes?: string;
 
@@ -102,6 +104,7 @@ export interface MedicalRecordResponse {
   revisitNotes?: string;
 
   prescription?: PrescriptionResponse;
+  labOrders?: LabOrder[];
 }
 
 export interface PatientMedicalHistoryResponse {

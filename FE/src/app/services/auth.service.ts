@@ -25,7 +25,12 @@ export class AuthService {
     // Nếu có token, luôn đồng bộ thông tin người dùng mới nhất từ server
     if (this.getAccessToken()) {
       this.fetchCurrentUser().subscribe({
-        error: () => this.clearAuthStorage()
+        error: (err) => {
+          // Chỉ xóa session nếu thực sự bị 401 Unauthorized từ server
+          if (err && err.status === 401) {
+            this.clearAuthStorage();
+          }
+        }
       });
     }
   }
@@ -75,8 +80,31 @@ export class AuthService {
 
   hasRole(role: string): boolean {
     const formatted = role.startsWith('ROLE_') ? role : `ROLE_${role}`;
-    return this.userRoles().includes(formatted);
+    const raw = role.startsWith('ROLE_') ? role.substring(5) : role;
+    return this.userRoles().includes(formatted) || this.userRoles().includes(raw);
   }
+
+  readonly isAdmin = computed(() => this.hasRole('ADMIN'));
+  readonly isDoctor = computed(() => this.hasRole('DOCTOR'));
+  readonly isStaff = computed(() => this.hasRole('STAFF'));
+
+  readonly isLabTech = computed(() => {
+    if (this.hasRole('LAB_TECH')) return true;
+    const pos = this.currentUser()?.position?.toLowerCase() || '';
+    const username = this.currentUser()?.username?.toLowerCase() || '';
+    const roles = this.userRoles().map(r => r.toLowerCase());
+    return (
+      pos.includes('xét nghiệm') ||
+      pos.includes('kỹ thuật viên') ||
+      username.startsWith('ktv_') ||
+      roles.some(r => r.includes('lab') || r.includes('tech'))
+    );
+  });
+
+  readonly isStaffOrMedicalUser = computed(() => {
+    if (!this.isAuthenticated()) return false;
+    return this.isAdmin() || this.isDoctor() || this.isStaff() || this.isLabTech();
+  });
 
   getAccessToken(): string | null {
     return localStorage.getItem(this.TOKEN_KEY);

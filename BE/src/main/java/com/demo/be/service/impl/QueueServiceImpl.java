@@ -483,6 +483,16 @@ public class QueueServiceImpl implements QueueService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
+        List<QueueTicketResponse> resultsReady = allTickets.stream()
+                .filter(t -> "RESULTS_READY".equals(t.getStatus()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        List<QueueTicketResponse> waitingForResults = allTickets.stream()
+                .filter(t -> "WAITING_FOR_RESULTS".equals(t.getStatus()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
         List<QueueTicketResponse> skipped = allTickets.stream()
                 .filter(t -> "SKIPPED".equals(t.getStatus()))
                 .map(this::mapToResponse)
@@ -495,7 +505,7 @@ public class QueueServiceImpl implements QueueService {
 
         int avgTime = (doctor != null && doctor.getAverageConsultationTime() != null)
                 ? doctor.getAverageConsultationTime() : 15;
-        int estimatedWait = waiting.size() * avgTime;
+        int estimatedWait = (waiting.size() + resultsReady.size()) * avgTime;
 
         return RoomQueueOverviewResponse.builder()
                 .examinationRoomId(room.getId())
@@ -508,9 +518,11 @@ public class QueueServiceImpl implements QueueService {
                 .currentExaminingTicket(examining != null ? mapToResponse(examining) : null)
                 .currentCalledTicket(called != null ? mapToResponse(called) : null)
                 .waitingTickets(waiting)
+                .resultsReadyTickets(resultsReady)
+                .waitingForResultsTickets(waitingForResults)
                 .skippedTickets(skipped)
                 .completedTickets(completed)
-                .totalWaitingCount(waiting.size())
+                .totalWaitingCount(waiting.size() + resultsReady.size())
                 .totalExaminedCount(completed.size())
                 .estimatedWaitMinutes(estimatedWait)
                 .build();

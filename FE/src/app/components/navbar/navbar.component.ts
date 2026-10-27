@@ -61,20 +61,36 @@ import { AuthService } from '../../services/auth.service';
               </a>
             }
             @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
-              <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
-                <i class="bi bi-house"></i> Trang chủ
-              </a>
               <a routerLink="/doctor/calling" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-megaphone"></i> Gọi khám
               </a>
               <a routerLink="/doctor/examination" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-clipboard2-pulse"></i> Bàn khám bệnh
               </a>
+              <a routerLink="/doctor/history" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-clock-history"></i> Lịch sử ca khám
+              </a>
+              <a routerLink="/doctor/medicines" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-capsule"></i> Tra cứu Dược
+              </a>
+              <a routerLink="/lab/services" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-journal-medical"></i> Danh mục XN
+              </a>
               <a routerLink="/doctor/schedule" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-calendar2-week"></i> Ca trực
               </a>
             }
-            @if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+            @if (authService.isLabTech() && !authService.hasRole('ADMIN')) {
+              <a routerLink="/lab" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
+                <i class="bi bi-eyedropper"></i> Bàn làm việc XN
+              </a>
+              <a routerLink="/lab/services" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-journal-medical"></i> Danh mục &amp; Chỉ số
+              </a>
+              <a routerLink="/lab/schedule" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar2-week"></i> Ca trực của tôi
+              </a>
+            } @else if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
               <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
                 <i class="bi bi-house"></i> Trang chủ
               </a>
@@ -408,6 +424,7 @@ export class NavbarComponent {
   }
 
   getRoleIconClass(): string {
+    if (this.authService.isLabTech()) return 'bi-eyedropper';
     const roles = this.authService.userRoles();
     if (roles.some(r => r.includes('ADMIN'))) return 'bi-shield-check';
     if (roles.some(r => r.includes('DOCTOR'))) return 'bi-person-badge-fill';
@@ -416,6 +433,7 @@ export class NavbarComponent {
   }
 
   getPrimaryRoleDisplayName(): string {
+    if (this.authService.isLabTech()) return 'Kỹ thuật viên';
     const roles = this.authService.userRoles();
     if (roles.some(r => r.includes('ADMIN'))) return 'Quản trị viên';
     if (roles.some(r => r.includes('DOCTOR'))) return 'Bác sĩ';

@@ -18,6 +18,21 @@
         }
       </button>
 
+      @if (selectedLabServices().length > 0) {
+        <button 
+          class="btn btn-warning btn-send-lab-top" 
+          [disabled]="submittingLab() || !currentTicket()" 
+          title="Lưu tạm hồ sơ & Gửi chỉ định sang phòng xét nghiệm"
+          (click)="sendLabOrders()"
+        >
+          @if (submittingLab()) {
+            <span class="spinner-sm"></span> Đang Gửi...
+          } @else {
+            <i class="bi bi-send-check-fill"></i> Gửi Chỉ Định XN ({{ selectedLabServices().length }})
+          }
+        </button>
+      }
+
       <button 
         class="btn btn-success btn-finish-exam" 
         [disabled]="submitting() || !currentTicket()" 
@@ -272,6 +287,234 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- KHỐI 1B: KẾT QUẢ CẬN LÂM SÀNG (PHA 2 - Khi bệnh nhân đã có kết quả trả về) -->
+    @if (labOrders().length > 0) {
+      <div class="card exam-section-card lab-results-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-2">
+            <span class="pulse-indicator"></span>
+            <h3 class="section-title text-success mb-0">
+              <i class="bi bi-file-earmark-medical-fill"></i> Kết Quả Cận Lâm Sàng &amp; Xét Nghiệm (Pha 2)
+            </h3>
+          </div>
+          <span class="sub-tag tag-active">
+            Đã có {{ labOrders().length }} chỉ định xét nghiệm
+          </span>
+        </div>
+
+        <div class="card-body">
+          @if (hasAbnormalLabResults()) {
+            <div class="lab-abnormal-alert">
+              <div class="alert-icon">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+              </div>
+              <div class="alert-content">
+                <strong>CẢNH BÁO CHỈ SỐ BẤT THƯỜNG:</strong>
+                <span>Phát hiện chỉ số xét nghiệm vượt ngưỡng tham chiếu sinh lý bình thường (đã được bôi đỏ). Bác sĩ lưu ý khi kết luận chẩn đoán và chỉ định phác đồ điều trị!</span>
+              </div>
+            </div>
+          }
+
+          <div class="table-responsive lab-results-table-wrapper">
+            <table class="table lab-results-table">
+              <thead>
+                <tr>
+                  <th style="width: 5%; text-align: center;">STT</th>
+                  <th style="width: 12%;">Mã XN</th>
+                  <th style="width: 25%;">Tên dịch vụ kỹ thuật</th>
+                  <th style="width: 15%; text-align: center;">Kết quả đo được</th>
+                  <th style="width: 14%; text-align: center;">Trị số tham chiếu</th>
+                  <th style="width: 8%; text-align: center;">Đơn vị</th>
+                  <th style="width: 11%;">KTV / Bác sĩ ký</th>
+                  <th style="width: 10%; text-align: center;">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of labOrders(); track order.id; let idx = $index) {
+                  <tr [class.row-abnormal]="order.isAbnormal">
+                    <td style="text-align: center; font-weight: 700;">{{ idx + 1 }}</td>
+                    <td>
+                      <span class="code-badge">{{ order.serviceCode }}</span>
+                    </td>
+                    <td>
+                      <div class="service-name-text">{{ order.serviceName }}</div>
+                      @if (order.conclusion) {
+                        <div class="service-conclusion text-muted small">
+                          <i class="bi bi-chat-left-quote"></i> Kết luận: <strong>{{ order.conclusion }}</strong>
+                        </div>
+                      }
+                      @if (order.notes) {
+                        <div class="service-notes text-muted small">Ghi chú: {{ order.notes }}</div>
+                      }
+                    </td>
+                    <td style="text-align: center;">
+                      @if (order.resultValue) {
+                        <div class="result-value-box" [class.val-abnormal]="order.isAbnormal">
+                          <span class="val-num">{{ order.resultValue }}</span>
+                          @if (order.isAbnormal) {
+                            <span class="abnormal-tag" title="Vượt ngưỡng tham chiếu">
+                              <i class="bi bi-arrow-up-circle-fill"></i> BẤT THƯỜNG
+                            </span>
+                          }
+                        </div>
+                      } @else {
+                        <span class="text-muted fst-italic">Chờ kết quả đo...</span>
+                      }
+                    </td>
+                    <td style="text-align: center;">
+                      <span class="reference-range-text">{{ order.referenceRange || 'Chưa thiết lập' }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                      <span class="unit-text">{{ order.unit || '---' }}</span>
+                    </td>
+                    <td>
+                      <div class="performer-name">{{ order.performerName || 'Đang cập nhật' }}</div>
+                      @if (order.performedTime) {
+                        <div class="performed-time small text-muted">{{ order.performedTime | date:'HH:mm dd/MM' }}</div>
+                      }
+                    </td>
+                    <td style="text-align: center;">
+                      @if (order.status === 'COMPLETED') {
+                        <span class="badge badge-success"><i class="bi bi-check-circle-fill"></i> Đã có KQ</span>
+                      } @else if (order.status === 'PROCESSING') {
+                        <span class="badge badge-warning"><i class="bi bi-gear-fill spin-icon"></i> Đang đo</span>
+                      } @else if (order.status === 'CANCELLED') {
+                        <span class="badge badge-danger">Đã hủy</span>
+                      } @else {
+                        <span class="badge badge-secondary"><i class="bi bi-hourglass-split"></i> Chờ làm</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- KHỐI 1C: CHỈ ĐỊNH CẬN LÂM SÀNG (PHA 1 - Bác sĩ lựa chọn dịch vụ kỹ thuật) -->
+    <div class="card exam-section-card lab-orders-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <h3 class="section-title text-primary mb-0">
+            <i class="bi bi-eyedropper"></i> Chỉ Định Cận Lâm Sàng &amp; Kỹ Thuật Xét Nghiệm (Pha 1)
+          </h3>
+        </div>
+        <span class="sub-tag" [ngClass]="selectedLabServices().length > 0 ? 'tag-active' : 'tag-disabled'">
+          {{ selectedLabServices().length > 0 ? ('Đã chọn ' + selectedLabServices().length + ' xét nghiệm') : 'Tùy chọn theo ca bệnh' }}
+        </span>
+      </div>
+
+      <div class="card-body">
+        <!-- Search & Filter Category Pills -->
+        <div class="lab-filter-row mb-3">
+          <div class="lab-search-box">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              [(ngModel)]="labSearchKeyword"
+              (input)="filterLabServices()"
+              placeholder="Tìm xét nghiệm: Công thức máu, Đường huyết, X-Quang, Siêu âm..."
+              class="form-control"
+            />
+            @if (labSearchKeyword) {
+              <button type="button" class="btn-clear-lab" (click)="labSearchKeyword = ''; filterLabServices()">×</button>
+            }
+          </div>
+
+          <!-- Category Pills -->
+          @if (labCategories().length > 1) {
+            <div class="lab-categories-pills">
+              @for (cat of labCategories(); track cat) {
+                <button
+                  type="button"
+                  class="btn-lab-pill"
+                  [class.active]="selectedLabCategory() === cat"
+                  (click)="onLabCategoryChange(cat)"
+                >
+                  {{ cat === 'ALL' ? 'Tất cả dịch vụ' : cat }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Available Lab Services Grid -->
+        <div class="lab-services-grid mb-3">
+          @for (service of filteredLabServices(); track service.id) {
+            <div 
+              class="lab-service-card" 
+              [class.selected]="isLabSelected(service.id)"
+              (click)="toggleLabSelection(service)"
+            >
+              <div class="lab-card-checkbox">
+                <input
+                  type="checkbox"
+                  [checked]="isLabSelected(service.id)"
+                  (click)="$event.stopPropagation()"
+                  (change)="toggleLabSelection(service)"
+                />
+              </div>
+              <div class="lab-card-info">
+                <div class="lab-code-row">
+                  <span class="lab-code">{{ service.serviceCode }}</span>
+                  <span class="lab-category-badge">{{ service.category || 'Xét nghiệm' }}</span>
+                </div>
+                <div class="lab-name">{{ service.serviceName }}</div>
+                <div class="lab-meta-row">
+                  <span class="lab-price text-primary font-weight-bold">{{ service.price | number:'1.0-0' }} đ</span>
+                  @if (service.referenceRange) {
+                    <span class="lab-ref text-muted" title="Trị số tham chiếu bình thường">
+                      TC: {{ service.referenceRange }}
+                    </span>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Selected Lab Services Summary & Action Bar -->
+        @if (selectedLabServices().length > 0) {
+          <div class="selected-lab-summary-bar">
+            <div class="summary-left">
+              <div class="summary-title">
+                <i class="bi bi-check2-circle text-success"></i> Danh sách {{ selectedLabServices().length }} chỉ định đã chọn:
+              </div>
+              <div class="selected-chips">
+                @for (s of selectedLabServices(); track s.id) {
+                  <span class="chip-item">
+                    {{ s.serviceName }} ({{ s.price | number:'1.0-0' }} đ)
+                    <button type="button" class="btn-remove-chip" (click)="removeSelectedLab(s.id); $event.stopPropagation()">×</button>
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="summary-right">
+              <div class="total-fee-box">
+                <span class="fee-lbl">Tổng chi phí CLS:</span>
+                <span class="fee-val">{{ totalLabFee() | number:'1.0-0' }} VNĐ</span>
+              </div>
+              <button 
+                type="button" 
+                class="btn btn-warning btn-send-lab-orders"
+                [disabled]="submittingLab() || !currentTicket()"
+                (click)="sendLabOrders()"
+              >
+                @if (submittingLab()) {
+                  <span class="spinner-sm"></span> Đang Gửi Chỉ Định...
+                } @else {
+                  <i class="bi bi-send-fill"></i> GỬI CHỈ ĐỊNH XÉT NGHIỆM &amp; TẠM DỪNG
+                }
+              </button>
+            </div>
+          </div>
+        }
       </div>
     </div>
 
@@ -790,10 +1033,49 @@
             </div>
           </div>
 
-          <!-- IV. Prescription Table -->
+          <!-- IV. Paraclinical / Lab Results (Kết quả cận lâm sàng tổng hợp) -->
+          @if (completedRecord()!.labOrders && completedRecord()!.labOrders!.length > 0) {
+            <div class="doc-section-card">
+              <div class="section-badge-title">IV. KẾT QUẢ CẬN LÂM SÀNG &amp; XÉT NGHIỆM</div>
+              <table class="doc-lab-table" style="width: 100%; border-collapse: collapse; margin-bottom: 0.5rem;">
+                <thead>
+                  <tr style="background: #f8fafc; border-bottom: 1px solid #cbd5e1;">
+                    <th style="width: 6%; text-align: center; padding: 6px;">STT</th>
+                    <th style="width: 44%; text-align: left; padding: 6px;">Tên dịch vụ kỹ thuật</th>
+                    <th style="width: 20%; text-align: center; padding: 6px;">Kết quả đo được</th>
+                    <th style="width: 18%; text-align: center; padding: 6px;">Trị số bình thường</th>
+                    <th style="width: 12%; text-align: center; padding: 6px;">Đơn vị</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (lb of completedRecord()!.labOrders!; track lb.id; let idx = $index) {
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="text-align: center; font-weight: bold; padding: 6px;">{{ idx + 1 }}</td>
+                      <td style="padding: 6px;">
+                        <strong>{{ lb.serviceName }}</strong>
+                        @if (lb.conclusion) {
+                          <div style="font-size: 0.8rem; color: #475569;">Nhận xét: {{ lb.conclusion }}</div>
+                        }
+                      </td>
+                      <td style="text-align: center; padding: 6px;">
+                        <strong [style.color]="lb.isAbnormal ? '#dc2626' : '#1e293b'">{{ lb.resultValue }}</strong>
+                        @if (lb.isAbnormal) {
+                          <span style="display: block; font-size: 0.65rem; color: #dc2626; font-weight: bold;">[Bất thường]</span>
+                        }
+                      </td>
+                      <td style="text-align: center; padding: 6px; font-size: 0.85rem;">{{ lb.referenceRange || '---' }}</td>
+                      <td style="text-align: center; padding: 6px; font-size: 0.85rem;">{{ lb.unit || '---' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <!-- V. Prescription Table -->
           @if (completedRecord()!.prescription && completedRecord()!.prescription!.items.length > 0) {
             <div class="doc-section-card">
-              <div class="section-badge-title">IV. CHỈ ĐỊNH DÙNG THUỐC (ĐƠN THUỐC)</div>
+              <div class="section-badge-title">V. CHỈ ĐỊNH DÙNG THUỐC (ĐƠN THUỐC)</div>
               <table class="doc-medicine-table">
                 <thead>
                   <tr>
@@ -870,6 +1152,151 @@
           <!-- Bottom Footer Notice -->
           <div class="doc-bottom-notice">
             * Chú ý: Đơn thuốc có giá trị mua trong vòng 05 ngày kể từ ngày kê đơn. Vui lòng mang theo phiếu này khi tái khám.
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: In Phiếu Chỉ Định Cận Lâm Sàng & Xét Nghiệm (Pha 1) -->
+  @if (showLabPrintModal()) {
+    <div class="modal-backdrop-print">
+      <div class="modal-print-container">
+        <!-- Floating Actions Bar -->
+        <div class="print-actions-floating-bar no-print">
+          <div class="actions-left">
+            <span class="badge badge-warning text-dark"><i class="bi bi-send-check-fill"></i> Đã Gửi Chỉ Định Xét Nghiệm</span>
+            <span class="text-white-50 small ms-2">Bệnh nhân chuyển sang trạng thái Chờ Kết Quả</span>
+          </div>
+          <div class="actions-right">
+            <button type="button" class="btn btn-primary btn-print-action" (click)="printLabOrderDocument()">
+              <i class="bi bi-printer-fill"></i> In Phiếu Chỉ Định (A4)
+            </button>
+            <button type="button" class="btn btn-outline-light btn-return-queue" (click)="closeLabPrintModalAndClear()">
+              <i class="bi bi-arrow-right-circle"></i> Đóng &amp; Đón Ca Khám Tiếp Theo
+            </button>
+          </div>
+        </div>
+
+        <!-- Printable Lab Order Sheet -->
+        <div class="hospital-document-sheet" id="printableLabArea">
+          <div class="doc-header-row">
+            <div class="doc-clinic-col">
+              <div class="clinic-brand-title">HỆ THỐNG PHÒNG KHÁM ĐA KHOA QUỐC TẾ MEDQUEUE</div>
+              <div class="clinic-sub">Địa chỉ: Km10, Đường Nguyễn Trãi, Q. Hà Đông, Hà Nội</div>
+              <div class="clinic-sub">Hotline: <strong>1900 6868</strong> • Khoa Xét Nghiệm &amp; CĐHA (Tầng 1)</div>
+            </div>
+            <div class="doc-meta-col">
+              <div class="meta-item"><span class="meta-label">Mã phiếu chỉ định:</span> <strong class="meta-val text-primary">#LAB-{{ lastSentLabRecord()?.id || currentTicket()?.id }}</strong></div>
+              <div class="meta-item"><span class="meta-label">Số thứ tự khám:</span> <strong class="meta-val text-danger">#{{ currentTicket()?.ticketNumber || 'N/A' }}</strong></div>
+              <div class="meta-item"><span class="meta-label">Thời gian chỉ định:</span> <span class="meta-val">{{ 'now' | date:'dd/MM/yyyy HH:mm' }}</span></div>
+            </div>
+          </div>
+
+          <div class="doc-header-line"></div>
+
+          <div class="doc-title-block">
+            <h1 class="doc-main-title text-primary">PHIẾU CHỈ ĐỊNH CẬN LÂM SÀNG &amp; XÉT NGHIỆM</h1>
+            <p class="doc-sub-title">(Người bệnh mang phiếu này tới Phòng Xét Nghiệm &amp; Thăm Dò Chức Năng)</p>
+          </div>
+
+          <!-- Thông tin bệnh nhân -->
+          <div class="doc-section-card">
+            <div class="section-badge-title">I. THÔNG TIN NGƯỜI BỆNH &amp; PHÒNG KHÁM CHỈ ĐỊNH</div>
+            <div class="doc-info-grid">
+              <div class="info-row">
+                <div class="info-cell"><span class="lbl">Họ và tên:</span> <strong class="val uppercase text-primary">{{ currentTicket()?.patientName }}</strong></div>
+                <div class="info-cell"><span class="lbl">Ngày sinh:</span> <span class="val">{{ currentTicket()?.patientDob ? (currentTicket()!.patientDob | date:'dd/MM/yyyy') : (currentTicket()?.patientYearOfBirth ? ('Năm ' + currentTicket()?.patientYearOfBirth) : '---') }}</span></div>
+                <div class="info-cell"><span class="lbl">Giới tính:</span> <span class="val">{{ currentTicket()?.patientGender || '---' }}</span></div>
+              </div>
+              <div class="info-row">
+                <div class="info-cell"><span class="lbl">Số điện thoại:</span> <span class="val">{{ currentTicket()?.patientPhone || '---' }}</span></div>
+                <div class="info-cell"><span class="lbl">Bác sĩ chỉ định:</span> <strong class="val">{{ authService.currentUser()?.fullName || 'Bác sĩ lâm sàng' }}</strong></div>
+                <div class="info-cell"><span class="lbl">Phòng khám gửi:</span> <span class="val">{{ currentTicket()?.roomNumber }} - {{ currentTicket()?.roomName }}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lâm sàng & Chẩn đoán sơ bộ -->
+          <div class="doc-section-card">
+            <div class="section-badge-title">II. TRIỆU CHỨNG &amp; CHẨN ĐOÁN SƠ BỘ</div>
+            <div class="clinical-content">
+              <p><strong>Triệu chứng lâm sàng:</strong> {{ symptoms || 'Theo dõi lâm sàng' }}</p>
+              @if (preliminaryDiagnosis) {
+                <p><strong>Chẩn đoán sơ bộ:</strong> <span class="text-primary font-weight-bold">{{ preliminaryDiagnosis }}</span></p>
+              }
+              @if (notes) {
+                <p><strong>Ghi chú của bác sĩ:</strong> {{ notes }}</p>
+              }
+            </div>
+          </div>
+
+          <!-- Danh sách dịch vụ chỉ định -->
+          <div class="doc-section-card">
+            <div class="section-badge-title">III. DANH MỤC DỊCH VỤ KỸ THUẬT CẦN THỰC HIỆN</div>
+            <table class="doc-medicine-table">
+              <thead>
+                <tr>
+                  <th style="width: 6%; text-align: center;">STT</th>
+                  <th style="width: 14%;">Mã DV</th>
+                  <th style="width: 45%;">Tên dịch vụ kỹ thuật xét nghiệm / CĐHA</th>
+                  <th style="width: 15%; text-align: center;">Đơn vị</th>
+                  <th style="width: 20%; text-align: right;">Đơn giá</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of selectedLabServices(); track s.id; let idx = $index) {
+                  <tr>
+                    <td style="text-align: center; font-weight: bold;">{{ idx + 1 }}</td>
+                    <td><span class="code-badge">{{ s.serviceCode }}</span></td>
+                    <td>
+                      <strong>{{ s.serviceName }}</strong>
+                      @if (s.category) {
+                        <span class="text-muted small"> ({{ s.category }})</span>
+                      }
+                    </td>
+                    <td style="text-align: center;">{{ s.unit || 'Lần' }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ s.price | number:'1.0-0' }} đ</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" style="text-align: right; font-weight: bold; padding: 8px;">TỔNG CHI PHÍ XÉT NGHIỆM:</td>
+                  <td style="text-align: right; font-weight: bold; color: #1e40af; font-size: 1.05rem; padding: 8px;">
+                    {{ totalLabFee() | number:'1.0-0' }} VNĐ
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Hướng dẫn người bệnh -->
+          <div class="doc-revisit-alert" style="background: #eff6ff; border-color: #bfdbfe;">
+            <div class="revisit-main" style="display: flex; flex-direction: column; gap: 4px;">
+              <strong class="text-primary"><i class="bi bi-info-circle-fill"></i> HƯỚNG DẪN THỰC HIỆN XÉT NGHIỆM:</strong>
+              <span class="small">1. Người bệnh cầm phiếu này sang <strong>Phòng Xét Nghiệm &amp; Chẩn Đoán Hình Ảnh (Tầng 1 - P.Lab)</strong>.</span>
+              <span class="small">2. Lấy mẫu hoặc chụp chiếu theo hướng dẫn của Kỹ thuật viên. Kết quả sẽ tự động đồng bộ về máy Bác sĩ khi hoàn tất.</span>
+              <span class="small">3. Sau khi làm xong xét nghiệm, người bệnh <strong>quay trở lại Phòng khám ban đầu</strong> để được Bác sĩ ưu tiên mời vào đọc kết quả và kê đơn thuốc.</span>
+            </div>
+          </div>
+
+          <!-- Chữ ký bác sĩ chỉ định -->
+          <div class="doc-signatures-row">
+            <div class="signature-col">
+              <div class="sig-role">NGƯỜI BỆNH / ĐẠI DIỆN</div>
+              <div class="sig-sub">(Ký và ghi rõ họ tên)</div>
+              <div class="sig-space"></div>
+              <div class="sig-name">{{ currentTicket()?.patientName }}</div>
+            </div>
+
+            <div class="signature-col doctor-sig-box">
+              <div class="sig-date">Hà Nội, {{ 'now' | date:'dd/MM/yyyy HH:mm' }}</div>
+              <div class="sig-role">BÁC SĨ CHỈ ĐỊNH</div>
+              <div class="sig-sub">(Ký và ghi rõ họ tên)</div>
+              <div class="sig-space"></div>
+              <div class="sig-name">{{ authService.currentUser()?.fullName || 'Bác sĩ điều trị' }}</div>
+            </div>
           </div>
         </div>
       </div>

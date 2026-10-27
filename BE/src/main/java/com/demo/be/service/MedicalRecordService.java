@@ -17,4 +17,6 @@ public interface MedicalRecordService {
     PatientMedicalHistoryResponse getPatientMedicalHistory(Long patientId);
 
     List<MedicalRecordResponse> getRecordsByDoctorId(Long doctorId);
+
+    List<MedicalRecordResponse> getMyDoctorRecords();
 }

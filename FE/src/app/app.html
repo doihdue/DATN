@@ -1,21 +1,46 @@
-<div class="app-layout">
-  <app-navbar></app-navbar>
-
-  <main class="main-content">
-    <router-outlet></router-outlet>
-  </main>
-
-  <footer class="app-footer">
-    <div class="footer-container">
-      <div class="footer-left">
-        <div class="footer-brand">
-          <i class="bi bi-hospital-fill text-primary"></i> <strong>MedQueue</strong>
+@if (authService.isStaffOrMedicalUser()) {
+  <!-- Giao diện Mini-Sidebar thông minh dành cho Nhân Viên Y Tế (Admin, Bác sĩ, KTV, Lễ tân) -->
+  <div class="app-sidebar-layout">
+    <app-sidebar></app-sidebar>
+    <div class="layout-body-wrapper" [class.sidebar-pinned]="sidebarService.isPinned()">
+      <app-topbar></app-topbar>
+      <main class="main-content">
+        <router-outlet></router-outlet>
+      </main>
+      <footer class="app-footer">
+        <div class="footer-container">
+          <div class="footer-left">
+            <div class="footer-brand">
+              <i class="bi bi-hospital-fill text-primary"></i> <strong>MedQueue</strong>
+            </div>
+            <p class="footer-copy">
+              Hệ thống tiếp đón, điều phối hàng đợi &amp; bệnh án điện tử thông minh.
+            </p>
+          </div>
         </div>
-        <p class="footer-copy">
-          Hệ thống đặt lịch khám bệnh & điều phối hàng đợi thông minh tại phòng khám.
-        </p>
-      </div>
-
+      </footer>
     </div>
-  </footer>
-</div>
+  </div>
+} @else {
+  <!-- Giao diện Portal thông thường dành cho Bệnh Nhân & Khách Vãng Lai & Màn hình TV -->
+  <div class="app-layout">
+    <app-navbar></app-navbar>
+
+    <main class="main-content">
+      <router-outlet></router-outlet>
+    </main>
+
+    <footer class="app-footer">
+      <div class="footer-container">
+        <div class="footer-left">
+          <div class="footer-brand">
+            <i class="bi bi-hospital-fill text-primary"></i> <strong>MedQueue</strong>
+          </div>
+          <p class="footer-copy">
+            Hệ thống đặt lịch khám bệnh &amp; điều phối hàng đợi thông minh tại phòng khám.
+          </p>
+        </div>
+      </div>
+    </footer>
+  </div>
+}

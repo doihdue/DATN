@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ExaminationRoom, WorkSchedule, WorkScheduleRequest } from '../models/schedule.model';
+import { ExaminationRoom, WorkSchedule, WorkScheduleRequest, BatchWorkScheduleRequest, BatchWorkScheduleResponse } from '../models/schedule.model';
 import { ApiResponse } from '../models/auth.models';
 
 @Injectable({
@@ -38,6 +38,10 @@ export class ScheduleService {
 
   createSchedule(request: WorkScheduleRequest): Observable<ApiResponse<WorkSchedule>> {
     return this.http.post<ApiResponse<WorkSchedule>>(`${this.baseUrl}/admin/work-schedules`, request);
+  }
+
+  createBatchSchedules(request: BatchWorkScheduleRequest): Observable<ApiResponse<BatchWorkScheduleResponse>> {
+    return this.http.post<ApiResponse<BatchWorkScheduleResponse>>(`${this.baseUrl}/admin/work-schedules/batch`, request);
   }
 
   updateSchedule(id: number, request: WorkScheduleRequest): Observable<ApiResponse<WorkSchedule>> {

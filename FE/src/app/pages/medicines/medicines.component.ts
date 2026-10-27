@@ -5,6 +5,7 @@ import { MedicineService } from '../../services/medicine.service';
 import { MedicineCategoryService } from '../../services/medicine-category.service';
 import { Medicine, MedicineRequest } from '../../models/medicine.model';
 import { MedicineCategory, MedicineCategoryRequest } from '../../models/medicine-category.model';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-medicines',
@@ -23,17 +24,19 @@ import { MedicineCategory, MedicineCategoryRequest } from '../../models/medicine
             Cấu hình phân loại nhóm dược lý, tra cứu biệt dược, hoạt chất, quy cách, đơn giá và định mức tồn kho
           </p>
         </div>
-        <div class="header-actions">
-          @if (activeTab() === 'medicines') {
-            <button class="btn btn-primary" (click)="openAddMedicineModal()">
-              <i class="bi bi-plus-circle-fill"></i> Thêm Thuốc Mới
-            </button>
-          } @else {
-            <button class="btn btn-primary" (click)="openAddCategoryModal()">
-              <i class="bi bi-folder-plus"></i> Thêm Nhóm Thuốc
-            </button>
-          }
-        </div>
+        @if (isAdmin()) {
+          <div class="header-actions">
+            @if (activeTab() === 'medicines') {
+              <button class="btn btn-primary" (click)="openAddMedicineModal()">
+                <i class="bi bi-plus-circle-fill"></i> Thêm Thuốc Mới
+              </button>
+            } @else {
+              <button class="btn btn-primary" (click)="openAddCategoryModal()">
+                <i class="bi bi-folder-plus"></i> Thêm Nhóm Thuốc
+              </button>
+            }
+          </div>
+        }
       </div>
 
       <!-- Navigation Tabs & Stats Card -->
@@ -233,12 +236,18 @@ import { MedicineCategory, MedicineCategoryRequest } from '../../models/medicine
                       </td>
                       <td style="text-align: center;">
                         <div class="action-buttons-cell">
-                          <button class="btn-action btn-action-edit" (click)="openEditMedicineModal(item)" title="Chỉnh sửa thông tin">
-                            <i class="bi bi-pencil-fill"></i>
-                          </button>
-                          <button class="btn-action btn-action-delete" (click)="confirmDeleteMedicine(item)" title="Xóa thuốc khỏi danh mục">
-                            <i class="bi bi-trash3-fill"></i>
-                          </button>
+                          @if (isAdmin()) {
+                            <button class="btn-action btn-action-edit" (click)="openEditMedicineModal(item)" title="Chỉnh sửa thông tin">
+                              <i class="bi bi-pencil-fill"></i>
+                            </button>
+                            <button class="btn-action btn-action-delete" (click)="confirmDeleteMedicine(item)" title="Xóa thuốc khỏi danh mục">
+                              <i class="bi bi-trash3-fill"></i>
+                            </button>
+                          } @else {
+                            <button class="btn-action btn-action-edit" (click)="openEditMedicineModal(item)" title="Xem thông tin chi tiết thuốc">
+                              <i class="bi bi-eye-fill"></i>
+                            </button>
+                          }
                         </div>
                       </td>
                     </tr>
@@ -1781,6 +1790,8 @@ import { MedicineCategory, MedicineCategoryRequest } from '../../models/medicine
 export class MedicinesComponent implements OnInit {
   private readonly medicineService = inject(MedicineService);
   private readonly categoryService = inject(MedicineCategoryService);
+  readonly authService = inject(AuthService);
+  readonly isAdmin = computed(() => this.authService.hasRole('ADMIN'));
 
   // Tab State: 'medicines' | 'categories'
   activeTab = signal<'medicines' | 'categories'>('medicines');

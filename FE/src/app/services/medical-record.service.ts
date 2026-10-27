@@ -58,6 +58,11 @@ export class MedicalRecordService {
     return this.http.get<ApiResponse<MedicalRecordResponse[]>>(`${this.baseUrl}/medical-records/doctor/${doctorId}`);
   }
 
+  // 7b. Bác sĩ hiện tại lấy danh sách các ca mình đã khám
+  getMyDoctorRecords(): Observable<ApiResponse<MedicalRecordResponse[]>> {
+    return this.http.get<ApiResponse<MedicalRecordResponse[]>>(`${this.baseUrl}/medical-records/doctor/my`);
+  }
+
   // 8. Tải file PDF Phiếu khám & Đơn thuốc (JasperReports) theo ID hồ sơ
   exportMedicalRecordPdf(id: number): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/medical-records/${id}/export-pdf`, {
