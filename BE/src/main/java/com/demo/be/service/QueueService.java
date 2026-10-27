@@ -13,7 +13,6 @@ public interface QueueService {
 
     QueueTicketResponse startExamination(Long ticketId);
 
-    QueueTicketResponse completeExamination(Long ticketId);
 
     QueueTicketResponse skipTicket(Long ticketId);
 

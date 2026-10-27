@@ -326,7 +326,7 @@ public class DataInitializer implements CommandLineRunner {
             int booked,
             String status
     ) {
-        boolean exists = workScheduleRepository.findByDoctorIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(doctor.getId(), date, date)
+        boolean exists = workScheduleRepository.findDoctorSchedules(doctor.getId(), date, date)
                 .stream()
                 .anyMatch(s -> s.getStartTime().equals(start));
         if (!exists) {
@@ -977,7 +977,7 @@ public class DataInitializer implements CommandLineRunner {
             if (doctor == null) continue;
 
             List<QueueTicket> todayTickets = queueTicketRepository
-                    .findByTicketDateAndExaminationRoomIdOrderByPriorityScoreDescCheckInTimeAsc(today, room.getId());
+                    .findRoomQueue(today, room.getId());
             long waitingCount = todayTickets.stream().filter(t -> "WAITING".equals(t.getStatus())).count();
             boolean hasSkipped = todayTickets.stream().anyMatch(t -> "SKIPPED".equals(t.getStatus()));
             if (waitingCount >= 3 || hasSkipped) continue;

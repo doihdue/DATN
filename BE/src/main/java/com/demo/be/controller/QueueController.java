@@ -90,14 +90,6 @@ public class QueueController {
         return ResponseEntity.ok(ApiResponse.success(ticket, "Đã bắt đầu lượt khám: " + ticket.getTicketNumber()));
     }
 
-    // 7. Hoàn thành khám
-    @PostMapping("/ticket/{ticketId}/complete")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<ApiResponse<QueueTicketResponse>> completeExamination(@PathVariable Long ticketId) {
-        QueueTicketResponse ticket = queueService.completeExamination(ticketId);
-        return ResponseEntity.ok(ApiResponse.success(ticket, "Đã hoàn thành lượt khám: " + ticket.getTicketNumber()));
-    }
-
     // 8. Bỏ qua lượt (vắng mặt)
     @PostMapping("/ticket/{ticketId}/skip")
     @PreAuthorize("hasRole('DOCTOR')")

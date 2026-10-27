@@ -10,14 +10,18 @@ import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.Appointment;
 import com.demo.be.model.Doctor;
 import com.demo.be.model.ExaminationRoom;
+import com.demo.be.model.User;
 import com.demo.be.model.WorkSchedule;
 import com.demo.be.repository.AppointmentRepository;
 import com.demo.be.repository.DoctorRepository;
 import com.demo.be.repository.ExaminationRoomRepository;
+import com.demo.be.repository.UserRepository;
 import com.demo.be.repository.WorkScheduleRepository;
 import com.demo.be.service.WorkScheduleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +41,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
     private final DoctorRepository doctorRepository;
     private final ExaminationRoomRepository examinationRoomRepository;
     private final AppointmentRepository appointmentRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,10 +60,10 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
 
     @Override
     @Transactional(readOnly = true)
-    public WorkScheduleResponse getScheduleById(Long id) {
-        WorkSchedule schedule = workScheduleRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Lịch làm việc", "id", id));
-        return mapToResponse(schedule);
+    public List<WorkScheduleResponse> getMySchedules(LocalDate startDate, LocalDate endDate) {
+        // Bác sĩ xác định từ tài khoản đăng nhập, không nhận doctorId từ client
+        Doctor doctor = getCurrentDoctor();
+        return getSchedules(startDate, endDate, doctor.getId(), null, null);
     }
 
     @Override
@@ -83,6 +88,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
     @Transactional
     public WorkScheduleResponse createSchedule(WorkScheduleRequest request) {
         validateTimeRange(request);
+        validateNotPastDate(request.getWorkDate());
 
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Bác sĩ", "id", request.getDoctorId()));
@@ -123,7 +129,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
                 .doctor(doctor)
                 .examinationRoom(room)
                 .workDate(request.getWorkDate())
-                .shiftType(request.getShiftType() != null ? request.getShiftType() : determineShiftType(request))
+                .shiftType(request.getShiftType() != null ? request.getShiftType() : determineShiftType(request.getStartTime()))
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .maxPatients(request.getMaxPatients())
@@ -146,6 +152,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new BadRequestException("Ngày bắt đầu không được sau ngày kết thúc");
         }
+        validateNotPastDate(request.getStartDate());
         long daysDiff = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate());
         if (daysDiff > 180) {
             throw new BadRequestException("Khoảng thời gian đăng ký lịch định kỳ tối đa là 180 ngày (khoảng 6 tháng)");
@@ -164,11 +171,18 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         List<Integer> daysOfWeek = request.getDaysOfWeek();
         String shiftType = request.getShiftType() != null && !request.getShiftType().isBlank()
                 ? request.getShiftType()
-                : (request.getStartTime().getHour() < 12 ? "CA_SÁNG" : (request.getStartTime().getHour() < 18 ? "CA_CHIỀU" : "CA_TỐI"));
+                : determineShiftType(request.getStartTime());
         String status = request.getStatus() != null && !request.getStatus().isBlank()
                 ? request.getStatus() : "AVAILABLE";
 
-        List<WorkScheduleResponse> createdSchedules = new ArrayList<>();
+        // Tải trước các ca của bác sĩ và của phòng trong cả khoảng ngày (2 truy vấn),
+        // thay vì mỗi ngày lại truy vấn kiểm tra trùng 2 lần
+        List<WorkSchedule> doctorSchedules = workScheduleRepository
+                .findDoctorSchedules(doctor.getId(), request.getStartDate(), request.getEndDate());
+        List<WorkSchedule> roomSchedules = workScheduleRepository
+                .filterSchedules(request.getStartDate(), request.getEndDate(), null, null, room.getId());
+
+        List<WorkSchedule> newSchedules = new ArrayList<>();
         List<String> conflictMessages = new ArrayList<>();
         int totalRequested = 0;
 
@@ -183,13 +197,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
             totalRequested++;
 
             // 1. Kiểm tra xung đột lịch Bác sĩ
-            boolean doctorConflict = workScheduleRepository.hasDoctorConflict(
-                    doctor.getId(),
-                    curr,
-                    request.getStartTime(),
-                    request.getEndTime(),
-                    null
-            );
+            boolean doctorConflict = hasOverlap(doctorSchedules, curr, request.getStartTime(), request.getEndTime());
             if (doctorConflict) {
                 conflictMessages.add("Ngày " + curr + ": Bác sĩ " + doctor.getFullName() + 
                         " đã có ca làm việc khác trong khung giờ " + request.getStartTime() + " - " + request.getEndTime());
@@ -198,13 +206,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
             }
 
             // 2. Kiểm tra xung đột Phòng khám
-            boolean roomConflict = workScheduleRepository.hasRoomConflict(
-                    room.getId(),
-                    curr,
-                    request.getStartTime(),
-                    request.getEndTime(),
-                    null
-            );
+            boolean roomConflict = hasOverlap(roomSchedules, curr, request.getStartTime(), request.getEndTime());
             if (roomConflict) {
                 conflictMessages.add("Ngày " + curr + ": Phòng " + room.getRoomNumber() + " (" + room.getRoomName() + ")" +
                         " đã được xếp ca cho bác sĩ khác trong khung giờ này");
@@ -212,7 +214,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
                 continue;
             }
 
-            // Không xung đột -> Tạo và lưu ca
+            // Không xung đột -> Tạo ca (lưu một lần ở cuối)
             WorkSchedule schedule = WorkSchedule.builder()
                     .doctor(doctor)
                     .examinationRoom(room)
@@ -225,10 +227,13 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
                     .status(status)
                     .build();
 
-            WorkSchedule saved = workScheduleRepository.save(schedule);
-            createdSchedules.add(mapToResponse(saved));
+            newSchedules.add(schedule);
             curr = curr.plusDays(1);
         }
+
+        List<WorkScheduleResponse> createdSchedules = workScheduleRepository.saveAll(newSchedules).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
 
         log.info("-> Đăng ký lịch định kỳ hoàn tất: Bác sĩ {} tại phòng {}, tổng ngày: {}, tạo thành công: {}, xung đột: {}",
                 doctor.getFullName(), room.getRoomNumber(), totalRequested, createdSchedules.size(), conflictMessages.size());
@@ -244,69 +249,12 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
 
     @Override
     @Transactional
-    public WorkScheduleResponse updateSchedule(Long id, WorkScheduleRequest request) {
-        validateTimeRange(request);
-
-        WorkSchedule schedule = workScheduleRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Lịch làm việc", "id", id));
-
-        Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Bác sĩ", "id", request.getDoctorId()));
-
-        ExaminationRoom room = examinationRoomRepository.findById(request.getExaminationRoomId())
-                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", request.getExaminationRoomId()));
-
-        // Kiểm tra xung đột trừ chính schedule này
-        boolean doctorConflict = workScheduleRepository.hasDoctorConflict(
-                doctor.getId(),
-                request.getWorkDate(),
-                request.getStartTime(),
-                request.getEndTime(),
-                id
-        );
-        if (doctorConflict) {
-            throw new BadRequestException("Bác sĩ " + doctor.getFullName() + 
-                    " đã có ca làm việc khác trùng khung giờ này ngày " + request.getWorkDate());
-        }
-
-        boolean roomConflict = workScheduleRepository.hasRoomConflict(
-                room.getId(),
-                request.getWorkDate(),
-                request.getStartTime(),
-                request.getEndTime(),
-                id
-        );
-        if (roomConflict) {
-            throw new BadRequestException("Phòng khám " + room.getRoomNumber() + 
-                    " đã được xếp cho bác sĩ khác trong khung giờ này ngày " + request.getWorkDate());
-        }
-
-        if (request.getMaxPatients() < schedule.getCurrentBookedCount()) {
-            throw new BadRequestException("Số lượng bệnh nhân tối đa không được nhỏ hơn số lượng bệnh nhân đã đặt trước (" + 
-                    schedule.getCurrentBookedCount() + ")");
-        }
-
-        schedule.setDoctor(doctor);
-        schedule.setExaminationRoom(room);
-        schedule.setWorkDate(request.getWorkDate());
-        schedule.setShiftType(request.getShiftType() != null ? request.getShiftType() : determineShiftType(request));
-        schedule.setStartTime(request.getStartTime());
-        schedule.setEndTime(request.getEndTime());
-        schedule.setMaxPatients(request.getMaxPatients());
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            schedule.setStatus(request.getStatus());
-        }
-
-        WorkSchedule updated = workScheduleRepository.save(schedule);
-        log.info("-> Đã cập nhật lịch làm việc ID {}", id);
-        return mapToResponse(updated);
-    }
-
-    @Override
-    @Transactional
     public WorkScheduleResponse cancelSchedule(Long id, String reason) {
         WorkSchedule schedule = workScheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Lịch làm việc", "id", id));
+        if (schedule.getWorkDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Không thể hủy ca làm việc đã diễn ra (ngày " + schedule.getWorkDate() + ")");
+        }
 
         schedule.setStatus("CANCELLED");
 
@@ -331,6 +279,9 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
     public void deleteSchedule(Long id) {
         WorkSchedule schedule = workScheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Lịch làm việc", "id", id));
+        if (schedule.getWorkDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Không thể xóa ca làm việc đã diễn ra (ngày " + schedule.getWorkDate() + "), cần giữ lại để tra cứu lịch sử");
+        }
 
         if (schedule.getCurrentBookedCount() > 0) {
             throw new BadRequestException("Không thể xóa ca làm việc vì đã có " + 
@@ -361,14 +312,41 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         }
     }
 
-    private String determineShiftType(WorkScheduleRequest request) {
-        if (request.getStartTime().getHour() < 12) {
+    private void validateNotPastDate(LocalDate workDate) {
+        if (workDate.isBefore(LocalDate.now())) {
+            throw new BadRequestException("Không thể xếp ca vào ngày đã qua (" + workDate + ")");
+        }
+    }
+
+    private Doctor getCurrentDoctor() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new BadRequestException("Không xác định được tài khoản bác sĩ đang đăng nhập");
+        }
+        User user = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", auth.getName()));
+        if (!(user.getPerson() instanceof Doctor doctor)) {
+            throw new BadRequestException("Tài khoản hiện tại không gắn với hồ sơ bác sĩ");
+        }
+        return doctor;
+    }
+
+    private String determineShiftType(LocalTime startTime) {
+        if (startTime.getHour() < 12) {
             return "CA_SÁNG";
-        } else if (request.getStartTime().getHour() < 18) {
+        } else if (startTime.getHour() < 18) {
             return "CA_CHIỀU";
         } else {
             return "CA_TỐI";
         }
+    }
+
+    // Ca chưa huỷ nào cùng ngày có khung giờ giao nhau với [startTime, endTime)
+    private boolean hasOverlap(List<WorkSchedule> schedules, LocalDate date, LocalTime startTime, LocalTime endTime) {
+        return schedules.stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .filter(ws -> date.equals(ws.getWorkDate()))
+                .anyMatch(ws -> ws.getStartTime().isBefore(endTime) && ws.getEndTime().isAfter(startTime));
     }
 
     private WorkScheduleResponse mapToResponse(WorkSchedule schedule) {

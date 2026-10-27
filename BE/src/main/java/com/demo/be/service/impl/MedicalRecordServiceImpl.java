@@ -91,6 +91,10 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             if (queueTicket.getEndTime() == null) {
                 queueTicket.setEndTime(LocalTime.now());
             }
+            // Đồng bộ trạng thái lịch hẹn online (nếu vé được cấp từ lịch hẹn)
+            if (queueTicket.getAppointment() != null) {
+                queueTicket.getAppointment().setStatus("COMPLETED");
+            }
             queueTicketRepository.save(queueTicket);
 
             // Bắn WebSocket thông báo tới bảng TV và các màn hình điều phối
@@ -222,7 +226,7 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bệnh nhân", "id", patientId));
 
-        List<MedicalRecord> historyList = medicalRecordRepository.findByPatientIdOrderByCreatedAtDesc(patientId);
+        List<MedicalRecord> historyList = medicalRecordRepository.findPatientHistory(patientId);
 
         List<MedicalRecordResponse> recordResponses = historyList.stream()
                 .map(MedicalRecordResponse::fromEntity)

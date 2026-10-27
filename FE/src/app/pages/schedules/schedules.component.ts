@@ -8,6 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { ExaminationRoom, WorkSchedule, WorkScheduleRequest, BatchWorkScheduleRequest, BatchWorkScheduleResponse } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
 import { toIsoDate } from '../../utils/date.utils';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-schedules',
@@ -20,19 +21,23 @@ import { toIsoDate } from '../../utils/date.utils';
         <div class="header-left">
           <div class="header-badge">
             <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
-            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : (authService.isLabTech() ? 'Lịch Trực Ca & Phân Công' : 'Lịch Trực Ca Bác Sĩ') }}
+            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : 'Lịch Trực Ca Bác Sĩ' }}
           </div>
-          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc' : (authService.isLabTech() ? 'Lịch Phân Công Ca Trực' : 'Danh Sách Ca Làm Việc & Trực Khám') }}</h1>
+          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc' : 'Lịch Trực Của Tôi' }}</h1>
           <p class="page-subtitle">
             {{ isAdmin() 
               ? 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' 
-              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
+              : 'Theo dõi các ca trực được phân công cho bạn, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
           </p>
         </div>
         @if (isAdmin()) {
           <div class="header-actions">
-            <button class="btn btn-primary" (click)="openAddModal()">
-              <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực Mới
+            <button class="btn btn-primary" [disabled]="openingForm()" (click)="openAddModal()">
+              @if (openingForm()) {
+                <span class="spinner-sm"></span> Đang tải dữ liệu...
+              } @else {
+                <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực Mới
+              }
             </button>
           </div>
         }
@@ -49,6 +54,7 @@ import { toIsoDate } from '../../utils/date.utils';
             <label class="filter-label"><i class="bi bi-calendar3"></i> Đến ngày</label>
             <input type="date" [(ngModel)]="filterEndDate" (change)="loadSchedules()" class="form-control" />
           </div>
+          @if (isAdmin()) {
           <div class="filter-item">
             <label class="filter-label"><i class="bi bi-door-open"></i> Phòng khám</label>
             <select [(ngModel)]="filterRoomId" (change)="loadSchedules()" class="form-control">
@@ -67,6 +73,7 @@ import { toIsoDate } from '../../utils/date.utils';
               }
             </select>
           </div>
+          }
         </div>
 
         <div class="filter-actions">
@@ -1249,6 +1256,7 @@ export class SchedulesComponent implements OnInit {
 
   readonly loading = signal(true);
   readonly submitting = signal(false);
+  readonly openingForm = signal(false);
   readonly showModal = signal(false);
 
   readonly alertMessage = signal<string | null>(null);
@@ -1433,9 +1441,11 @@ export class SchedulesComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadRooms();
-    this.loadSpecialties();
-    this.loadDoctors();
+    // Phòng & chuyên khoa chỉ dùng cho bộ lọc của Admin; bác sĩ chỉ xem lịch của mình
+    if (this.isAdmin()) {
+      this.loadRooms();
+      this.loadSpecialties();
+    }
     this.loadSchedules();
   }
 
@@ -1459,32 +1469,17 @@ export class SchedulesComponent implements OnInit {
     });
   }
 
-  // Danh sách bác sĩ để xếp ca (chỉ Admin), gồm cả bác sĩ chưa phân khoa, bỏ qua tài khoản đã khóa
-  loadDoctors(): void {
-    if (!this.isAdmin()) return;
-    this.doctorService.getDoctors().subscribe({
-      next: res => {
-        if (res.success && res.data) {
-          this.doctorList.set(res.data
-            .filter(d => d.status !== 'LOCKED')
-            .map(d => ({
-              id: d.id,
-              fullName: d.fullName,
-              specialtyName: d.specialtyName || 'Chưa phân khoa'
-            })));
-        }
-      }
-    });
-  }
-
   loadSchedules(): void {
     this.loading.set(true);
-    this.scheduleService.getSchedules({
-      startDate: this.filterStartDate || undefined,
-      endDate: this.filterEndDate || undefined,
-      roomId: this.filterRoomId || undefined,
-      specialtyId: this.filterSpecialtyId || undefined
-    }).subscribe({
+    const request$ = this.isAdmin()
+      ? this.scheduleService.getSchedules({
+          startDate: this.filterStartDate || undefined,
+          endDate: this.filterEndDate || undefined,
+          roomId: this.filterRoomId || undefined,
+          specialtyId: this.filterSpecialtyId || undefined
+        })
+      : this.scheduleService.getMySchedules(this.filterStartDate || undefined, this.filterEndDate || undefined);
+    request$.subscribe({
       next: res => {
         if (res.success && res.data) {
           this.schedules.set(res.data);
@@ -1508,7 +1503,33 @@ export class SchedulesComponent implements OnInit {
     this.loadSchedules();
   }
 
+  // Dữ liệu cho form (bác sĩ đang hoạt động, phòng khám) chỉ tải khi Admin mở form đăng ký ca
   openAddModal(): void {
+    this.openingForm.set(true);
+    forkJoin({
+      doctors: this.doctorService.getDoctors(),
+      rooms: this.scheduleService.getAllRooms()
+    }).subscribe({
+      next: ({ doctors, rooms }) => {
+        this.doctorList.set((doctors.data || [])
+          .filter(d => d.status !== 'LOCKED')
+          .map(d => ({
+            id: d.id,
+            fullName: d.fullName,
+            specialtyName: d.specialtyName || 'Chưa phân khoa'
+          })));
+        this.rooms.set(rooms.data || []);
+        this.openingForm.set(false);
+        this.showAddForm();
+      },
+      error: err => {
+        this.openingForm.set(false);
+        this.showAlert(err.error?.message || 'Không tải được danh sách bác sĩ / phòng khám', 'danger');
+      }
+    });
+  }
+
+  private showAddForm(): void {
     this.batchResult.set(null);
     this.scheduleMode = 'SINGLE';
 
