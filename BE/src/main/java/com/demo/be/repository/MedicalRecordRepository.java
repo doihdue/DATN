@@ -1,6 +1,7 @@
 package com.demo.be.repository;
 
 import com.demo.be.model.MedicalRecord;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +13,8 @@ import java.util.Optional;
 @Repository
 public interface MedicalRecordRepository extends JpaRepository<MedicalRecord, Long> {
 
+    // Nạp sẵn bác sĩ, vé khám, đơn thuốc trong cùng truy vấn để tránh N+1 khi xem tiền sử bệnh
+    @EntityGraph(attributePaths = {"patient", "doctor", "doctor.specialty", "queueTicket", "prescription"})
     List<MedicalRecord> findByPatientIdOrderByCreatedAtDesc(Long patientId);
 
     Optional<MedicalRecord> findByQueueTicketId(Long queueTicketId);

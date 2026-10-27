@@ -5,7 +5,6 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MedicalRecordService } from '../../services/medical-record.service';
 import { MedicineCategoryService } from '../../services/medicine-category.service';
 import { QueueService } from '../../services/queue.service';
-import { ScheduleService } from '../../services/schedule.service';
 import { AuthService } from '../../services/auth.service';
 import { ClinicalLabService } from '../../services/lab.service';
 import {
@@ -17,7 +16,6 @@ import {
 } from '../../models/medical-record.model';
 import { MedicineCategory } from '../../models/medicine-category.model';
 import { QueueTicket } from '../../models/queue.model';
-import { ExaminationRoom } from '../../models/schedule.model';
 import { toIsoDate } from '../../utils/date.utils';
 import { LabService, LabOrder, SendLabOrdersRequest } from '../../models/lab.model';
 
@@ -43,7 +41,6 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   private readonly medicalService = inject(MedicalRecordService);
   private readonly categoryService = inject(MedicineCategoryService);
   private readonly queueService = inject(QueueService);
-  private readonly scheduleService = inject(ScheduleService);
   private readonly labService = inject(ClinicalLabService);
   readonly authService = inject(AuthService);
 
@@ -56,7 +53,6 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   alertType = signal<'success' | 'danger'>('success');
 
   // Hàng đợi phòng khám & Đổi bệnh nhân
-  rooms = signal<ExaminationRoom[]>([]);
   activeRoomId = signal<number>(1);
   roomTickets = signal<QueueTicket[]>([]);
   showQueueDrawer = signal<boolean>(false);
@@ -190,22 +186,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Tải danh sách phòng khám
-    this.scheduleService.getAllRooms().subscribe({
-      next: res => {
-        if (res.data && res.data.length > 0) {
-          this.rooms.set(res.data);
-        }
-      }
-    });
-
-    // 0. Đọc từ router state (nếu vừa chuyển từ màn điều phối/gọi số)
+    // 0. Đọc từ router state (nếu vừa chuyển từ màn điều phối/gọi số) để hiển thị ngay;
+    // tiền sử bệnh sẽ được tải 1 lần khi đồng bộ vé ở bước dưới
     const stateTicket = history.state?.ticket;
     if (stateTicket && stateTicket.status !== 'COMPLETED') {
       this.currentTicket.set(stateTicket);
       if (stateTicket.id) this.ticketId.set(stateTicket.id);
       if (stateTicket.examinationRoomId) this.activeRoomId.set(stateTicket.examinationRoomId);
-      if (stateTicket.patientId) this.loadPatientHistory(stateTicket.patientId);
     } else {
       try {
         const saved = sessionStorage.getItem('currentExaminingTicket');
@@ -215,7 +202,6 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             this.currentTicket.set(t);
             if (t.id) this.ticketId.set(t.id);
             if (t.examinationRoomId) this.activeRoomId.set(t.examinationRoomId);
-            if (t.patientId) this.loadPatientHistory(t.patientId);
           } else {
             sessionStorage.removeItem('currentExaminingTicket');
           }
@@ -257,7 +243,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             this.patientHistory.set(null);
           }
           this.loadExistingRecord(t.id);
-          this.loadRoomTickets(t.examinationRoomId || 1);
+          this.loadRoomTickets();
         } else {
           this.currentTicket.set(null);
           this.ticketId.set(null);
@@ -276,9 +262,9 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadRoomTickets(roomId?: number): void {
-    const rId = roomId || this.activeRoomId();
-    this.queueService.getRoomQueue(rId).subscribe({
+  // Danh sách bệnh nhân trong ngăn "Đổi bệnh nhân": luôn là hàng đợi phòng bác sĩ đang trực
+  loadRoomTickets(): void {
+    this.queueService.getMyRoomQueue().subscribe({
       next: res => {
         if (res.data) {
           const overview = res.data;
