@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,8 @@ public class DataInitializer implements CommandLineRunner {
     private final MedicalRecordRepository medicalRecordRepository;
     private final QueueTicketRepository queueTicketRepository;
     private final AppointmentRepository appointmentRepository;
+    private final LabServiceRepository labServiceRepository;
+    private final LabOrderRepository labOrderRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -44,6 +47,7 @@ public class DataInitializer implements CommandLineRunner {
         Role adminRole = createRoleIfNotFound("ROLE_ADMIN", "Quản trị viên toàn hệ thống");
         Role doctorRole = createRoleIfNotFound("ROLE_DOCTOR", "Bác sĩ khám chữa bệnh");
         Role staffRole = createRoleIfNotFound("ROLE_STAFF", "Nhân viên tiếp đón và điều phối hàng đợi");
+        Role labTechRole = createRoleIfNotFound("ROLE_LAB_TECH", "Kỹ thuật viên phòng Xét nghiệm & Cận lâm sàng");
         Role patientRole = createRoleIfNotFound("ROLE_PATIENT", "Bệnh nhân đặt khám và lấy số thứ tự");
 
         // 2. Tạo 7 chuyên khoa lâm sàng đa dạng
@@ -190,6 +194,43 @@ public class DataInitializer implements CommandLineRunner {
             staffUser2.addRole(staffRole);
             userRepository.save(staffUser2);
             log.info("-> Đã tạo tài khoản Nhân viên: staff_quang / Staff@123456 (Nguyễn Văn Quang)");
+        }
+
+        if (!userRepository.existsByUsername("ktv_lan")) {
+            Employee ktv = Employee.builder()
+                    .fullName("Trần Thị Lan")
+                    .gender("Nữ")
+                    .dateOfBirth(LocalDate.of(1992, 10, 12))
+                    .address("Thanh Xuân, Hà Nội")
+                    .nationalId("001092887766")
+                    .employeeCode("KTV001")
+                    .position("Kỹ thuật viên Trưởng Phòng Xét Nghiệm & Cận Lâm Sàng")
+                    .hireDate(LocalDate.of(2022, 3, 1))
+                    .build();
+            ktv = employeeRepository.save(ktv);
+
+            User ktvUser = User.builder()
+                    .username("ktv_lan")
+                    .passwordHash(passwordEncoder.encode("123456"))
+                    .email("lan.tran@clinic.com")
+                    .phoneNumber("0918776655")
+                    .status("ACTIVE")
+                    .person(ktv)
+                    .build();
+            ktvUser.addRole(labTechRole);
+            ktvUser.addRole(staffRole);
+            userRepository.save(ktvUser);
+            log.info("-> Đã tạo tài khoản Kỹ thuật viên: ktv_lan / 123456 (Trần Thị Lan) với vai trò ROLE_LAB_TECH");
+        } else {
+            userRepository.findByUsername("ktv_lan").ifPresent(u -> {
+                boolean hasLabTech = u.getUserRoles().stream()
+                        .anyMatch(ur -> "ROLE_LAB_TECH".equals(ur.getRole().getName()));
+                if (!hasLabTech) {
+                    u.addRole(labTechRole);
+                    userRepository.save(u);
+                    log.info("-> Đã cập nhật bổ sung vai trò ROLE_LAB_TECH cho tài khoản ktv_lan");
+                }
+            });
         }
 
         // 7. Tạo 5 Bệnh nhân mẫu với các độ tuổi và nhóm máu khác nhau
@@ -776,6 +817,290 @@ public class DataInitializer implements CommandLineRunner {
 
             appointmentRepository.saveAll(sampleAppointments);
             log.info("-> Đã khởi tạo các cuộc hẹn mẫu với trạng thái hoàn tất / huỷ lịch để tính tỷ lệ huỷ!");
+        }
+
+        // 3. Khởi tạo danh mục dịch vụ cận lâm sàng / xét nghiệm (Lab Services)
+        initComprehensiveLabServices();
+
+        // 4. Khởi tạo các ca dữ liệu mẫu chuyên biệt cho luồng Xét Nghiệm
+        initSampleLabWorkflowTickets(today, room101, room102, doctorHung, doctorHoa);
+    }
+
+    private void initComprehensiveLabServices() {
+        createLabServiceIfNotFound("XN-HEM-01", "Tổng phân tích tế bào máu ngoại vi bằng máy laser (22 thông số)",
+                120000.0, "4.0 - 10.0 G/L (WBC), 4.2 - 5.4 T/L (RBC)", 4.0, 10.0, "G/L", "Huyết học",
+                "Đánh giá số lượng bạch cầu, hồng cầu, tiểu cầu, phát hiện tình trạng nhiễm trùng, thiếu máu.");
+
+        createLabServiceIfNotFound("XN-GLU-01", "Định lượng Glucose trong máu (Đường huyết lúc đói)",
+                60000.0, "3.9 - 6.4 mmol/L", 3.9, 6.4, "mmol/L", "Sinh hóa máu",
+                "Sàng lọc, chẩn đoán và theo dõi điều trị đái tháo đường.");
+
+        createLabServiceIfNotFound("XN-HBA1C-01", "Đo phần trăm HbA1c trong máu (Sắc ký lỏng)",
+                150000.0, "4.0 - 5.6 %", 4.0, 5.6, "%", "Sinh hóa máu",
+                "Chỉ số vàng theo dõi đường huyết trung bình trong 3 tháng gần nhất.");
+
+        createLabServiceIfNotFound("XN-URE-01", "Định lượng Ure máu",
+                60000.0, "2.5 - 7.5 mmol/L", 2.5, 7.5, "mmol/L", "Sinh hóa máu",
+                "Đánh giá chức năng lọc cầu thận và tình trạng chuyển hóa đạm.");
+
+        createLabServiceIfNotFound("XN-CRE-01", "Định lượng Creatinin huyết thanh",
+                65000.0, "62 - 115 umol/L", 62.0, 115.0, "umol/L", "Sinh hóa máu",
+                "Đánh giá chính xác chức năng lọc cầu thận và độ thanh thải thận.");
+
+        createLabServiceIfNotFound("XN-AST-01", "Đo hoạt độ AST (GOT) trong máu",
+                55000.0, "< 37 U/L", 0.0, 37.0, "U/L", "Men gan",
+                "Đánh giá tổn thương tế bào gan, hoại tử nhu mô gan hoặc cơ tim.");
+
+        createLabServiceIfNotFound("XN-ALT-01", "Đo hoạt độ ALT (GPT) trong máu",
+                55000.0, "< 40 U/L", 0.0, 40.0, "U/L", "Men gan",
+                "Chỉ số đặc hiệu cảnh báo viêm gan cấp, viêm gan virus, tổn thương gan do thuốc.");
+
+        createLabServiceIfNotFound("XN-GGT-01", "Đo hoạt độ GGT (Gamma GT) trong máu",
+                65000.0, "< 55 U/L", 0.0, 55.0, "U/L", "Men gan",
+                "Đánh giá tổn thương đường mật, ứ mật và tác hại của rượu bia lên gan.");
+
+        createLabServiceIfNotFound("XN-CHOL-01", "Định lượng Cholesterol toàn phần",
+                70000.0, "3.9 - 5.2 mmol/L", 3.9, 5.2, "mmol/L", "Mỡ máu",
+                "Sàng lọc rối loạn lipid máu và nguy cơ mảng xơ vữa động mạch.");
+
+        createLabServiceIfNotFound("XN-TRIG-01", "Định lượng Triglycerid huyết thanh",
+                65000.0, "0.4 - 1.7 mmol/L", 0.4, 1.7, "mmol/L", "Mỡ máu",
+                "Đánh giá rối loạn chuyển hóa mỡ máu và nguy cơ viêm tụy cấp khi tăng quá cao.");
+
+        createLabServiceIfNotFound("XN-HDL-01", "Định lượng HDL-Cholesterol (Mỡ tốt bảo vệ tim)",
+                70000.0, "> 1.0 mmol/L", 1.0, 3.5, "mmol/L", "Mỡ máu",
+                "Mỡ có lợi giúp vận chuyển cholesterol dư thừa từ mạch máu về gan thoái hóa.");
+
+        createLabServiceIfNotFound("XN-LDL-01", "Định lượng LDL-Cholesterol (Mỡ xấu gây xơ vữa)",
+                70000.0, "< 3.4 mmol/L", 0.0, 3.4, "mmol/L", "Mỡ máu",
+                "Yếu tố nguy cơ hàng đầu gây tắc nghẽn động mạch và nhồi máu cơ tim.");
+
+        createLabServiceIfNotFound("XN-URIC-01", "Định lượng Acid Uric trong máu",
+                65000.0, "200 - 420 umol/L", 200.0, 420.0, "umol/L", "Sinh hóa máu",
+                "Chẩn đoán cơn gút (gout) cấp tính và theo dõi nồng độ acid uric ở người thừa đạm.");
+
+        createLabServiceIfNotFound("XN-URI-01", "Tổng phân tích nước tiểu tự động (10 thông số)",
+                50000.0, "Âm tính các thông số bệnh lý", null, null, "Que thử", "Nước tiểu",
+                "Phát hiện hồng cầu, bạch cầu, protein, đường trong nước tiểu, tầm soát bệnh thận - tiết niệu.");
+
+        createLabServiceIfNotFound("XN-DENGUE-01", "Test nhanh kháng nguyên & kháng thể Sốt xuất huyết Dengue",
+                180000.0, "Âm tính (Negative)", null, null, "Test nhanh", "Miễn dịch",
+                "Phát hiện sớm kháng nguyên NS1 và kháng thể IgM/IgG Dengue từ ngày đầu của sốt.");
+
+        createLabServiceIfNotFound("XN-CRP-01", "Định lượng CRP (C-Reactive Protein định lượng cao)",
+                130000.0, "< 5.0 mg/L", 0.0, 5.0, "mg/L", "Miễn dịch",
+                "Chỉ số sinh học đánh giá nhanh phản ứng viêm nhiễm cấp do vi khuẩn.");
+
+        createLabServiceIfNotFound("CDHA-XR-01", "Chụp X-Quang ngực thẳng kỹ thuật số (CR/DR)",
+                150000.0, "Hình ảnh tim phổi bình thường", null, null, "Phim", "Chẩn đoán hình ảnh",
+                "Kiểm tra tổn thương nhu mô phổi, phế quản, bóng tim và xương lồng ngực.");
+
+        createLabServiceIfNotFound("CDHA-US-01", "Siêu âm ổ bụng tổng quát Doppler màu",
+                180000.0, "Cấu trúc gan, mật, tụy, lách, thận bình thường", null, null, "Lần", "Chẩn đoán hình ảnh",
+                "Khảo sát hình thái các tạng trong ổ bụng, phát hiện khối u, sỏi, nang, dịch tự do.");
+
+        createLabServiceIfNotFound("CDHA-ECG-01", "Ghi điện tim (ECG) 12 chuyển đạo",
+                80000.0, "Nhịp xoang đều, tần số 60 - 90 chu kỳ/phút", null, null, "Bản ghi", "Chẩn đoán hình ảnh",
+                "Phát hiện nhanh rối loạn nhịp tim, thiếu máu cục bộ cơ tim và phì đại tâm thất.");
+
+        createLabServiceIfNotFound("CDHA-CT-01", "Chụp cắt lớp vi tính (CT Scanner) sọ não",
+                950000.0, "Nhu mô não không thấy ổ tổn thương tỷ trọng bất thường", null, null, "Lần", "Chẩn đoán hình ảnh",
+                "Chẩn đoán tai biến mạch máu não, xuất huyết não, chấn thương sọ não cấp.");
+
+        log.info("-> Đã kiểm tra và đồng bộ đầy đủ danh mục xét nghiệm & cận lâm sàng!");
+    }
+
+    private LabService createLabServiceIfNotFound(String code, String name, Double price, String refRange,
+                                                  Double lower, Double upper, String unit, String category, String desc) {
+        return labServiceRepository.findByServiceCode(code).orElseGet(() -> {
+            LabService s = LabService.builder()
+                    .serviceCode(code)
+                    .serviceName(name)
+                    .price(price)
+                    .referenceRange(refRange)
+                    .lowerLimit(lower)
+                    .upperLimit(upper)
+                    .unit(unit)
+                    .category(category)
+                    .description(desc)
+                    .isActive(true)
+                    .build();
+            return labServiceRepository.save(s);
+        });
+    }
+
+    private void initSampleLabWorkflowTickets(LocalDate today, ExaminationRoom room101, ExaminationRoom room102,
+                                             Doctor doctorHung, Doctor doctorHoa) {
+        // Ca 1: P101-005 - WAITING_FOR_RESULTS (Có 2 chỉ định PENDING để KTV test bấm "Tiếp nhận" và "Nhập KQ")
+        if (queueTicketRepository.findByTicketNumberAndTicketDate("P101-005", today).isEmpty()) {
+            QueueTicket ticket1 = QueueTicket.builder()
+                    .ticketNumber("P101-005")
+                    .ticketDate(today)
+                    .patientName("Hoàng Minh Tuấn")
+                    .patientPhone("0912888999")
+                    .patientGender("Nam")
+                    .patientYearOfBirth(1990)
+                    .status("WAITING_FOR_RESULTS")
+                    .isEmergency(false)
+                    .hasAppointment(false)
+                    .priorityScore(0)
+                    .checkInTime(LocalTime.of(9, 30))
+                    .callTime(LocalTime.of(9, 40))
+                    .startTime(LocalTime.of(9, 42))
+                    .estimatedWaitingMinutes(20)
+                    .examinationRoom(room101)
+                    .doctor(doctorHung)
+                    .build();
+            ticket1 = queueTicketRepository.save(ticket1);
+
+            MedicalRecord record1 = medicalRecordRepository.save(MedicalRecord.builder()
+                    .symptoms("Sốt cao 39°C liên tục 3 ngày, đau mỏi cơ khớp toàn thân, nhức hai hốc mắt, mệt lả.")
+                    .preliminaryDiagnosis("Theo dõi Sốt xuất huyết Dengue ngày thứ 3 / Sốt siêu vi")
+                    .vitalSigns("HA: 115/75 mmHg, Mạch: 88 ck/ph, T: 39.1°C, SpO2: 98%")
+                    .bloodPressure("115/75").heartRate(88).temperature(39.1).weight(68.0).height(172.0)
+                    .queueTicket(ticket1).doctor(doctorHung).build());
+
+            LabService hem = labServiceRepository.findByServiceCode("XN-HEM-01").orElse(null);
+            LabService dengue = labServiceRepository.findByServiceCode("XN-DENGUE-01").orElse(null);
+
+            List<LabOrder> orders = new ArrayList<>();
+            if (hem != null) {
+                orders.add(LabOrder.builder().medicalRecord(record1).labService(hem).price(hem.getPrice())
+                        .status("PENDING").notes("Kiểm tra số lượng tiểu cầu và hematocrit xem có cô đặc máu không").build());
+            }
+            if (dengue != null) {
+                orders.add(LabOrder.builder().medicalRecord(record1).labService(dengue).price(dengue.getPrice())
+                        .status("PENDING").notes("Test NS1 Ag và IgM/IgG chẩn đoán sốt xuất huyết").build());
+            }
+            labOrderRepository.saveAll(orders);
+            log.info("-> Đã tạo ca P101-005 (Hoàng Minh Tuấn) với 2 chỉ định PENDING!");
+        }
+
+        // Ca 2: P102-003 - WAITING_FOR_RESULTS (Có 2 chỉ định PROCESSING đang chạy máy sinh hóa)
+        if (queueTicketRepository.findByTicketNumberAndTicketDate("P102-003", today).isEmpty()) {
+            QueueTicket ticket2 = QueueTicket.builder()
+                    .ticketNumber("P102-003")
+                    .ticketDate(today)
+                    .patientName("Bùi Thanh Hương")
+                    .patientPhone("0983112233")
+                    .patientGender("Nữ")
+                    .patientYearOfBirth(1975)
+                    .status("WAITING_FOR_RESULTS")
+                    .isEmergency(false)
+                    .hasAppointment(true)
+                    .priorityScore(10)
+                    .checkInTime(LocalTime.of(8, 45))
+                    .callTime(LocalTime.of(8, 55))
+                    .startTime(LocalTime.of(9, 0))
+                    .estimatedWaitingMinutes(15)
+                    .examinationRoom(room102)
+                    .doctor(doctorHoa)
+                    .build();
+            ticket2 = queueTicketRepository.save(ticket2);
+
+            MedicalRecord record2 = medicalRecordRepository.save(MedicalRecord.builder()
+                    .symptoms("Tức nặng ngực trái khi gắng sức, hồi hộp trống ngực, tiền sử tăng mỡ máu.")
+                    .preliminaryDiagnosis("Theo dõi Bệnh mạch vành / Rối loạn lipid máu hỗn hợp")
+                    .vitalSigns("HA: 135/85 mmHg, Mạch: 78 ck/ph, T: 36.6°C, SpO2: 99%")
+                    .bloodPressure("135/85").heartRate(78).temperature(36.6).weight(58.0).height(155.0)
+                    .queueTicket(ticket2).doctor(doctorHoa).build());
+
+            LabService chol = labServiceRepository.findByServiceCode("XN-CHOL-01").orElse(null);
+            LabService ldl = labServiceRepository.findByServiceCode("XN-LDL-01").orElse(null);
+            LabService ecg = labServiceRepository.findByServiceCode("CDHA-ECG-01").orElse(null);
+
+            List<LabOrder> orders2 = new ArrayList<>();
+            if (chol != null) {
+                orders2.add(LabOrder.builder().medicalRecord(record2).labService(chol).price(chol.getPrice())
+                        .status("PROCESSING").resultValue("Đang ly tâm mẫu huyết thanh").notes("Mẫu máu lấy lúc 09:10").build());
+            }
+            if (ldl != null) {
+                orders2.add(LabOrder.builder().medicalRecord(record2).labService(ldl).price(ldl.getPrice())
+                        .status("PROCESSING").resultValue("Đang ủ hóa chất đo quang").notes("Chờ đọc kết quả máy tự động").build());
+            }
+            if (ecg != null) {
+                orders2.add(LabOrder.builder().medicalRecord(record2).labService(ecg).price(ecg.getPrice())
+                        .status("COMPLETED").resultValue("Nhịp xoang đều, 76 ck/phút, ST không chênh")
+                        .conclusion("Chưa thấy hình ảnh thiếu máu cục bộ cơ tim trên điện tâm đồ").performedTime(LocalDateTime.now().minusMinutes(20))
+                        .notes("Đã in bản ghi 12 cần").build());
+            }
+            labOrderRepository.saveAll(orders2);
+            log.info("-> Đã tạo ca P102-003 (Bùi Thanh Hương) với 2 chỉ định PROCESSING và 1 COMPLETED!");
+        }
+
+        // Ca 3: P101-006 - RESULTS_READY (Đã có kết quả xét nghiệm, có chỉ số bất thường vọt ngưỡng bôi đỏ)
+        if (queueTicketRepository.findByTicketNumberAndTicketDate("P101-006", today).isEmpty()) {
+            QueueTicket ticket3 = QueueTicket.builder()
+                    .ticketNumber("P101-006")
+                    .ticketDate(today)
+                    .patientName("Lê Thị Mai")
+                    .patientPhone("0988665544")
+                    .patientGender("Nữ")
+                    .patientYearOfBirth(1982)
+                    .status("RESULTS_READY")
+                    .isEmergency(false)
+                    .hasAppointment(false)
+                    .priorityScore(0)
+                    .checkInTime(LocalTime.of(9, 15))
+                    .callTime(LocalTime.of(9, 25))
+                    .startTime(LocalTime.of(9, 27))
+                    .estimatedWaitingMinutes(10)
+                    .examinationRoom(room101)
+                    .doctor(doctorHung)
+                    .build();
+            ticket3 = queueTicketRepository.save(ticket3);
+
+            MedicalRecord record3 = medicalRecordRepository.save(MedicalRecord.builder()
+                    .symptoms("Khát nước nhiều, tiểu đêm 3-4 lần, sụt 3kg trong 1 tháng qua, ăn nhiều nhưng hay mệt mỏi.")
+                    .preliminaryDiagnosis("Theo dõi Đái tháo đường type 2 / Rối loạn chuyển hóa men gan")
+                    .vitalSigns("HA: 130/85 mmHg, Mạch: 80 ck/ph, T: 36.8°C, BMI: 25.4")
+                    .bloodPressure("130/85").heartRate(80).temperature(36.8).weight(64.0).height(158.0)
+                    .queueTicket(ticket3).doctor(doctorHung).build());
+
+            LabService glu = labServiceRepository.findByServiceCode("XN-GLU-01").orElse(null);
+            LabService alt = labServiceRepository.findByServiceCode("XN-ALT-01").orElse(null);
+            LabService hba1c = labServiceRepository.findByServiceCode("XN-HBA1C-01").orElse(null);
+
+            List<LabOrder> orders3 = new ArrayList<>();
+            if (glu != null) {
+                orders3.add(LabOrder.builder().medicalRecord(record3).labService(glu).price(glu.getPrice())
+                        .resultValue("9.8").isAbnormal(true).conclusion("Đường huyết lúc đói tăng cao vượt ngưỡng tham chiếu (3.9 - 6.4 mmol/L)")
+                        .status("COMPLETED").performedTime(LocalDateTime.now().minusMinutes(15)).notes("Đã kiểm tra lại 2 lần trên máy sinh hóa").build());
+            }
+            if (alt != null) {
+                orders3.add(LabOrder.builder().medicalRecord(record3).labService(alt).price(alt.getPrice())
+                        .resultValue("68.0").isAbnormal(true).conclusion("Hoạt độ men gan ALT tăng gấp 1.7 lần giới hạn trên (< 40 U/L)")
+                        .status("COMPLETED").performedTime(LocalDateTime.now().minusMinutes(15)).notes("Huyết thanh đục nhẹ").build());
+            }
+            if (hba1c != null) {
+                orders3.add(LabOrder.builder().medicalRecord(record3).labService(hba1c).price(hba1c.getPrice())
+                        .resultValue("7.8").isAbnormal(true).conclusion("Chỉ số HbA1c tăng cao (> 6.5%), xác định đái tháo đường chưa kiểm soát")
+                        .status("COMPLETED").performedTime(LocalDateTime.now().minusMinutes(15)).notes("Chạy sắc ký lỏng cao áp").build());
+            }
+            labOrderRepository.saveAll(orders3);
+            log.info("-> Đã tạo ca P101-006 (Lê Thị Mai) với 3 chỉ định COMPLETED bất thường!");
+        }
+
+        // Ca 4: P101-007 - WAITING (Chờ vào khám ban đầu)
+        if (queueTicketRepository.findByTicketNumberAndTicketDate("P101-007", today).isEmpty()) {
+            QueueTicket ticketWaiting = QueueTicket.builder()
+                    .ticketNumber("P101-007")
+                    .ticketDate(today)
+                    .patientName("Nguyễn Văn An")
+                    .patientPhone("0977223344")
+                    .patientGender("Nam")
+                    .patientYearOfBirth(1988)
+                    .status("WAITING")
+                    .isEmergency(false)
+                    .hasAppointment(false)
+                    .priorityScore(0)
+                    .checkInTime(LocalTime.of(9, 45))
+                    .estimatedWaitingMinutes(25)
+                    .examinationRoom(room101)
+                    .doctor(doctorHung)
+                    .build();
+            queueTicketRepository.save(ticketWaiting);
+            log.info("-> Đã tạo ca P101-007 (Nguyễn Văn An) trạng thái WAITING!");
         }
     }
 }

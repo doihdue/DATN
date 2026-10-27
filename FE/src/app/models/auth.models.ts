@@ -7,6 +7,7 @@ export interface UserSummary {
   avatarUrl?: string;
   status: string;
   personId?: number;
+  position?: string;
   roles: string[];
 }
 

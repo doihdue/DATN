@@ -127,4 +127,12 @@ public class MedicalRecordController {
         List<MedicalRecordResponse> list = medicalRecordService.getRecordsByDoctorId(doctorId);
         return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách bệnh án của bác sĩ thành công"));
     }
+
+    // 5b. Bác sĩ đang đăng nhập lấy danh sách toàn bộ bệnh án mình đã khám
+    @GetMapping({"/doctor/my", "/my-doctor-records"})
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<ApiResponse<List<MedicalRecordResponse>>> getMyDoctorRecords() {
+        List<MedicalRecordResponse> list = medicalRecordService.getMyDoctorRecords();
+        return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách ca khám của bác sĩ hiện tại thành công"));
+    }
 }

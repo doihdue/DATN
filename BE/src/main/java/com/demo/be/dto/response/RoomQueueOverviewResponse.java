@@ -25,7 +25,13 @@ public class RoomQueueOverviewResponse {
     private QueueTicketResponse currentCalledTicket;    // Đang gọi vào phòng
 
     @Builder.Default
-    private List<QueueTicketResponse> waitingTickets = new ArrayList<>(); // Danh sách đang chờ
+    private List<QueueTicketResponse> waitingTickets = new ArrayList<>(); // Danh sách đang chờ khám lần 1
+
+    @Builder.Default
+    private List<QueueTicketResponse> resultsReadyTickets = new ArrayList<>(); // Danh sách đã có kết quả CLS (Ưu tiên gọi)
+
+    @Builder.Default
+    private List<QueueTicketResponse> waitingForResultsTickets = new ArrayList<>(); // Danh sách đang làm xét nghiệm / chờ kết quả
 
     @Builder.Default
     private List<QueueTicketResponse> skippedTickets = new ArrayList<>(); // Danh sách bị nhỡ lượt

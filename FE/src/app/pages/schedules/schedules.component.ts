@@ -18,13 +18,13 @@ import { Specialty } from '../../models/specialty.model';
         <div class="header-left">
           <div class="header-badge">
             <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
-            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : 'Lịch Trực Ca Bác Sĩ' }}
+            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : (authService.isLabTech() ? 'Lịch Trực Ca & Phân Công' : 'Lịch Trực Ca Bác Sĩ') }}
           </div>
-          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc Bác Sĩ' : 'Danh Sách Ca Làm Việc & Trực Khám' }}</h1>
+          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc' : (authService.isLabTech() ? 'Lịch Phân Công Ca Trực' : 'Danh Sách Ca Làm Việc & Trực Khám') }}</h1>
           <p class="page-subtitle">
             {{ isAdmin() 
               ? 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' 
-              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân đã tiếp nhận' }}
+              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
           </p>
         </div>
         @if (isAdmin()) {

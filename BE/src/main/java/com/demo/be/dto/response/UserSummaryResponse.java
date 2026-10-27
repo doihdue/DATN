@@ -19,5 +19,6 @@ public class UserSummaryResponse {
     private String avatarUrl;
     private String status;
     private Long personId;
+    private String position;
     private List<String> roles;
 }

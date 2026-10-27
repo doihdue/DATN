@@ -59,6 +59,10 @@ public class MedicalRecordResponse {
     // Đơn thuốc (Extend UC)
     private PrescriptionResponse prescription;
 
+    // Danh sách chỉ định cận lâm sàng / xét nghiệm
+    @Builder.Default
+    private java.util.List<LabOrderResponse> labOrders = new java.util.ArrayList<>();
+
     public static MedicalRecordResponse fromEntity(MedicalRecord record) {
         if (record == null) return null;
 
@@ -78,6 +82,12 @@ public class MedicalRecordResponse {
                 .notes(record.getNotes())
                 .revisitDate(record.getRevisitDate())
                 .revisitNotes(record.getRevisitNotes());
+
+        if (record.getLabOrders() != null && !record.getLabOrders().isEmpty()) {
+            builder.labOrders(record.getLabOrders().stream()
+                    .map(LabOrderResponse::fromEntity)
+                    .collect(java.util.stream.Collectors.toList()));
+        }
 
         if (record.getPatient() != null) {
             builder.patientId(record.getPatient().getId());

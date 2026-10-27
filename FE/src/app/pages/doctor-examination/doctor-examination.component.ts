@@ -5,7 +5,9 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MedicalRecordService } from '../../services/medical-record.service';
 import { MedicineCategoryService } from '../../services/medicine-category.service';
 import { QueueService } from '../../services/queue.service';
+import { ScheduleService } from '../../services/schedule.service';
 import { AuthService } from '../../services/auth.service';
+import { ClinicalLabService } from '../../services/lab.service';
 import {
   Medicine,
   PrescriptionItemRequest,
@@ -15,8 +17,8 @@ import {
 } from '../../models/medical-record.model';
 import { MedicineCategory } from '../../models/medicine-category.model';
 import { QueueTicket } from '../../models/queue.model';
-import { ScheduleService } from '../../services/schedule.service';
 import { ExaminationRoom } from '../../models/schedule.model';
+import { LabService, LabOrder, SendLabOrdersRequest } from '../../models/lab.model';
 
 interface PrescribedItemUI extends PrescriptionItemRequest {
   _medicineName: string;
@@ -41,6 +43,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   private readonly categoryService = inject(MedicineCategoryService);
   private readonly queueService = inject(QueueService);
   private readonly scheduleService = inject(ScheduleService);
+  private readonly labService = inject(ClinicalLabService);
   readonly authService = inject(AuthService);
 
   // Trạng thái phiếu khám & bệnh nhân
@@ -126,6 +129,27 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   showPrintModal = signal<boolean>(false);
   downloadingPdf = signal<boolean>(false);
 
+  // UC: Cận lâm sàng & Xét nghiệm (Lab Orders)
+  existingRecordId = signal<number | null>(null);
+  availableLabServices = signal<LabService[]>([]);
+  filteredLabServices = signal<LabService[]>([]);
+  selectedLabServices = signal<LabService[]>([]);
+  labSearchKeyword = '';
+  selectedLabCategory = signal<string>('ALL');
+  submittingLab = signal<boolean>(false);
+  labOrders = signal<LabOrder[]>([]);
+  showLabPrintModal = signal<boolean>(false);
+  lastSentLabRecord = signal<MedicalRecordResponse | null>(null);
+
+  labCategories = computed(() => {
+    const list = this.availableLabServices().map(s => s.category).filter((c): c is string => !!c);
+    const unique = Array.from(new Set(list));
+    return ['ALL', ...unique];
+  });
+
+  totalLabFee = computed(() => this.selectedLabServices().reduce((sum, s) => sum + s.price, 0));
+  hasAbnormalLabResults = computed(() => this.labOrders().some(o => o.isAbnormal));
+
   // Quản lý trạng thái lỗi validation của các trường nhập liệu
   validationErrors: Record<string, boolean> = {};
 
@@ -210,9 +234,10 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Tải danh mục thuốc & nhóm thuốc sẵn sàng cho tra cứu
+    // Tải danh mục thuốc & nhóm thuốc & danh mục dịch vụ cận lâm sàng
     this.loadCategories();
     this.loadMedicines();
+    this.loadLabServices();
   }
 
   ngOnDestroy(): void {}
@@ -230,11 +255,14 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
           } else {
             this.patientHistory.set(null);
           }
+          this.loadExistingRecord(t.id);
           this.loadRoomTickets(t.examinationRoomId || 1);
         } else {
           this.currentTicket.set(null);
           this.ticketId.set(null);
           this.patientHistory.set(null);
+          this.existingRecordId.set(null);
+          this.labOrders.set([]);
         }
         this.loading.set(false);
       },
@@ -274,6 +302,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     } else {
       this.patientHistory.set(null);
     }
+    this.loadExistingRecord(ticket.id);
     this.showQueueDrawer.set(false);
     this.showAlert(`Đã chuyển sang khám bệnh nhân: ${ticket.patientName} (#${ticket.ticketNumber})`, 'success');
   }
@@ -304,6 +333,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             } else {
               this.patientHistory.set(null);
             }
+            this.loadExistingRecord(activeTicket.id);
             this.loading.set(false);
             return;
           }
@@ -544,6 +574,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
     // Chuẩn bị payload
     const req: CreateMedicalRecordRequest = {
+      recordId: this.existingRecordId() || undefined,
       queueTicketId: ticketId,
       patientId: patientId as any,
       bloodPressure: this.bloodPressure ? this.bloodPressure.trim() : undefined,
@@ -695,7 +726,164 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     this.revisitDate = '';
     this.revisitNotes = '';
     this.prescribedItems = [];
+    this.selectedLabServices.set([]);
+    this.labOrders.set([]);
+    this.existingRecordId.set(null);
     this.router.navigate(['/doctor/calling']);
+  }
+
+  // --- Cận lâm sàng & Xét nghiệm Methods ---
+  loadLabServices(): void {
+    this.labService.getLabServices().subscribe({
+      next: res => {
+        if (res.data) {
+          this.availableLabServices.set(res.data);
+          this.filterLabServices();
+        }
+      }
+    });
+  }
+
+  filterLabServices(): void {
+    const kw = this.labSearchKeyword.trim().toLowerCase();
+    const cat = this.selectedLabCategory();
+    const list = this.availableLabServices().filter(s => {
+      const matchKw = !kw || s.serviceName.toLowerCase().includes(kw) || s.serviceCode.toLowerCase().includes(kw);
+      const matchCat = cat === 'ALL' || s.category === cat;
+      return matchKw && matchCat;
+    });
+    this.filteredLabServices.set(list);
+  }
+
+  onLabCategoryChange(cat: string): void {
+    this.selectedLabCategory.set(cat);
+    this.filterLabServices();
+  }
+
+  toggleLabSelection(service: LabService): void {
+    const current = this.selectedLabServices();
+    const exists = current.some(s => s.id === service.id);
+    if (exists) {
+      this.selectedLabServices.set(current.filter(s => s.id !== service.id));
+    } else {
+      this.selectedLabServices.set([...current, service]);
+    }
+  }
+
+  isLabSelected(id: number): boolean {
+    return this.selectedLabServices().some(s => s.id === id);
+  }
+
+  removeSelectedLab(serviceId: number): void {
+    this.selectedLabServices.set(this.selectedLabServices().filter(s => s.id !== serviceId));
+  }
+
+  // Pha 1: Bác sĩ gửi chỉ định cận lâm sàng & tạm dừng ca khám
+  sendLabOrders(): void {
+    const currentTkt = this.currentTicket();
+    if (!currentTkt) {
+      this.showAlert('Không tìm thấy thông tin lượt khám của bệnh nhân!', 'danger');
+      return;
+    }
+
+    if (this.selectedLabServices().length === 0) {
+      this.showAlert('Vui lòng chọn ít nhất 1 dịch vụ xét nghiệm từ danh mục cận lâm sàng!', 'danger');
+      return;
+    }
+
+    if (!this.symptoms.trim()) {
+      this.validationErrors['symptoms'] = true;
+      this.showAlert('Vui lòng nhập triệu chứng lâm sàng sơ bộ trước khi gửi chỉ định xét nghiệm!', 'danger');
+      this.focusAndScrollToField('symptomsField');
+      return;
+    }
+
+    const req: SendLabOrdersRequest = {
+      queueTicketId: currentTkt.id,
+      patientId: currentTkt.patientId || this.patientHistory()?.patientId,
+      bloodPressure: this.bloodPressure ? this.bloodPressure.trim() : undefined,
+      heartRate: this.heartRate || undefined,
+      temperature: this.temperature || undefined,
+      weight: this.weight || undefined,
+      height: this.height || undefined,
+      vitalSigns: this.vitalSignsNotes ? this.vitalSignsNotes.trim() : undefined,
+      symptoms: this.symptoms.trim(),
+      preliminaryDiagnosis: this.preliminaryDiagnosis ? this.preliminaryDiagnosis.trim() : undefined,
+      notes: this.notes ? this.notes.trim() : undefined,
+      labServiceIds: this.selectedLabServices().map(s => s.id)
+    };
+
+    this.submittingLab.set(true);
+    this.labService.sendLabOrders(req).subscribe({
+      next: res => {
+        this.submittingLab.set(false);
+        this.lastSentLabRecord.set(res.data || null);
+        try {
+          sessionStorage.removeItem('currentExaminingTicket');
+        } catch {}
+        this.showLabPrintModal.set(true);
+        this.showAlert('Đã gửi chỉ định cận lâm sàng thành công! Bệnh nhân đã chuyển sang chờ kết quả.', 'success');
+      },
+      error: err => {
+        this.submittingLab.set(false);
+        this.showAlert(err.error?.message || 'Có lỗi xảy ra khi gửi chỉ định xét nghiệm!', 'danger');
+      }
+    });
+  }
+
+  // Pha 2: Tải lại hồ sơ bệnh án đang khám dở kèm kết quả xét nghiệm
+  loadExistingRecord(ticketId: number): void {
+    this.medicalService.getMedicalRecordByTicketId(ticketId).subscribe({
+      next: res => {
+        if (res.data) {
+          const record = res.data;
+          this.existingRecordId.set(record.id);
+          if (record.bloodPressure) this.bloodPressure = record.bloodPressure;
+          if (record.heartRate) this.heartRate = record.heartRate;
+          if (record.temperature) this.temperature = record.temperature;
+          if (record.weight) this.weight = record.weight;
+          if (record.height) this.height = record.height;
+          if (record.vitalSigns) this.vitalSignsNotes = record.vitalSigns;
+          if (record.symptoms) this.symptoms = record.symptoms;
+          if (record.preliminaryDiagnosis) this.preliminaryDiagnosis = record.preliminaryDiagnosis;
+          if (record.finalDiagnosis) this.finalDiagnosis = record.finalDiagnosis;
+          if (record.icd10Code) this.icd10Code = record.icd10Code;
+          if (record.notes) this.notes = record.notes;
+
+          if (record.labOrders && record.labOrders.length > 0) {
+            this.labOrders.set(record.labOrders);
+          } else {
+            this.labOrders.set([]);
+          }
+        }
+      },
+      error: () => {
+        this.existingRecordId.set(null);
+        this.labOrders.set([]);
+      }
+    });
+  }
+
+  closeLabPrintModalAndClear(): void {
+    this.showLabPrintModal.set(false);
+    this.lastSentLabRecord.set(null);
+    this.selectedLabServices.set([]);
+    this.symptoms = '';
+    this.preliminaryDiagnosis = '';
+    this.finalDiagnosis = '';
+    this.bloodPressure = '';
+    this.heartRate = null;
+    this.temperature = null;
+    this.weight = null;
+    this.height = null;
+    this.vitalSignsNotes = '';
+    this.currentTicket.set(null);
+    this.ticketId.set(null);
+    this.router.navigate(['/doctor/calling']);
+  }
+
+  printLabOrderDocument(): void {
+    window.print();
   }
 
   showAlert(msg: string, type: 'success' | 'danger'): void {
