@@ -87,9 +87,6 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/lab/services" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-journal-medical"></i> Danh mục &amp; Chỉ số
               </a>
-              <a routerLink="/lab/schedule" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-calendar2-week"></i> Ca trực của tôi
-              </a>
             } @else if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
               <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
                 <i class="bi bi-house"></i> Trang chủ

@@ -37,10 +37,15 @@ public class WorkScheduleController {
         return ResponseEntity.ok(ApiResponse.success(schedules, "Lấy danh sách ca làm việc thành công"));
     }
 
-    @GetMapping("/work-schedules/{id}")
-    public ResponseEntity<ApiResponse<WorkScheduleResponse>> getScheduleById(@PathVariable Long id) {
-        WorkScheduleResponse schedule = workScheduleService.getScheduleById(id);
-        return ResponseEntity.ok(ApiResponse.success(schedule, "Lấy chi tiết ca làm việc thành công"));
+
+    @GetMapping("/work-schedules/my")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<ApiResponse<List<WorkScheduleResponse>>> getMySchedules(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        List<WorkScheduleResponse> schedules = workScheduleService.getMySchedules(startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(schedules, "Lấy lịch trực của bác sĩ thành công"));
     }
 
     @GetMapping("/examination-rooms")
@@ -69,15 +74,6 @@ public class WorkScheduleController {
                 .body(ApiResponse.success(response, "Đăng ký ca làm việc định kỳ thành công"));
     }
 
-    @PutMapping("/admin/work-schedules/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<WorkScheduleResponse>> updateSchedule(
-            @PathVariable Long id,
-            @Valid @RequestBody WorkScheduleRequest request
-    ) {
-        WorkScheduleResponse updated = workScheduleService.updateSchedule(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật ca làm việc thành công"));
-    }
 
     @PatchMapping("/admin/work-schedules/{id}/cancel")
     @PreAuthorize("hasRole('ADMIN')")

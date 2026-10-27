@@ -141,12 +141,6 @@ export const routes: Routes = [
     canActivate: [roleGuard(['ADMIN', 'DOCTOR', 'STAFF', 'LAB_TECH'])]
   },
   {
-    path: 'lab/schedule',
-    component: SchedulesComponent,
-    title: 'Ca Trực & Phân Công KTV - MedQueue',
-    canActivate: [labTechGuard]
-  },
-  {
     path: 'staff/appointments',
     component: AppointmentManagementComponent,
     title: 'Quản lý lịch hẹn - MedQueue',

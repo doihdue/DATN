@@ -57,10 +57,6 @@ export class QueueService {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/start`, {});
   }
 
-  completeExamination(ticketId: number): Observable<ApiResponse<QueueTicket>> {
-    return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/complete`, {});
-  }
-
   skipTicket(ticketId: number): Observable<ApiResponse<QueueTicket>> {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/skip`, {});
   }

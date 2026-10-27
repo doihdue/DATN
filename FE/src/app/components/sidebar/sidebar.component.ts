@@ -97,10 +97,6 @@ import { SidebarService } from '../../services/sidebar.service';
             <div class="nav-icon"><i class="bi bi-journal-medical"></i></div>
             <span class="nav-label">DANH MỤC &amp; CHỈ SỐ</span>
           </a>
-          <a routerLink="/lab/schedule" routerLinkActive="active" class="nav-link-item" title="Ca trực phân công">
-            <div class="nav-icon"><i class="bi bi-calendar2-week-fill"></i></div>
-            <span class="nav-label">CA TRỰC CỦA TÔI</span>
-          </a>
         } @else {
           <!-- 4. STAFF / CHUNG MENU (Lễ tân, Điều phối hoặc Fallback an toàn) -->
           <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-link-item" title="Tiếp đón & cấp số">

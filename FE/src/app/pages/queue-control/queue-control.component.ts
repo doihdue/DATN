@@ -229,9 +229,6 @@ import { RouterLink } from '@angular/router';
                              class="btn btn-primary btn-sm">
                             <i class="bi bi-file-earmark-medical-fill"></i> Bàn Khám &amp; Kê Đơn
                           </a>
-                          <button class="btn btn-outline btn-sm" (click)="completeExam(overview()!.currentExaminingTicket!.id)">
-                            <i class="bi bi-check-circle-fill text-success"></i> Xong Nhanh
-                          </button>
                         </div>
                       }
                     </div>
@@ -1863,17 +1860,6 @@ export class QueueControlComponent implements OnInit, OnDestroy {
     try {
       sessionStorage.setItem('currentExaminingTicket', JSON.stringify(ticket));
     } catch { }
-  }
-
-  completeExam(ticketId: number): void {
-    this.queueService.completeExamination(ticketId).subscribe({
-      next: () => {
-        this.showAlert('Đã hoàn thành lượt khám bệnh!', 'success');
-        this.fetchOverview(false);
-        this.loadDisplayBoardCounts();
-      },
-      error: err => this.showAlert(err.error?.message || 'Lỗi khi hoàn thành khám', 'danger')
-    });
   }
 
   skipTicket(ticketId: number): void {

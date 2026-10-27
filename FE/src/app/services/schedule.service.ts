@@ -28,8 +28,12 @@ export class ScheduleService {
     return this.http.get<ApiResponse<WorkSchedule[]>>(`${this.baseUrl}/work-schedules`, { params });
   }
 
-  getScheduleById(id: number): Observable<ApiResponse<WorkSchedule>> {
-    return this.http.get<ApiResponse<WorkSchedule>>(`${this.baseUrl}/work-schedules/${id}`);
+  // Lịch trực của bác sĩ đang đăng nhập (BE tự xác định bác sĩ từ token)
+  getMySchedules(startDate?: string, endDate?: string): Observable<ApiResponse<WorkSchedule[]>> {
+    let params = new HttpParams();
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
+    return this.http.get<ApiResponse<WorkSchedule[]>>(`${this.baseUrl}/work-schedules/my`, { params });
   }
 
   getAllRooms(): Observable<ApiResponse<ExaminationRoom[]>> {
@@ -42,10 +46,6 @@ export class ScheduleService {
 
   createBatchSchedules(request: BatchWorkScheduleRequest): Observable<ApiResponse<BatchWorkScheduleResponse>> {
     return this.http.post<ApiResponse<BatchWorkScheduleResponse>>(`${this.baseUrl}/admin/work-schedules/batch`, request);
-  }
-
-  updateSchedule(id: number, request: WorkScheduleRequest): Observable<ApiResponse<WorkSchedule>> {
-    return this.http.put<ApiResponse<WorkSchedule>>(`${this.baseUrl}/admin/work-schedules/${id}`, request);
   }
 
   cancelSchedule(id: number, reason?: string): Observable<ApiResponse<WorkSchedule>> {

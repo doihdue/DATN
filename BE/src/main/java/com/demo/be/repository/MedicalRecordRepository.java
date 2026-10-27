@@ -15,7 +15,8 @@ public interface MedicalRecordRepository extends JpaRepository<MedicalRecord, Lo
 
     // Nạp sẵn bác sĩ, vé khám, đơn thuốc trong cùng truy vấn để tránh N+1 khi xem tiền sử bệnh
     @EntityGraph(attributePaths = {"patient", "doctor", "doctor.specialty", "queueTicket", "prescription"})
-    List<MedicalRecord> findByPatientIdOrderByCreatedAtDesc(Long patientId);
+    @Query("SELECT mr FROM MedicalRecord mr WHERE mr.patient.id = :patientId ORDER BY mr.createdAt DESC")
+    List<MedicalRecord> findPatientHistory(@Param("patientId") Long patientId);
 
     Optional<MedicalRecord> findByQueueTicketId(Long queueTicketId);
 
