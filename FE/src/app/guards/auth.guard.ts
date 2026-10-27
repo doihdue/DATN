@@ -72,7 +72,7 @@ export const patientOrGuestGuard: CanActivateFn = () => {
 
 /**
  * Guard dành riêng cho Bàn Tiếp Đón & Điều Phối Lễ Tân.
- * - Chỉ Nhân viên Lễ tân (STAFF) hoặc ADMIN.
+ * - Chỉ Nhân viên Lễ tân (STAFF).
  * - Kỹ thuật viên Xét nghiệm bị chuyển hướng về /lab.
  */
 export const receptionistGuard: CanActivateFn = () => {
@@ -89,7 +89,28 @@ export const receptionistGuard: CanActivateFn = () => {
     return false;
   }
 
-  if (authService.hasRole('STAFF') || authService.hasRole('ADMIN')) {
+  if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+    return true;
+  }
+
+  router.navigate(['/']);
+  return false;
+};
+
+/**
+ * Guard dành riêng cho Bàn làm việc & Ca trực của Kỹ thuật viên Xét nghiệm.
+ * - Chỉ KTV Xét nghiệm (không cho Admin, Bác sĩ, Lễ tân vào).
+ */
+export const labTechGuard: CanActivateFn = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    router.navigate(['/login']);
+    return false;
+  }
+
+  if (authService.isLabTech() && !authService.hasRole('ADMIN')) {
     return true;
   }
 

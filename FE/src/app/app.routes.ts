@@ -19,7 +19,7 @@ import { StaffComponent } from './pages/staff/staff.component';
 import { LabManagementComponent } from './pages/lab-management/lab-management.component';
 import { LabServicesComponent } from './pages/lab-services/lab-services.component';
 import { DoctorHistoryComponent } from './pages/doctor-history/doctor-history.component';
-import { roleGuard, patientOrGuestGuard, receptionistGuard } from './guards/auth.guard';
+import { roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   // Trang chủ - ai cũng vào được
@@ -94,13 +94,13 @@ export const routes: Routes = [
     path: 'doctor/history',
     component: DoctorHistoryComponent,
     title: 'Lịch Sử Ca Khám Bệnh - MedQueue',
-    canActivate: [roleGuard(['DOCTOR', 'ADMIN'])]
+    canActivate: [roleGuard(['DOCTOR'])]
   },
   {
     path: 'doctor/medicines',
     component: MedicinesComponent,
     title: 'Tra Cứu Danh Mục Thuốc - MedQueue',
-    canActivate: [roleGuard(['DOCTOR', 'ADMIN'])]
+    canActivate: [roleGuard(['DOCTOR'])]
   },
   {
     path: 'doctor/schedule',
@@ -132,7 +132,7 @@ export const routes: Routes = [
     path: 'lab',
     component: LabManagementComponent,
     title: 'Phòng Xét Nghiệm & Cận Lâm Sàng - MedQueue',
-    canActivate: [roleGuard(['ADMIN', 'DOCTOR', 'STAFF', 'LAB_TECH'])]
+    canActivate: [labTechGuard]
   },
   {
     path: 'lab/services',
@@ -144,7 +144,7 @@ export const routes: Routes = [
     path: 'lab/schedule',
     component: SchedulesComponent,
     title: 'Ca Trực & Phân Công KTV - MedQueue',
-    canActivate: [roleGuard(['ADMIN', 'STAFF', 'LAB_TECH'])]
+    canActivate: [labTechGuard]
   },
   {
     path: 'staff/appointments',

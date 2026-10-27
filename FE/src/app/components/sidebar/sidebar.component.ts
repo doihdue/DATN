@@ -61,14 +61,6 @@ import { SidebarService } from '../../services/sidebar.service';
             <div class="nav-icon"><i class="bi bi-journal-medical"></i></div>
             <span class="nav-label">DANH MỤC XÉT NGHIỆM</span>
           </a>
-          <a routerLink="/lab" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-link-item" title="Bàn làm việc kỹ thuật viên xét nghiệm">
-            <div class="nav-icon"><i class="bi bi-eyedropper"></i></div>
-            <span class="nav-label">PHÒNG XÉT NGHIỆM</span>
-          </a>
-          <a routerLink="/staff/queue" routerLinkActive="active" class="nav-link-item" title="Bàn điều phối hàng đợi phòng khám">
-            <div class="nav-icon"><i class="bi bi-sliders"></i></div>
-            <span class="nav-label">ĐIỀU PHỐI HÀNG ĐỢI</span>
-          </a>
         } @else if (isDoctor()) {
           <!-- 2. DOCTOR MENU -->
           <a routerLink="/doctor/calling" routerLinkActive="active" class="nav-link-item" title="Bàn gọi số khám bệnh">
@@ -118,10 +110,6 @@ import { SidebarService } from '../../services/sidebar.service';
           <a routerLink="/staff/queue" routerLinkActive="active" class="nav-link-item" title="Điều phối hàng đợi phòng khám">
             <div class="nav-icon"><i class="bi bi-sliders"></i></div>
             <span class="nav-label">ĐIỀU PHỐI HÀNG ĐỢI</span>
-          </a>
-          <a routerLink="/lab" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-link-item" title="Bàn làm việc xét nghiệm">
-            <div class="nav-icon"><i class="bi bi-eyedropper"></i></div>
-            <span class="nav-label">PHÒNG XÉT NGHIỆM</span>
           </a>
           <a routerLink="/lab/services" routerLinkActive="active" class="nav-link-item" title="Bảng giá kỹ thuật cận lâm sàng">
             <div class="nav-icon"><i class="bi bi-journal-medical"></i></div>
