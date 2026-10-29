@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ClinicalLabService } from '../../services/lab.service';
 import { AuthService } from '../../services/auth.service';
 import { LabOrder, UpdateLabOrderResultRequest } from '../../models/lab.model';
-import { timeout } from 'rxjs';
+import { toIsoDate } from '../../utils/date.utils';
 
 @Component({
   selector: 'app-lab-management',
@@ -16,22 +16,23 @@ import { timeout } from 'rxjs';
       <div class="lab-header">
         <div class="header-left">
           <div class="lab-badge">
-            <span class="live-dot"></span> PHÒNG XÉT NGHIỆM &amp; CHẨN ĐOÁN HÌNH ẢNH
+            <span class="live-dot"></span> {{ departmentLabel() }}
           </div>
-          <h1 class="page-title">Bàn Làm Việc Kỹ Thuật Viên Xét Nghiệm</h1>
+          <h1 class="page-title">Bàn Làm Việc Kỹ Thuật Viên</h1>
           <p class="page-subtitle">
             Tiếp nhận chỉ định từ bác sĩ phòng khám, ghi nhận kết quả đo lường và ký duyệt kết quả tự động đồng bộ về ca khám
           </p>
         </div>
 
         <div class="header-right">
+          <input type="date" class="form-control date-picker" [max]="todayIso"
+                 [ngModel]="workDate()" (ngModelChange)="onWorkDateChange($event)" title="Ngày làm việc" />
           <button type="button" class="btn btn-outline" (click)="loadOrders(true)" title="Làm mới danh sách">
             <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i> Làm mới dữ liệu
           </button>
         </div>
       </div>
 
-      <!-- Quick Metrics Counters -->
       <!-- Quick Metrics Counters -->
       <div class="metrics-grid">
         <div class="metric-card card-pending" (click)="selectTab('PENDING')">
@@ -59,7 +60,7 @@ import { timeout } from 'rxjs';
           <div class="metric-icon"><i class="bi bi-collection-fill"></i></div>
           <div class="metric-info">
             <span class="metric-val">{{ orders().length }}</span>
-            <span class="metric-lbl">Tổng Chỉ Định Hôm Nay</span>
+            <span class="metric-lbl">{{ workDate() === todayIso ? 'Tổng Chỉ Định Hôm Nay' : 'Tổng Chỉ Định Trong Ngày' }}</span>
           </div>
         </div>
       </div>
@@ -87,37 +88,51 @@ import { timeout } from 'rxjs';
         <!-- Control Bar (Tabs & Search) -->
         <div class="control-bar">
           <div class="tabs-group">
-            <button class="tab-btn" [class.active]="activeTab === 'ALL'" (click)="selectTab('ALL')">
+            <button class="tab-btn" [class.active]="activeTab() === 'ALL'" (click)="selectTab('ALL')">
               Tất Cả ({{ orders().length }})
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'PENDING'" (click)="selectTab('PENDING')">
+            <button class="tab-btn" [class.active]="activeTab() === 'PENDING'" (click)="selectTab('PENDING')">
               <span class="dot-pending"></span> Chờ Làm ({{ countPending() }})
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'PROCESSING'" (click)="selectTab('PROCESSING')">
+            <button class="tab-btn" [class.active]="activeTab() === 'PROCESSING'" (click)="selectTab('PROCESSING')">
               <span class="dot-processing"></span> Đang Đo ({{ countProcessing() }})
             </button>
-            <button class="tab-btn" [class.active]="activeTab === 'COMPLETED'" (click)="selectTab('COMPLETED')">
+            <button class="tab-btn" [class.active]="activeTab() === 'COMPLETED'" (click)="selectTab('COMPLETED')">
               <span class="dot-completed"></span> Đã Hoàn Thành ({{ countCompleted() }})
             </button>
           </div>
+
+          <select class="form-select room-filter" [ngModel]="roomFilter()" (ngModelChange)="onRoomFilterChange($event)"
+                  title="Lọc theo phòng khám ra chỉ định">
+            <option value="">Mọi phòng chỉ định</option>
+            @for (room of rooms(); track room) {
+              <option [value]="room">Chỉ định từ {{ room }}</option>
+            }
+          </select>
 
           <div class="search-box">
             <i class="bi bi-search"></i>
             <input
               type="text"
-              [(ngModel)]="searchKeyword"
-              (ngModelChange)="onSearchChange()"
+              [ngModel]="searchKeyword()"
+              (ngModelChange)="onSearchChange($event)"
               placeholder="Tìm theo số vé (#101), tên người bệnh, mã xét nghiệm..."
               class="form-control-sm"
             />
-            @if (searchKeyword) {
-              <button class="btn-clear" (click)="clearSearch()">×</button>
+            @if (searchKeyword()) {
+              <button class="btn-clear" (click)="onSearchChange('')" aria-label="Xoá từ khoá">×</button>
             }
           </div>
         </div>
 
         <!-- Orders Table -->
-        @if (loading() && orders().length === 0) {
+        @if (loadError()) {
+          <div class="empty-state">
+            <i class="bi bi-wifi-off text-danger"></i>
+            <p>{{ loadError() }}</p>
+            <button type="button" class="btn btn-outline" (click)="loadOrders(true)">Thử lại</button>
+          </div>
+        } @else if (loading() && orders().length === 0) {
           <div class="loading-state">
             <div class="spinner"></div>
             <p>Đang tải danh sách chỉ định xét nghiệm...</p>
@@ -125,7 +140,7 @@ import { timeout } from 'rxjs';
         } @else if (filteredOrders().length === 0) {
           <div class="empty-state">
             <i class="bi bi-inbox text-muted"></i>
-            <p>{{ searchKeyword ? 'Không tìm thấy chỉ định xét nghiệm nào khớp với từ khóa' : 'Không có chỉ định xét nghiệm nào trong mục này' }}</p>
+            <p>{{ searchKeyword() ? 'Không tìm thấy chỉ định xét nghiệm nào khớp với từ khóa' : 'Không có chỉ định xét nghiệm nào trong mục này' }}</p>
           </div>
         } @else {
           <div class="table-responsive">
@@ -148,7 +163,10 @@ import { timeout } from 'rxjs';
                     <td>
                       <div class="patient-cell">
                         <span class="ticket-tag">#{{ order.ticketNumber || 'N/A' }}</span>
-                        <strong class="patient-name">{{ order.patientName }}</strong>
+                        <strong class="patient-name">{{ order.patientName || 'Chưa rõ tên' }}</strong>
+                        @if (order.roomNumber) {
+                          <span class="patient-sub text-muted small" title="Phòng khám của bác sĩ ra chỉ định">Chỉ định từ {{ order.roomNumber }}</span>
+                        }
                         <span class="patient-sub text-muted small">
                           {{ order.patientGender || '---' }}
                           @if (order.patientYearOfBirth) {
@@ -168,7 +186,7 @@ import { timeout } from 'rxjs';
                     <td>
                       <div class="service-name font-weight-bold">{{ order.serviceName }}</div>
                       <div class="order-time text-muted small">
-                        <i class="bi bi-clock"></i> Chỉ định lúc: {{ formatOrderTime(order.orderTime) }}
+                        <i class="bi bi-clock"></i> Chỉ định lúc: {{ formatDateTime(order.orderTime) }}
                       </div>
                       @if (order.conclusion) {
                         <div class="order-conclusion small text-success mt-1">
@@ -182,7 +200,7 @@ import { timeout } from 'rxjs';
 
                     <!-- Kết quả đo được -->
                     <td style="text-align: center;">
-                      @if (order.resultValue) {
+                      @if (order.status === 'COMPLETED') {
                         <div class="result-val-display" [class.val-danger]="order.isAbnormal">
                           <span class="val-num">{{ order.resultValue }}</span>
                           <span class="unit-sub text-muted">{{ order.unit || '' }}</span>
@@ -190,6 +208,14 @@ import { timeout } from 'rxjs';
                             <span class="badge badge-abnormal"><i class="bi bi-exclamation-triangle-fill"></i> Vượt ngưỡng</span>
                           }
                         </div>
+                        <div class="signed-by text-muted small">
+                          {{ order.performerName || 'KTV' }} · {{ formatDateTime(order.performedTime) }}
+                        </div>
+                      } @else if (order.status === 'PROCESSING') {
+                        <span class="badge badge-waiting">Đang đo</span>
+                        @if (order.performerName) {
+                          <div class="signed-by text-muted small">Tiếp nhận: {{ order.performerName }}</div>
+                        }
                       } @else {
                         <span class="badge badge-waiting">Chưa có kết quả</span>
                       }
@@ -220,7 +246,8 @@ import { timeout } from 'rxjs';
                     <td style="text-align: center;">
                       <div class="action-btn-group">
                         @if (order.status === 'PENDING') {
-                          <button class="btn btn-sm btn-outline-primary" (click)="startProcessing(order)" title="Tiếp nhận mẫu bệnh phẩm">
+                          <button class="btn btn-sm btn-outline-primary" [disabled]="startingId() === order.id"
+                                  (click)="startProcessing(order)" title="Tiếp nhận mẫu bệnh phẩm">
                             <i class="bi bi-play-circle"></i> Tiếp nhận
                           </button>
                         }
@@ -229,8 +256,8 @@ import { timeout } from 'rxjs';
                             <i class="bi bi-pencil-square"></i> Nhập KQ
                           </button>
                         } @else if (order.status === 'COMPLETED') {
-                          <button class="btn btn-sm btn-outline-secondary" (click)="openResultModal(order)" title="Xem hoặc sửa lại kết quả">
-                            <i class="bi bi-eye"></i> Sửa KQ
+                          <button class="btn btn-sm btn-outline-secondary" (click)="openResultModal(order)" title="Sửa lại kết quả">
+                            <i class="bi bi-pencil"></i> Sửa KQ
                           </button>
                         }
                       </div>
@@ -250,12 +277,9 @@ import { timeout } from 'rxjs';
               </span>
               <div class="page-size-selector">
                 <label for="pageSizeSelect">Số ca/trang:</label>
-                <select
-                  id="pageSizeSelect"
-                  [value]="pageSize()"
-                  (change)="onPageSizeChange($event)">
+                <select id="pageSizeSelect" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
                   @for (opt of pageSizeOptions; track opt) {
-                    <option [value]="opt">{{ opt }} ca</option>
+                    <option [ngValue]="opt">{{ opt }} ca</option>
                   }
                 </select>
               </div>
@@ -274,7 +298,7 @@ import { timeout } from 'rxjs';
                 type="button"
                 class="btn-page-nav"
                 [disabled]="currentPage() === 1"
-                (click)="prevPage()"
+                (click)="goToPage(currentPage() - 1)"
                 title="Trang trước">
                 <i class="bi bi-chevron-left"></i>
               </button>
@@ -299,7 +323,7 @@ import { timeout } from 'rxjs';
                 type="button"
                 class="btn-page-nav"
                 [disabled]="currentPage() === totalPages()"
-                (click)="nextPage()"
+                (click)="goToPage(currentPage() + 1)"
                 title="Trang sau">
                 <i class="bi bi-chevron-right"></i>
               </button>
@@ -324,7 +348,7 @@ import { timeout } from 'rxjs';
               <div class="modal-title-box">
                 <i class="bi bi-file-earmark-medical-fill text-primary"></i>
                 <div>
-                  <h3 class="modal-title">Nhập Kết Quả Xét Nghiệm &amp; Ký Duyệt</h3>
+                  <h3 class="modal-title">{{ activeOrder()?.status === 'COMPLETED' ? 'Sửa Kết Quả Xét Nghiệm' : 'Nhập Kết Quả Xét Nghiệm &amp; Ký Duyệt' }}</h3>
                   <span class="modal-sub">Mã chỉ định: #LAB-{{ activeOrder()?.id }} • Số phiếu: #{{ activeOrder()?.ticketNumber }}</span>
                 </div>
               </div>
@@ -375,7 +399,7 @@ import { timeout } from 'rxjs';
                 />
                 <label for="abnormalCheck" class="form-check-label font-weight-bold cursor-pointer">
                   <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
-                  Đánh dấu chỉ số BẤT THƯỜNG / VƯỢT NGƯỠNG THAM CHIẾU (Hệ thống sẽ bôi đỏ cảnh báo bác sĩ)
+                  Đánh dấu chỉ số BẤT THƯỜNG / VƯỢT NGƯỠNG THAM CHIẾU (tự đánh dấu khi kết quả số nằm ngoài ngưỡng, bác sĩ sẽ thấy cảnh báo đỏ)
                 </label>
               </div>
 
@@ -423,6 +447,16 @@ import { timeout } from 'rxjs';
     </div>
   `,
   styles: [`
+    .date-picker {
+      width: auto;
+      min-width: 150px;
+    }
+
+    .signed-by {
+      margin-top: 0.3rem;
+      font-size: 0.75rem;
+    }
+
     .lab-workspace-page {
       padding: 1.5rem 1.5rem 3.5rem;
       max-width: 1400px;
@@ -612,6 +646,16 @@ import { timeout } from 'rxjs';
         .dot-pending { width: 7px; height: 7px; background: #f59e0b; border-radius: 50%; }
         .dot-processing { width: 7px; height: 7px; background: #3b82f6; border-radius: 50%; }
         .dot-completed { width: 7px; height: 7px; background: #10b981; border-radius: 50%; }
+      }
+
+      .room-filter {
+        width: 180px;
+        height: 36px;
+        margin-left: auto;
+        margin-right: 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.85rem;
       }
 
       .search-box {
@@ -1052,65 +1096,81 @@ import { timeout } from 'rxjs';
 })
 export class LabManagementComponent implements OnInit, OnDestroy {
   private readonly labService = inject(ClinicalLabService);
-  readonly authService = inject(AuthService);
+  private readonly authService = inject(AuthService);
 
-  orders = signal<LabOrder[]>([]);
-  loading = signal<boolean>(false);
-  activeTab: 'ALL' | 'PENDING' | 'PROCESSING' | 'COMPLETED' = 'ALL';
-  searchKeyword = '';
+  // Khoa của KTV đang đăng nhập (backend đã lọc danh sách theo khoa này)
+  readonly departmentLabel = computed(() => {
+    switch (this.authService.currentUser()?.department) {
+      case 'XET_NGHIEM': return 'KHOA XÉT NGHIỆM';
+      case 'CHAN_DOAN_HINH_ANH': return 'KHOA CHẨN ĐOÁN HÌNH ẢNH';
+      default: return 'XÉT NGHIỆM & CHẨN ĐOÁN HÌNH ẢNH';
+    }
+  });
 
-  // Phân trang (Pagination)
-  readonly currentPage = signal<number>(1);
-  readonly pageSize = signal<number>(6);
-  readonly pageSizeOptions = [4, 6, 8, 10, 15];
+  readonly orders = signal<LabOrder[]>([]);
+  readonly loading = signal(false);
+  readonly loadError = signal<string | null>(null);
+  readonly activeTab = signal<'ALL' | 'PENDING' | 'PROCESSING' | 'COMPLETED'>('ALL');
+  readonly searchKeyword = signal('');
+  readonly roomFilter = signal('');
+  readonly todayIso = toIsoDate(new Date());
+  readonly workDate = signal(this.todayIso);
+  // Chỉ định đang được gửi tiếp nhận, tránh bấm 2 lần
+  readonly startingId = signal<number | null>(null);
 
-  // Modal Nhập kết quả
-  showResultModal = signal<boolean>(false);
-  activeOrder = signal<LabOrder | null>(null);
-  submittingResult = signal<boolean>(false);
+  // Phân trang
+  readonly currentPage = signal(1);
+  readonly pageSize = signal(8);
+  readonly pageSizeOptions = [6, 8, 10, 15, 20];
 
+  // Modal nhập kết quả
+  readonly showResultModal = signal(false);
+  readonly activeOrder = signal<LabOrder | null>(null);
+  readonly submittingResult = signal(false);
   resultValueInput = '';
   conclusionInput = '';
   notesInput = '';
   isAbnormalInput = false;
 
-  alertMessage = signal<string | null>(null);
-  alertType = signal<'success' | 'danger'>('success');
+  readonly alertMessage = signal<string | null>(null);
+  readonly alertType = signal<'success' | 'danger'>('success');
 
-  private timer: any = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private alertTimer: ReturnType<typeof setTimeout> | null = null;
 
-  countPending = computed(() => this.orders().filter(o => o.status === 'PENDING').length);
-  countProcessing = computed(() => this.orders().filter(o => o.status === 'PROCESSING').length);
-  countCompleted = computed(() => this.orders().filter(o => o.status === 'COMPLETED').length);
+  // Các phòng khám có chỉ định trong danh sách, dùng cho ô lọc phòng
+  readonly rooms = computed(() =>
+    [...new Set(this.orders().map(o => o.roomNumber).filter((r): r is string => !!r))].sort());
 
-  filteredOrders = computed(() => {
-    let list = this.orders();
-    if (this.activeTab !== 'ALL') {
-      list = list.filter(o => o.status === this.activeTab);
-    }
-    const kw = this.searchKeyword.trim().toLowerCase();
-    if (kw) {
-      list = list.filter(o =>
-        (o.ticketNumber && o.ticketNumber.toLowerCase().includes(kw)) ||
-        (o.patientName && o.patientName.toLowerCase().includes(kw)) ||
-        (o.serviceName && o.serviceName.toLowerCase().includes(kw)) ||
-        (o.serviceCode && o.serviceCode.toLowerCase().includes(kw))
-      );
-    }
-    return list;
+  readonly countPending = computed(() => this.orders().filter(o => o.status === 'PENDING').length);
+  readonly countProcessing = computed(() => this.orders().filter(o => o.status === 'PROCESSING').length);
+  readonly countCompleted = computed(() => this.orders().filter(o => o.status === 'COMPLETED').length);
+
+  // Việc cần làm lên trước (chờ làm / đang đo theo giờ chỉ định), đã xong / đã huỷ xếp sau, mới nhất trước
+  readonly filteredOrders = computed(() => {
+    const tab = this.activeTab();
+    const kw = this.searchKeyword().trim().toLowerCase();
+    const room = this.roomFilter();
+    const rank = (o: LabOrder) => (o.status === 'PENDING' || o.status === 'PROCESSING' ? 0 : 1);
+    return this.orders()
+      .filter(o => tab === 'ALL' || o.status === tab)
+      .filter(o => !room || o.roomNumber === room)
+      .filter(o => !kw
+        || o.ticketNumber?.toLowerCase().includes(kw)
+        || o.patientName?.toLowerCase().includes(kw)
+        || o.serviceName?.toLowerCase().includes(kw)
+        || o.serviceCode?.toLowerCase().includes(kw))
+      .sort((a, b) => rank(a) - rank(b) || (rank(a) === 0
+        ? a.orderTime.localeCompare(b.orderTime)
+        : (b.performedTime ?? b.orderTime).localeCompare(a.performedTime ?? a.orderTime)));
   });
 
   readonly totalOrders = computed(() => this.filteredOrders().length);
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.totalOrders() / this.pageSize())));
-
   readonly startOrderIndex = computed(() =>
     this.totalOrders() === 0 ? 0 : (this.currentPage() - 1) * this.pageSize() + 1
   );
-
-  readonly endOrderIndex = computed(() =>
-    Math.min(this.totalOrders(), this.currentPage() * this.pageSize())
-  );
-
+  readonly endOrderIndex = computed(() => Math.min(this.totalOrders(), this.currentPage() * this.pageSize()));
   readonly pagedOrders = computed(() => {
     const start = (this.currentPage() - 1) * this.pageSize();
     return this.filteredOrders().slice(start, start + this.pageSize());
@@ -1124,9 +1184,7 @@ export class LabManagementComponent implements OnInit, OnDestroy {
     }
     const pages: (number | string)[] = [1];
     if (current > 3) pages.push('...');
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    for (let i = start; i <= end; i++) {
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
       pages.push(i);
     }
     if (current < total - 2) pages.push('...');
@@ -1134,14 +1192,41 @@ export class LabManagementComponent implements OnInit, OnDestroy {
     return pages;
   });
 
-  constructor() {
-    // Khởi tạo dữ liệu mẫu ngay lập tức để màn hình hiển thị trong 0ms, không bắt người dùng chờ
-    this.orders.set(this.fallbackOrders);
+  ngOnInit(): void {
+    this.loadOrders(true);
+    // Tự làm mới để nhận chỉ định mới từ bác sĩ
+    this.timer = setInterval(() => this.loadOrders(false), 15000);
   }
 
-  // DatePipe ném lỗi với chuỗi không phải ngày hợp lệ (vd. dữ liệu mẫu '08:30 Hôm nay'),
-  // làm hỏng cả lượt render (sidebar/topbar trắng) nên tự định dạng an toàn tại đây
-  formatOrderTime(value: string | null | undefined): string {
+  ngOnDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
+    if (this.alertTimer) clearTimeout(this.alertTimer);
+  }
+
+  loadOrders(showSpinner: boolean): void {
+    if (showSpinner) this.loading.set(true);
+    this.labService.getWorklist(this.workDate()).subscribe({
+      next: res => {
+        this.orders.set(res.data || []);
+        this.loadError.set(null);
+        // Danh sách ngắn lại (đã làm xong) thì không để trang hiện tại vượt quá số trang
+        if (this.currentPage() > this.totalPages()) this.currentPage.set(this.totalPages());
+        this.loading.set(false);
+      },
+      error: err => {
+        this.loadError.set(err.error?.message || 'Không tải được danh sách chỉ định xét nghiệm. Vui lòng thử lại.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  onWorkDateChange(date: string): void {
+    this.workDate.set(date || this.todayIso);
+    this.currentPage.set(1);
+    this.loadOrders(true);
+  }
+
+  formatDateTime(value: string | null | undefined): string {
     if (!value) return '';
     const date = new Date(value);
     if (isNaN(date.getTime())) return value;
@@ -1150,16 +1235,17 @@ export class LabManagementComponent implements OnInit, OnDestroy {
   }
 
   selectTab(tab: 'ALL' | 'PENDING' | 'PROCESSING' | 'COMPLETED'): void {
-    this.activeTab = tab;
+    this.activeTab.set(tab);
     this.currentPage.set(1);
   }
 
-  onSearchChange(): void {
+  onRoomFilterChange(room: string): void {
+    this.roomFilter.set(room);
     this.currentPage.set(1);
   }
 
-  clearSearch(): void {
-    this.searchKeyword = '';
+  onSearchChange(keyword: string): void {
+    this.searchKeyword.set(keyword);
     this.currentPage.set(1);
   }
 
@@ -1169,75 +1255,30 @@ export class LabManagementComponent implements OnInit, OnDestroy {
     }
   }
 
-  prevPage(): void {
-    this.goToPage(this.currentPage() - 1);
-  }
-
-  nextPage(): void {
-    this.goToPage(this.currentPage() + 1);
-  }
-
-  onPageSizeChange(event: Event): void {
-    const select = event.target as HTMLSelectElement;
-    const newSize = parseInt(select.value, 10);
-    if (!isNaN(newSize)) {
-      this.pageSize.set(newSize);
-      this.currentPage.set(1);
-    }
-  }
-
-  ngOnInit(): void {
-    // Tải dữ liệu ngầm từ BE (nếu BE phản hồi thì cập nhật, nếu không thì giữ nguyên dữ liệu tức thì)
-    this.loadOrders(false);
-    this.timer = setInterval(() => {
-      this.loadOrders(false);
-    }, 10000);
-  }
-
-  ngOnDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
-  }
-
-  loadOrders(showSpinner = false): void {
-    if (showSpinner && this.orders().length === 0) this.loading.set(true);
-    this.labService.getOrders().pipe(timeout(2500)).subscribe({
-      next: res => {
-        if (res.data && res.data.length > 0) {
-          this.orders.set(res.data);
-        }
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-      }
-    });
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
   }
 
   startProcessing(order: LabOrder): void {
-    const req: UpdateLabOrderResultRequest = {
-      resultValue: order.resultValue || 'Đang đo lường',
-      conclusion: order.conclusion,
-      notes: order.notes,
-      isAbnormal: order.isAbnormal,
-      status: 'PROCESSING'
-    };
-
-    this.labService.updateOrderResult(order.id, req).subscribe({
-      next: () => {
-        this.showAlert(`Đã tiếp nhận mẫu xét nghiệm: ${order.serviceName} cho bệnh nhân ${order.patientName}`, 'success');
-        this.loadOrders(false);
+    this.startingId.set(order.id);
+    this.labService.startProcessing(order.id).subscribe({
+      next: res => {
+        this.startingId.set(null);
+        this.replaceOrder(res.data);
+        this.showAlert(`Đã tiếp nhận mẫu ${order.serviceName} của bệnh nhân ${order.patientName}`, 'success');
       },
-      error: () => {
-        // Cập nhật trạng thái cục bộ để test UI mượt mà ngay cả khi backend offline
-        this.orders.update(list => list.map(o => o.id === order.id ? { ...o, status: 'PROCESSING', resultValue: 'Đang đo lường trên máy tự động' } : o));
-        this.showAlert(`Đã tiếp nhận mẫu xét nghiệm: ${order.serviceName} cho bệnh nhân ${order.patientName}`, 'success');
+      error: err => {
+        this.startingId.set(null);
+        this.showAlert(err.error?.message || 'Không thể tiếp nhận mẫu xét nghiệm', 'danger');
+        this.loadOrders(false);
       }
     });
   }
 
   openResultModal(order: LabOrder): void {
     this.activeOrder.set(order);
-    this.resultValueInput = order.resultValue || '';
+    this.resultValueInput = order.status === 'COMPLETED' ? order.resultValue || '' : '';
     this.conclusionInput = order.conclusion || '';
     this.notesInput = order.notes || '';
     this.isAbnormalInput = order.isAbnormal || false;
@@ -1249,27 +1290,13 @@ export class LabManagementComponent implements OnInit, OnDestroy {
     this.activeOrder.set(null);
   }
 
+  // Kết quả dạng số: tự đánh dấu bất thường khi ngoài ngưỡng tham chiếu (KTV vẫn sửa được)
   autoCheckAbnormal(): void {
     const order = this.activeOrder();
-    if (!order) return;
-    const valStr = this.resultValueInput.trim();
-    if (!valStr) return;
-
-    try {
-      const clean = valStr.replace(/[^0-9.]/g, ' ').trim().split(/\s+/)[0];
-      const num = parseFloat(clean);
-      if (!isNaN(num)) {
-        if (order.lowerLimit !== undefined && order.lowerLimit !== null && num < order.lowerLimit) {
-          this.isAbnormalInput = true;
-          return;
-        }
-        if (order.upperLimit !== undefined && order.upperLimit !== null && num > order.upperLimit) {
-          this.isAbnormalInput = true;
-          return;
-        }
-        this.isAbnormalInput = false;
-      }
-    } catch {}
+    const num = parseFloat(this.resultValueInput.trim().replace(',', '.').replace(/[^0-9.\-]/g, ' ').trim().split(/\s+/)[0]);
+    if (!order || isNaN(num)) return;
+    this.isAbnormalInput = (order.lowerLimit != null && num < order.lowerLimit)
+      || (order.upperLimit != null && num > order.upperLimit);
   }
 
   confirmSaveResult(): void {
@@ -1280,253 +1307,36 @@ export class LabManagementComponent implements OnInit, OnDestroy {
       resultValue: this.resultValueInput.trim(),
       conclusion: this.conclusionInput.trim() || undefined,
       notes: this.notesInput.trim() || undefined,
-      isAbnormal: this.isAbnormalInput,
-      status: 'COMPLETED'
+      isAbnormal: this.isAbnormalInput
     };
 
     this.submittingResult.set(true);
     this.labService.updateOrderResult(order.id, req).subscribe({
-      next: () => {
+      next: res => {
         this.submittingResult.set(false);
-        this.showAlert(`Đã lưu kết quả & ký duyệt thành công cho chỉ định: ${order.serviceName}!`, 'success');
+        this.replaceOrder(res.data);
+        this.showAlert(`Đã lưu kết quả & ký duyệt: ${order.serviceName}`, 'success');
         this.closeResultModal();
-        this.loadOrders(false);
       },
-      error: () => {
+      error: err => {
         this.submittingResult.set(false);
-        // Cập nhật trạng thái cục bộ để test UI mượt mà ngay cả khi backend offline
-        this.orders.update(list => list.map(o => o.id === order.id ? {
-          ...o,
-          resultValue: req.resultValue,
-          conclusion: req.conclusion,
-          notes: req.notes,
-          isAbnormal: req.isAbnormal,
-          status: 'COMPLETED'
-        } : o));
-        this.showAlert(`Đã lưu kết quả & ký duyệt thành công cho chỉ định: ${order.serviceName}!`, 'success');
-        this.closeResultModal();
+        this.showAlert(err.error?.message || 'Không thể lưu kết quả xét nghiệm', 'danger');
       }
     });
   }
 
-  showAlert(msg: string, type: 'success' | 'danger'): void {
-    this.alertMessage.set(msg);
-    this.alertType.set(type);
-    setTimeout(() => this.alertMessage.set(null), 5000);
+  private replaceOrder(updated: LabOrder | undefined): void {
+    if (!updated) {
+      this.loadOrders(false);
+      return;
+    }
+    this.orders.update(list => list.map(o => o.id === updated.id ? updated : o));
   }
 
-  readonly fallbackOrders: LabOrder[] = [
-    {
-      id: 301,
-      medicalRecordId: 101,
-      labServiceId: 1,
-      serviceCode: 'XN-HEM-01',
-      serviceName: 'Tổng phân tích tế bào máu ngoại vi (22 thông số)',
-      price: 120000,
-      referenceRange: '4.0 - 10.0 G/L (WBC), 4.2 - 5.4 T/L (RBC)',
-      lowerLimit: 4.0,
-      upperLimit: 10.0,
-      unit: 'G/L',
-      category: 'Huyết học',
-      orderTime: '08:30 Hôm nay',
-      status: 'PENDING',
-      notes: 'Bệnh nhân sốt cao ngày thứ 3, kiểm tra số lượng tiểu cầu và bạch cầu',
-      ticketNumber: 'P101-005',
-      patientName: 'Hoàng Minh Tuấn',
-      patientGender: 'Nam',
-      patientYearOfBirth: 1990
-    },
-    {
-      id: 302,
-      medicalRecordId: 101,
-      labServiceId: 15,
-      serviceCode: 'XN-DENGUE-01',
-      serviceName: 'Test nhanh Sốt xuất huyết Dengue NS1 & IgM/IgG',
-      price: 180000,
-      referenceRange: 'Âm tính (Negative)',
-      unit: 'Test nhanh',
-      category: 'Miễn dịch',
-      orderTime: '08:32 Hôm nay',
-      status: 'PENDING',
-      notes: 'Lấy máu mao mạch hoặc huyết thanh làm test nhanh',
-      ticketNumber: 'P101-005',
-      patientName: 'Hoàng Minh Tuấn',
-      patientGender: 'Nam',
-      patientYearOfBirth: 1990
-    },
-    {
-      id: 303,
-      medicalRecordId: 102,
-      labServiceId: 9,
-      serviceCode: 'XN-CHOL-01',
-      serviceName: 'Định lượng Cholesterol toàn phần',
-      price: 70000,
-      referenceRange: '3.9 - 5.2 mmol/L',
-      lowerLimit: 3.9,
-      upperLimit: 5.2,
-      unit: 'mmol/L',
-      category: 'Mỡ máu',
-      orderTime: '08:15 Hôm nay',
-      resultValue: 'Đang ly tâm mẫu huyết thanh',
-      status: 'PROCESSING',
-      notes: 'Bệnh nhân nhịn ăn sáng, mẫu không vỡ hồng cầu',
-      ticketNumber: 'P102-003',
-      patientName: 'Bùi Thanh Hương',
-      patientGender: 'Nữ',
-      patientYearOfBirth: 1975
-    },
-    {
-      id: 304,
-      medicalRecordId: 102,
-      labServiceId: 12,
-      serviceCode: 'XN-LDL-01',
-      serviceName: 'Định lượng LDL-Cholesterol (Mỡ xấu)',
-      price: 70000,
-      referenceRange: '< 3.4 mmol/L',
-      lowerLimit: 0.0,
-      upperLimit: 3.4,
-      unit: 'mmol/L',
-      category: 'Mỡ máu',
-      orderTime: '08:15 Hôm nay',
-      resultValue: 'Đang ủ hóa chất đo quang tự động',
-      status: 'PROCESSING',
-      notes: 'Chạy trên máy sinh hóa tự động Cobas c501',
-      ticketNumber: 'P102-003',
-      patientName: 'Bùi Thanh Hương',
-      patientGender: 'Nữ',
-      patientYearOfBirth: 1975
-    },
-    {
-      id: 305,
-      medicalRecordId: 103,
-      labServiceId: 2,
-      serviceCode: 'XN-GLU-01',
-      serviceName: 'Định lượng Glucose trong máu (Đường huyết đói)',
-      price: 60000,
-      referenceRange: '3.9 - 6.4 mmol/L',
-      lowerLimit: 3.9,
-      upperLimit: 6.4,
-      unit: 'mmol/L',
-      category: 'Sinh hóa máu',
-      orderTime: '08:00 Hôm nay',
-      resultValue: '9.8',
-      isAbnormal: true,
-      conclusion: 'Đường huyết lúc đói tăng cao vượt ngưỡng tham chiếu',
-      status: 'COMPLETED',
-      performedTime: '08:22 Hôm nay',
-      notes: 'Đã kiểm tra lại 2 lần',
-      ticketNumber: 'P101-006',
-      patientName: 'Lê Thị Mai',
-      patientGender: 'Nữ',
-      patientYearOfBirth: 1982
-    },
-    {
-      id: 306,
-      medicalRecordId: 103,
-      labServiceId: 7,
-      serviceCode: 'XN-ALT-01',
-      serviceName: 'Đo hoạt độ ALT (GPT) trong máu',
-      price: 55000,
-      referenceRange: '< 40 U/L',
-      lowerLimit: 0.0,
-      upperLimit: 40.0,
-      unit: 'U/L',
-      category: 'Men gan',
-      orderTime: '08:00 Hôm nay',
-      resultValue: '68.0',
-      isAbnormal: true,
-      conclusion: 'Hoạt độ men gan ALT tăng gấp 1.7 lần giới hạn trên',
-      status: 'COMPLETED',
-      performedTime: '08:24 Hôm nay',
-      notes: 'Huyết thanh đục nhẹ',
-      ticketNumber: 'P101-006',
-      patientName: 'Lê Thị Mai',
-      patientGender: 'Nữ',
-      patientYearOfBirth: 1982
-    },
-    {
-      id: 307,
-      medicalRecordId: 104,
-      labServiceId: 1,
-      serviceCode: 'XN-HEM-01',
-      serviceName: 'Tổng phân tích tế bào máu ngoại vi (22 thông số)',
-      price: 120000,
-      referenceRange: '4.0 - 10.0 G/L (WBC), 4.2 - 5.4 T/L (RBC)',
-      lowerLimit: 4.0,
-      upperLimit: 10.0,
-      unit: 'G/L',
-      category: 'Huyết học',
-      orderTime: '07:45 Hôm nay',
-      resultValue: '6.5',
-      isAbnormal: false,
-      conclusion: 'Các dòng tế bào máu trong giới hạn bình thường',
-      status: 'COMPLETED',
-      performedTime: '08:05 Hôm nay',
-      notes: 'Bình thường',
-      ticketNumber: 'P103-002',
-      patientName: 'Trần Quốc Bảo',
-      patientGender: 'Nam',
-      patientYearOfBirth: 1995
-    },
-    {
-      id: 308,
-      medicalRecordId: 104,
-      labServiceId: 17,
-      serviceCode: 'CDHA-XR-01',
-      serviceName: 'Chụp X-Quang ngực thẳng kỹ thuật số (CR/DR)',
-      price: 150000,
-      referenceRange: 'Hình ảnh tim phổi bình thường',
-      unit: 'Phim',
-      category: 'Chẩn đoán hình ảnh',
-      orderTime: '07:45 Hôm nay',
-      resultValue: 'Hình ảnh tim phổi sáng bình thường',
-      isAbnormal: false,
-      conclusion: 'Không thấy tổn thương thâm nhiễm nhu mô phổi hay tràn dịch',
-      status: 'COMPLETED',
-      performedTime: '08:12 Hôm nay',
-      notes: 'Chụp tư thế PA đứng',
-      ticketNumber: 'P103-002',
-      patientName: 'Trần Quốc Bảo',
-      patientGender: 'Nam',
-      patientYearOfBirth: 1995
-    },
-    {
-      id: 309,
-      medicalRecordId: 105,
-      labServiceId: 14,
-      serviceCode: 'XN-URI-01',
-      serviceName: 'Tổng phân tích nước tiểu tự động (10 thông số)',
-      price: 50000,
-      referenceRange: 'Âm tính các thông số bệnh lý',
-      unit: 'Que thử',
-      category: 'Nước tiểu',
-      orderTime: '08:40 Hôm nay',
-      status: 'PENDING',
-      notes: 'Bệnh nhân đang lấy mẫu nước tiểu giữa dòng',
-      ticketNumber: 'P101-008',
-      patientName: 'Phạm Thị Lan',
-      patientGender: 'Nữ',
-      patientYearOfBirth: 1968
-    },
-    {
-      id: 310,
-      medicalRecordId: 105,
-      labServiceId: 5,
-      serviceCode: 'XN-CRE-01',
-      serviceName: 'Định lượng Creatinin huyết thanh',
-      price: 65000,
-      referenceRange: '62 - 115 umol/L',
-      lowerLimit: 62.0,
-      upperLimit: 115.0,
-      unit: 'umol/L',
-      category: 'Sinh hóa máu',
-      orderTime: '08:40 Hôm nay',
-      status: 'CANCELLED',
-      notes: 'Bệnh nhân đã có kết quả kiểm tra chức năng thận 2 ngày trước tại tuyến trên, xin hủy',
-      ticketNumber: 'P101-008',
-      patientName: 'Phạm Thị Lan',
-      patientGender: 'Nữ',
-      patientYearOfBirth: 1968
-    }
-  ];
+  showAlert(msg: string, type: 'success' | 'danger'): void {
+    if (this.alertTimer) clearTimeout(this.alertTimer);
+    this.alertMessage.set(msg);
+    this.alertType.set(type);
+    this.alertTimer = setTimeout(() => this.alertMessage.set(null), 5000);
+  }
 }

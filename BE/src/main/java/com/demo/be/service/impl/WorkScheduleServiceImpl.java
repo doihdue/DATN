@@ -93,8 +93,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Bác sĩ", "id", request.getDoctorId()));
 
-        ExaminationRoom room = examinationRoomRepository.findById(request.getExaminationRoomId())
-                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", request.getExaminationRoomId()));
+        ExaminationRoom room = findExamRoom(request.getExaminationRoomId());
 
         // 1. Kiểm tra xung đột lịch của Bác sĩ
         boolean doctorConflict = workScheduleRepository.hasDoctorConflict(
@@ -160,8 +159,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Bác sĩ", "id", request.getDoctorId()));
 
-        ExaminationRoom room = examinationRoomRepository.findById(request.getExaminationRoomId())
-                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", request.getExaminationRoomId()));
+        ExaminationRoom room = findExamRoom(request.getExaminationRoomId());
 
         String shiftType = request.getShiftType() != null && !request.getShiftType().isBlank()
                 ? request.getShiftType()
@@ -239,8 +237,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
 
         Doctor doctor = doctorRepository.findById(request.getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Bác sĩ", "id", request.getDoctorId()));
-        ExaminationRoom room = examinationRoomRepository.findById(request.getExaminationRoomId())
-                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", request.getExaminationRoomId()));
+        ExaminationRoom room = findExamRoom(request.getExaminationRoomId());
 
         // Bệnh nhân đã đặt theo ngày giờ của ca: có lịch hẹn thì không cho đổi ngày/giờ, không giảm dưới số đã đặt
         int booked = schedule.getCurrentBookedCount() != null ? schedule.getCurrentBookedCount() : 0;
@@ -338,7 +335,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
     @Override
     @Transactional(readOnly = true)
     public List<ExaminationRoomResponse> getAllExaminationRooms() {
-        return examinationRoomRepository.findAllByOrderByRoomNumberAsc().stream()
+        return examinationRoomRepository.findExamRooms().stream()
                 .map(room -> ExaminationRoomResponse.builder()
                         .id(room.getId())
                         .roomNumber(room.getRoomNumber())
@@ -346,6 +343,16 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
                         .floor(room.getFloor())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    // Ca bác sĩ chỉ xếp vào phòng khám, phòng cận lâm sàng dành cho lịch KTV
+    private ExaminationRoom findExamRoom(Long roomId) {
+        ExaminationRoom room = examinationRoomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", roomId));
+        if (room.getRoomType() != null && !"KHAM".equals(room.getRoomType())) {
+            throw new BadRequestException("Phòng " + room.getRoomNumber() + " là phòng cận lâm sàng, không xếp ca bác sĩ");
+        }
+        return room;
     }
 
     private void validateTimeRange(WorkScheduleRequest request) {

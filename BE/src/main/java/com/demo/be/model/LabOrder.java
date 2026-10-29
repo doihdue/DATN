@@ -54,9 +54,10 @@ public class LabOrder {
     @Column(name = "notes", length = 500)
     private String notes;
 
+    // KTV tiếp nhận mẫu và ký duyệt kết quả (null khi bác sĩ vừa chỉ định)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "performer_id")
-    private Doctor performer; // Bác sĩ / KTV thực hiện và ký duyệt kết quả (nullable lúc chỉ định)
+    @JoinColumn(name = "performed_by_id", foreignKey = @ForeignKey(name = "fk_lab_order_performer"))
+    private LabTechnician performer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_schedule_id")

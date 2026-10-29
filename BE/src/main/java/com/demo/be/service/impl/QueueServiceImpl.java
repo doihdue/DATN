@@ -591,7 +591,7 @@ public class QueueServiceImpl implements QueueService {
     @Transactional(readOnly = true)
     public List<ClinicDisplayBoardResponse> getClinicDisplayBoard() {
         LocalDate today = LocalDate.now();
-        List<ExaminationRoom> rooms = examinationRoomRepository.findAllByOrderByRoomNumberAsc();
+        List<ExaminationRoom> rooms = examinationRoomRepository.findExamRooms();
         List<ClinicDisplayBoardResponse> displayList = new ArrayList<>();
 
         for (ExaminationRoom room : rooms) {

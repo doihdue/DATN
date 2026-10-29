@@ -28,6 +28,10 @@ public class ExaminationRoom {
     @Column(name = "floor")
     private Integer floor;
 
+    // KHAM: phòng khám bác sĩ; XET_NGHIEM / CHAN_DOAN_HINH_ANH: phòng cận lâm sàng của KTV (null = phòng khám)
+    @Column(name = "room_type", length = 30)
+    private String roomType;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "clinic_id")
     private Clinic clinic;

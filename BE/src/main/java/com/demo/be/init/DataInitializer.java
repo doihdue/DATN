@@ -5,6 +5,7 @@ import com.demo.be.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +37,18 @@ public class DataInitializer implements CommandLineRunner {
     private final AppointmentRepository appointmentRepository;
     private final LabServiceRepository labServiceRepository;
     private final LabOrderRepository labOrderRepository;
+    private final StaffShiftRepository staffShiftRepository;
+    private final LabTechnicianRepository labTechnicianRepository;
+    private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public void run(String... args) {
         log.info("==> Đang khởi tạo bộ dữ liệu mẫu đa dạng phục vụ Demo & Test...");
+
+        // 0. Dữ liệu cũ: KTV từng lưu là Employee kèm cột employees.department -> chuyển sang bảng lab_technicians
+        migrateLabTechnicians();
 
         // 1. Tạo các vai trò (Roles)
         Role adminRole = createRoleIfNotFound("ROLE_ADMIN", "Quản trị viên toàn hệ thống");
@@ -68,6 +75,11 @@ public class DataInitializer implements CommandLineRunner {
         ExaminationRoom room203 = createRoomIfNotFound("P.203", "Phòng Khám Răng Hàm Mặt", 2);
         ExaminationRoom room301 = createRoomIfNotFound("P.301", "Phòng Khám Da Liễu & Thẩm Mỹ", 3);
         ExaminationRoom room302 = createRoomIfNotFound("P.100", "Phòng Cấp Cứu Ban Đầu & Xử Trí Nhanh", 1);
+
+        // Phòng cận lâm sàng: nơi KTV trực, không xếp ca bác sĩ
+        ExaminationRoom labRoomXn = createLabRoomIfNotFound("P.104", "Phòng Lấy Mẫu & Xét Nghiệm", 1, "XET_NGHIEM");
+        ExaminationRoom labRoomXray = createLabRoomIfNotFound("P.204", "Phòng X-Quang & CT", 2, "CHAN_DOAN_HINH_ANH");
+        ExaminationRoom labRoomUs = createLabRoomIfNotFound("P.205", "Phòng Siêu Âm & Điện Tim", 2, "CHAN_DOAN_HINH_ANH");
 
         // 4. Tạo tài khoản Quản trị viên (Admin)
         if (!userRepository.existsByUsername("admin")) {
@@ -197,17 +209,18 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (!userRepository.existsByUsername("ktv_lan")) {
-            Employee ktv = Employee.builder()
+            LabTechnician ktv = LabTechnician.builder()
                     .fullName("Trần Thị Lan")
                     .gender("Nữ")
                     .dateOfBirth(LocalDate.of(1992, 10, 12))
                     .address("Thanh Xuân, Hà Nội")
                     .nationalId("001092887766")
                     .employeeCode("KTV001")
-                    .position("Kỹ thuật viên Trưởng Phòng Xét Nghiệm & Cận Lâm Sàng")
+                    .position("Kỹ thuật viên Trưởng Khoa Xét Nghiệm")
+                    .department("XET_NGHIEM")
                     .hireDate(LocalDate.of(2022, 3, 1))
                     .build();
-            ktv = employeeRepository.save(ktv);
+            ktv = labTechnicianRepository.save(ktv);
 
             User ktvUser = User.builder()
                     .username("ktv_lan")
@@ -218,19 +231,48 @@ public class DataInitializer implements CommandLineRunner {
                     .person(ktv)
                     .build();
             ktvUser.addRole(labTechRole);
-            ktvUser.addRole(staffRole);
             userRepository.save(ktvUser);
-            log.info("-> Đã tạo tài khoản Kỹ thuật viên: ktv_lan / 123456 (Trần Thị Lan) với vai trò ROLE_LAB_TECH");
+            log.info("-> Đã tạo tài khoản Kỹ thuật viên: ktv_lan / 123456 (Trần Thị Lan) - Khoa Xét nghiệm");
         } else {
+            // Đồng bộ dữ liệu cũ: KTV chỉ giữ vai trò LAB_TECH
             userRepository.findByUsername("ktv_lan").ifPresent(u -> {
-                boolean hasLabTech = u.getUserRoles().stream()
-                        .anyMatch(ur -> "ROLE_LAB_TECH".equals(ur.getRole().getName()));
-                if (!hasLabTech) {
+                boolean changed = u.getUserRoles().removeIf(ur -> "ROLE_STAFF".equals(ur.getRole().getName()));
+                if (u.getUserRoles().stream().noneMatch(ur -> "ROLE_LAB_TECH".equals(ur.getRole().getName()))) {
                     u.addRole(labTechRole);
+                    changed = true;
+                }
+                if (changed) {
                     userRepository.save(u);
-                    log.info("-> Đã cập nhật bổ sung vai trò ROLE_LAB_TECH cho tài khoản ktv_lan");
+                    log.info("-> Đã đồng bộ vai trò tài khoản ktv_lan (chỉ ROLE_LAB_TECH)");
                 }
             });
+        }
+
+        if (!userRepository.existsByUsername("ktv_minh")) {
+            LabTechnician ktv2 = LabTechnician.builder()
+                    .fullName("Phạm Văn Minh")
+                    .gender("Nam")
+                    .dateOfBirth(LocalDate.of(1990, 4, 18))
+                    .address("Cầu Giấy, Hà Nội")
+                    .nationalId("001090554433")
+                    .employeeCode("KTV002")
+                    .position("Kỹ thuật viên Chẩn Đoán Hình Ảnh")
+                    .department("CHAN_DOAN_HINH_ANH")
+                    .hireDate(LocalDate.of(2023, 6, 1))
+                    .build();
+            ktv2 = labTechnicianRepository.save(ktv2);
+
+            User ktvUser2 = User.builder()
+                    .username("ktv_minh")
+                    .passwordHash(passwordEncoder.encode("123456"))
+                    .email("minh.pham@clinic.com")
+                    .phoneNumber("0918334455")
+                    .status("ACTIVE")
+                    .person(ktv2)
+                    .build();
+            ktvUser2.addRole(labTechRole);
+            userRepository.save(ktvUser2);
+            log.info("-> Đã tạo tài khoản Kỹ thuật viên: ktv_minh / 123456 (Phạm Văn Minh) - Khoa Chẩn đoán hình ảnh");
         }
 
         // 7. Tạo 5 Bệnh nhân mẫu với các độ tuổi và nhóm máu khác nhau
@@ -276,6 +318,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // 12. Mỗi lần khởi động: đảm bảo hôm nay có hàng đợi để test luồng gọi số (bác sĩ gọi, lễ tân điều phối)
         initComprehensiveLabServices();
+        seedStaffShiftsIfEmpty(labRoomXn, labRoomXray, labRoomUs);
         initSampleLabWorkflowTickets(LocalDate.now(), room101, room102, doctorHung, doctorHoa);
         seedTodayQueueTicketsForTesting();
 
@@ -675,6 +718,48 @@ public class DataInitializer implements CommandLineRunner {
         log.info("-> Đã khởi tạo các hồ sơ bệnh án và đơn thuốc mẫu chi tiết!");
     }
 
+    // Chạy 1 lần trên DB cũ (trước khi nạp bất kỳ Person nào): mỗi Employee có khoa thành một LabTechnician
+    // (kế thừa JOINED không có cột phân loại, chỉ cần thêm dòng ở bảng con), rồi bỏ cột employees.department
+    private void migrateLabTechnicians() {
+        Integer hasOldColumn = jdbcTemplate.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH('employees', 'department') IS NULL THEN 0 ELSE 1 END", Integer.class);
+        if (hasOldColumn != null && hasOldColumn == 1) {
+            int moved = jdbcTemplate.update("INSERT INTO lab_technicians (id, department) " +
+                    "SELECT e.id, e.department FROM employees e " +
+                    "WHERE e.department IS NOT NULL AND NOT EXISTS (SELECT 1 FROM lab_technicians t WHERE t.id = e.id)");
+            jdbcTemplate.execute("ALTER TABLE employees DROP COLUMN department");
+            log.info("-> Đã chuyển {} kỹ thuật viên sang bảng lab_technicians và bỏ cột employees.department", moved);
+        }
+        // Hibernate không tạo được khoá ngoại này khi bảng ca trực đã có dữ liệu trước lúc chuyển KTV
+        jdbcTemplate.execute("IF OBJECT_ID('fk_staff_shift_technician', 'F') IS NULL " +
+                "ALTER TABLE staff_shifts ADD CONSTRAINT fk_staff_shift_technician " +
+                "FOREIGN KEY (employee_id) REFERENCES lab_technicians (id)");
+
+        // Người ký kết quả xét nghiệm giờ là LabTechnician: bỏ khoá ngoại cũ performed_by_id -> employees
+        dropForeignKeys("lab_orders", "performed_by_id", "employees");
+        // Cột cũ performer_id (chỉ nhận bác sĩ, ghi sai người ký) không còn dùng
+        Integer hasOldPerformer = jdbcTemplate.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH('lab_orders', 'performer_id') IS NULL THEN 0 ELSE 1 END", Integer.class);
+        if (hasOldPerformer != null && hasOldPerformer == 1) {
+            dropForeignKeys("lab_orders", "performer_id", null);
+            jdbcTemplate.execute("ALTER TABLE lab_orders DROP COLUMN performer_id");
+            log.info("-> Đã bỏ cột cũ lab_orders.performer_id");
+        }
+    }
+
+    // Xoá các khoá ngoại trên một cột (referencedTable = null: mọi bảng đích); tên khoá do Hibernate sinh ngẫu nhiên nên tra theo cột
+    private void dropForeignKeys(String table, String column, String referencedTable) {
+        List<String> names = jdbcTemplate.queryForList(
+                "SELECT fk.name FROM sys.foreign_keys fk " +
+                "JOIN sys.foreign_key_columns c ON c.constraint_object_id = fk.object_id " +
+                "WHERE fk.parent_object_id = OBJECT_ID(?) AND COL_NAME(c.parent_object_id, c.parent_column_id) = ? " +
+                "AND (? IS NULL OR fk.referenced_object_id = OBJECT_ID(?))",
+                String.class, table, column, referencedTable, referencedTable);
+        for (String name : names) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT [" + name + "]");
+        }
+    }
+
     private Role createRoleIfNotFound(String name, String description) {
         return roleRepository.findByName(name)
                 .orElseGet(() -> roleRepository.save(Role.builder()
@@ -698,6 +783,53 @@ public class DataInitializer implements CommandLineRunner {
                         .roomName(roomName)
                         .floor(floor)
                         .build()));
+    }
+
+    private ExaminationRoom createLabRoomIfNotFound(String roomNumber, String roomName, Integer floor, String roomType) {
+        ExaminationRoom room = createRoomIfNotFound(roomNumber, roomName, floor);
+        if (!roomType.equals(room.getRoomType())) {
+            room.setRoomType(roomType);
+            room = examinationRoomRepository.save(room);
+        }
+        return room;
+    }
+
+    // Lịch trực KTV mẫu 2 tuần (từ thứ 2 tuần này, trừ Chủ nhật): Lan trực phòng XN, Minh trực X-Quang sáng / Siêu âm chiều
+    private void seedStaffShiftsIfEmpty(ExaminationRoom labRoomXn, ExaminationRoom labRoomXray, ExaminationRoom labRoomUs) {
+        if (staffShiftRepository.count() > 0) return;
+        LabTechnician lan = findTechnician("ktv_lan");
+        LabTechnician minh = findTechnician("ktv_minh");
+        if (lan == null || minh == null) return;
+
+        LocalTime morningStart = LocalTime.of(7, 30), morningEnd = LocalTime.of(12, 0);
+        LocalTime afternoonStart = LocalTime.of(13, 30), afternoonEnd = LocalTime.of(17, 30);
+        LocalDate monday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        List<StaffShift> shifts = new ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            LocalDate day = monday.plusDays(i);
+            if (day.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) continue;
+            shifts.add(staffShift(lan, labRoomXn, day, "CA_SÁNG", morningStart, morningEnd));
+            shifts.add(staffShift(minh, labRoomXray, day, "CA_SÁNG", morningStart, morningEnd));
+            if (day.getDayOfWeek() != java.time.DayOfWeek.SATURDAY) {
+                shifts.add(staffShift(lan, labRoomXn, day, "CA_CHIỀU", afternoonStart, afternoonEnd));
+                shifts.add(staffShift(minh, labRoomUs, day, "CA_CHIỀU", afternoonStart, afternoonEnd));
+            }
+        }
+        staffShiftRepository.saveAll(shifts);
+        log.info("-> Đã tạo {} ca trực KTV mẫu", shifts.size());
+    }
+
+    private LabTechnician findTechnician(String username) {
+        return userRepository.findByUsername(username)
+                .map(User::getPerson)
+                .filter(LabTechnician.class::isInstance)
+                .map(LabTechnician.class::cast)
+                .orElse(null);
+    }
+
+    private StaffShift staffShift(LabTechnician technician, ExaminationRoom room, LocalDate day, String type, LocalTime start, LocalTime end) {
+        return StaffShift.builder().technician(technician).room(room).workDate(day)
+                .shiftType(type).startTime(start).endTime(end).build();
     }
 
     private void seedSampleTicketsAndAppointmentsIfEmpty(
@@ -963,7 +1095,7 @@ public class DataInitializer implements CommandLineRunner {
         };
 
         int roomIndex = 0;
-        for (ExaminationRoom room : examinationRoomRepository.findAllByOrderByRoomNumberAsc()) {
+        for (ExaminationRoom room : examinationRoomRepository.findExamRooms()) {
             Doctor doctor = workScheduleRepository.findByExaminationRoomIdAndWorkDate(room.getId(), today).stream()
                     .filter(ws -> !"CANCELLED".equals(ws.getStatus()) && ws.getDoctor() != null)
                     .sorted((a, b) -> {

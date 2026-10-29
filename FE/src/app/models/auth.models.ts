@@ -8,6 +8,7 @@ export interface UserSummary {
   status: string;
   personId?: number;
   position?: string;
+  department?: string;
   roles: string[];
 }
 

@@ -114,8 +114,6 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             record = medicalRecordRepository.findByQueueTicketId(queueTicket.getId()).orElse(null);
         }
 
-        // Chỉ hồ sơ đã tạo từ trước (pha gửi xét nghiệm) mới có thể có chỉ định cận lâm sàng
-        boolean isExistingRecord = record != null;
         if (record == null) {
             record = MedicalRecord.builder()
                     .patient(patient)
@@ -185,13 +183,8 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             record.setPrescription(prescription);
         }
 
+        // Không gán lại danh sách labOrders (orphanRemoval): hồ sơ đang được quản lý nên chỉ định tự nạp khi tạo response
         MedicalRecord saved = medicalRecordRepository.save(record);
-
-        // Nạp kèm danh sách LabOrders (hồ sơ mới tạo thì chưa có chỉ định nào)
-        if (isExistingRecord) {
-            List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(saved.getId());
-            saved.setLabOrders(labOrders);
-        }
 
         log.info("-> Đã lưu thành công hồ sơ bệnh án ID: {} kèm đơn thuốc {}", 
                 saved.getId(), 

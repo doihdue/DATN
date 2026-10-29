@@ -124,8 +124,8 @@ class QueueServiceCheckInTest {
         when(patientRepository.findByPhoneNumber("0901234567")).thenReturn(List.of(patient));
         QueueTicket existing = QueueTicket.builder().id(1L).ticketNumber("P101-002")
                 .examinationRoom(room).status("WAITING").build();
-        when(queueTicketRepository.findFirstByTicketDateAndPatientIdAndStatusIn(any(), eq(10L), any()))
-                .thenReturn(Optional.of(existing));
+        when(queueTicketRepository.findPatientActiveTickets(any(), eq(10L), any()))
+                .thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> service.checkIn(request("Nguyễn Văn Nam")))
                 .isInstanceOf(BadRequestException.class)

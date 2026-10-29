@@ -5,6 +5,7 @@ import com.demo.be.dto.request.UpdateLabOrderResultRequest;
 import com.demo.be.dto.response.LabOrderResponse;
 import com.demo.be.dto.response.MedicalRecordResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface LabOrderService {
@@ -18,11 +19,13 @@ public interface LabOrderService {
     // Lấy danh sách chỉ định theo mã phiếu khám
     List<LabOrderResponse> getOrdersByTicketId(Long ticketId);
 
-    // Dành cho phòng Lab / Kỹ thuật viên
-    List<LabOrderResponse> getOrdersByStatus(String status);
+    // Dành cho phòng Lab / Kỹ thuật viên: chỉ định trong ngày + chỉ định còn dang dở
+    List<LabOrderResponse> getWorklist(LocalDate date);
 
-    List<LabOrderResponse> getAllOrders();
+    // KTV tiếp nhận mẫu: PENDING -> PROCESSING
+    LabOrderResponse startProcessing(Long orderId);
 
+    // KTV nhập kết quả & ký duyệt: -> COMPLETED
     LabOrderResponse updateOrderResult(Long orderId, UpdateLabOrderResultRequest request);
 
     void cancelOrder(Long orderId);
