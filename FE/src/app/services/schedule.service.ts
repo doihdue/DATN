@@ -48,6 +48,10 @@ export class ScheduleService {
     return this.http.post<ApiResponse<BatchWorkScheduleResponse>>(`${this.baseUrl}/admin/work-schedules/batch`, request);
   }
 
+  updateSchedule(id: number, request: WorkScheduleRequest): Observable<ApiResponse<WorkSchedule>> {
+    return this.http.put<ApiResponse<WorkSchedule>>(`${this.baseUrl}/admin/work-schedules/${id}`, request);
+  }
+
   cancelSchedule(id: number, reason?: string): Observable<ApiResponse<WorkSchedule>> {
     let params = new HttpParams();
     if (reason) params = params.set('reason', reason);
