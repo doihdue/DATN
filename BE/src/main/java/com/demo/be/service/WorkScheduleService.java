@@ -34,6 +34,8 @@ public interface WorkScheduleService {
 
     BatchWorkScheduleResponse createBatchSchedules(BatchWorkScheduleRequest request);
 
+    WorkScheduleResponse updateSchedule(Long id, WorkScheduleRequest request);
+
     WorkScheduleResponse cancelSchedule(Long id, String reason);
 
     void deleteSchedule(Long id);

@@ -75,6 +75,16 @@ public class WorkScheduleController {
     }
 
 
+    @PutMapping("/admin/work-schedules/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<WorkScheduleResponse>> updateSchedule(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkScheduleRequest request
+    ) {
+        WorkScheduleResponse updated = workScheduleService.updateSchedule(id, request);
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật ca làm việc thành công"));
+    }
+
     @PatchMapping("/admin/work-schedules/{id}/cancel")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<WorkScheduleResponse>> cancelSchedule(
