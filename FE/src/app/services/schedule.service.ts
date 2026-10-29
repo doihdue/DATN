@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ExaminationRoom, WorkSchedule, WorkScheduleRequest, BatchWorkScheduleRequest, BatchWorkScheduleResponse } from '../models/schedule.model';
+import { BatchStaffShiftRequest, BatchStaffShiftResponse, ExaminationRoom, LabTech, StaffShift, StaffShiftRequest, WorkSchedule, WorkScheduleRequest, BatchWorkScheduleRequest, BatchWorkScheduleResponse } from '../models/schedule.model';
 import { ApiResponse } from '../models/auth.models';
 
 @Injectable({
@@ -60,5 +60,45 @@ export class ScheduleService {
 
   deleteSchedule(id: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.baseUrl}/admin/work-schedules/${id}`);
+  }
+
+  // ===== Lịch trực KTV (phòng cận lâm sàng) =====
+  getStaffShifts(startDate?: string, endDate?: string, roomId?: number): Observable<ApiResponse<StaffShift[]>> {
+    let params = new HttpParams();
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
+    if (roomId) params = params.set('roomId', roomId.toString());
+    return this.http.get<ApiResponse<StaffShift[]>>(`${this.baseUrl}/admin/staff-shifts`, { params });
+  }
+
+  getMyStaffShifts(startDate?: string, endDate?: string): Observable<ApiResponse<StaffShift[]>> {
+    let params = new HttpParams();
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
+    return this.http.get<ApiResponse<StaffShift[]>>(`${this.baseUrl}/staff-shifts/my`, { params });
+  }
+
+  createStaffShift(request: StaffShiftRequest): Observable<ApiResponse<StaffShift>> {
+    return this.http.post<ApiResponse<StaffShift>>(`${this.baseUrl}/admin/staff-shifts`, request);
+  }
+
+  createBatchStaffShifts(request: BatchStaffShiftRequest): Observable<ApiResponse<BatchStaffShiftResponse>> {
+    return this.http.post<ApiResponse<BatchStaffShiftResponse>>(`${this.baseUrl}/admin/staff-shifts/batch`, request);
+  }
+
+  updateStaffShift(id: number, request: StaffShiftRequest): Observable<ApiResponse<StaffShift>> {
+    return this.http.put<ApiResponse<StaffShift>>(`${this.baseUrl}/admin/staff-shifts/${id}`, request);
+  }
+
+  deleteStaffShift(id: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.baseUrl}/admin/staff-shifts/${id}`);
+  }
+
+  getLabRooms(): Observable<ApiResponse<ExaminationRoom[]>> {
+    return this.http.get<ApiResponse<ExaminationRoom[]>>(`${this.baseUrl}/lab-rooms`);
+  }
+
+  getLabTechs(): Observable<ApiResponse<LabTech[]>> {
+    return this.http.get<ApiResponse<LabTech[]>>(`${this.baseUrl}/admin/lab-techs`);
   }
 }

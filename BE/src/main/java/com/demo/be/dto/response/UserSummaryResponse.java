@@ -20,5 +20,6 @@ public class UserSummaryResponse {
     private String status;
     private Long personId;
     private String position;
+    private String department;
     private List<String> roles;
 }

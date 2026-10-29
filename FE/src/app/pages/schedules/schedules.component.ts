@@ -5,12 +5,64 @@ import { ScheduleService } from '../../services/schedule.service';
 import { SpecialtyService } from '../../services/specialty.service';
 import { DoctorService } from '../../services/doctor.service';
 import { AuthService } from '../../services/auth.service';
-import { ExaminationRoom, WorkSchedule, WorkScheduleRequest, BatchWorkScheduleRequest, BatchWorkScheduleResponse } from '../../models/schedule.model';
+import { ExaminationRoom, StaffShift, StaffShiftRequest, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
 import { toIsoDate, addDays } from '../../utils/date.utils';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, Observable, of, map, tap } from 'rxjs';
 
-const NO_SCHEDULES: WorkSchedule[] = [];
+// Lịch trực dùng chung cho bác sĩ (ca tại phòng khám) và kỹ thuật viên (ca tại phòng cận lâm sàng)
+type StaffKind = 'DOCTOR' | 'TECH';
+
+// Một ca trên bảng phân ca: chuyển từ WorkSchedule (bác sĩ) hoặc StaffShift (KTV) về cùng một dạng
+interface RosterEntry {
+  id: number;
+  personId: number;
+  personName: string;
+  personTitle?: string;
+  personSub: string; // Chuyên khoa của bác sĩ / khoa của KTV
+  roomId: number;
+  roomNumber: string;
+  roomName: string;
+  floor?: number;
+  workDate: string;
+  shiftType: string;
+  startTime: string;
+  endTime: string;
+  status: 'AVAILABLE' | 'FULL' | 'CANCELLED';
+  booked: number;
+  max: number;
+  remaining: number;
+  notes?: string;
+}
+
+interface Person { id: number; fullName: string; sub: string; department?: string; }
+
+interface BatchResult { totalRequested: number; successCount: number; conflictCount: number; conflictMessages: string[]; }
+
+const NO_ENTRIES: RosterEntry[] = [];
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  XET_NGHIEM: 'Khoa Xét nghiệm',
+  CHAN_DOAN_HINH_ANH: 'Khoa Chẩn đoán hình ảnh'
+};
+
+function fromSchedule(s: WorkSchedule): RosterEntry {
+  return {
+    id: s.id, personId: s.doctorId, personName: s.doctorName, personTitle: s.academicTitle, personSub: s.specialtyName,
+    roomId: s.examinationRoomId, roomNumber: s.roomNumber, roomName: s.roomName, floor: s.floor,
+    workDate: s.workDate, shiftType: s.shiftType, startTime: s.startTime, endTime: s.endTime,
+    status: s.status, booked: s.currentBookedCount, max: s.maxPatients, remaining: s.remainingSlots
+  };
+}
+
+function fromShift(s: StaffShift): RosterEntry {
+  return {
+    id: s.id, personId: s.employeeId, personName: s.employeeName, personSub: DEPARTMENT_LABELS[s.department] ?? s.department,
+    roomId: s.roomId, roomNumber: s.roomNumber, roomName: s.roomName,
+    workDate: s.workDate, shiftType: s.shiftType, startTime: s.startTime, endTime: s.endTime,
+    status: 'AVAILABLE', booked: 0, max: 0, remaining: 0, notes: s.notes
+  };
+}
 
 // Thứ Hai của tuần chứa ngày đã cho
 function mondayOf(date: Date): Date {
@@ -36,18 +88,32 @@ function lastOfMonth(date: Date): Date {
         <div class="header-left">
           <div class="header-badge">
             <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
-            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : 'Lịch Trực Ca Bác Sĩ' }}
+            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : isTech() ? 'Lịch Trực Kỹ Thuật Viên' : 'Lịch Trực Ca Bác Sĩ' }}
           </div>
           <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc' : 'Lịch Trực Của Tôi' }}</h1>
           <p class="page-subtitle">
-            {{ isAdmin() 
-              ? 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' 
-              : 'Theo dõi các ca trực được phân công cho bạn, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
+            @if (isAdmin()) {
+              {{ isTech()
+                ? 'Xếp kỹ thuật viên vào phòng xét nghiệm / chẩn đoán hình ảnh. Mỗi ca có thể có nhiều KTV, chỉ chọn được KTV đúng khoa của phòng'
+                : 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' }}
+            } @else {
+              {{ isTech()
+                ? 'Theo dõi các ca trực được phân công cho bạn tại phòng cận lâm sàng'
+                : 'Theo dõi các ca trực được phân công cho bạn, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
+            }
           </p>
         </div>
         @if (isAdmin()) {
           <div class="header-actions">
-            <div class="view-toggle" role="tablist">
+            <div class="view-toggle" role="tablist" aria-label="Loại nhân sự">
+              <button type="button" class="view-toggle-btn" [class.active]="!isTech()" (click)="setKind('DOCTOR')">
+                <i class="bi bi-person-badge"></i> Bác sĩ
+              </button>
+              <button type="button" class="view-toggle-btn" [class.active]="isTech()" (click)="setKind('TECH')">
+                <i class="bi bi-eyedropper"></i> Kỹ thuật viên
+              </button>
+            </div>
+            <div class="view-toggle" role="tablist" aria-label="Chế độ xem">
               <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'MONTH'" (click)="setViewMode('MONTH')">
                 <i class="bi bi-calendar3"></i> Tháng
               </button>
@@ -88,7 +154,7 @@ function lastOfMonth(date: Date): Date {
       }
 
       @if (isAdmin() && viewMode() === 'ROSTER') {
-      <!-- Bảng phân ca theo tuần: hàng = phòng khám, cột = ngày, mỗi ô gồm 3 ca -->
+      <!-- Bảng phân ca theo tuần: hàng = phòng, cột = ngày, mỗi ô gồm 3 ca -->
       <div class="roster-card">
         <div class="roster-toolbar">
           <div class="week-nav">
@@ -115,15 +181,15 @@ function lastOfMonth(date: Date): Date {
         } @else if (rooms().length === 0) {
           <div class="empty-state">
             <i class="bi bi-door-closed"></i>
-            <h3>Chưa có phòng khám nào</h3>
-            <p>Hãy thêm phòng khám trước khi xếp lịch trực.</p>
+            <h3>Chưa có {{ roomLabel().toLowerCase() }} nào</h3>
+            <p>Hãy thêm {{ roomLabel().toLowerCase() }} trước khi xếp lịch trực.</p>
           </div>
         } @else {
           <div class="roster-scroll">
             <table class="roster-table">
               <thead>
                 <tr>
-                  <th class="roster-room-col">Phòng khám</th>
+                  <th class="roster-room-col">{{ roomLabel() }}</th>
                   @for (day of weekDays(); track day.iso) {
                     <th [class.is-today]="day.isToday" [class.is-past]="day.isPast">
                       <span class="day-name">{{ day.weekday }}</span>
@@ -142,28 +208,36 @@ function lastOfMonth(date: Date): Date {
                     @for (day of weekDays(); track day.iso) {
                       <td [class.is-today]="day.isToday" [class.is-past]="day.isPast">
                         @for (shift of shiftSlots; track shift.key) {
-                          @let items = slotSchedules(room.id, day.iso, shift.key);
-                          @if (items.length > 0) {
-                            @for (s of items; track s.id) {
-                              <button type="button" class="slot slot-filled" [ngClass]="shift.css" [class.slot-new]="s.id === highlightId()"
-                                      [disabled]="day.isPast || openingForm()" (click)="openEditModal(s)"
-                                      [title]="shift.label + ' ' + day.short + ' · ' + s.doctorName + ' (' + s.specialtyName + ')' + (day.isPast ? '' : ' · Bấm để sửa')">
-                                <span class="slot-shift">{{ shift.label }}</span>
-                                <span class="slot-doctor">{{ s.doctorName }}</span>
-                                <span class="slot-meta">{{ s.startTime.substring(0, 5) }}–{{ s.endTime.substring(0, 5) }} · {{ s.currentBookedCount }}/{{ s.maxPatients }}</span>
-                              </button>
-                            }
-                          } @else if (day.isPast) {
+                          @let items = slotEntries(room.id, day.iso, shift.key);
+                          @for (s of items; track s.id) {
+                            <button type="button" class="slot slot-filled" [ngClass]="shift.css" [class.slot-new]="s.id === highlightId()"
+                                    [disabled]="day.isPast || openingForm()" (click)="openEditModal(s)"
+                                    [title]="shift.label + ' ' + day.short + ' · ' + s.personName + ' (' + s.personSub + ')' + (day.isPast ? '' : ' · Bấm để sửa')">
+                              <span class="slot-shift">{{ shift.label }}</span>
+                              <span class="slot-doctor">{{ s.personName }}</span>
+                              <span class="slot-meta">
+                                {{ s.startTime.substring(0, 5) }}–{{ s.endTime.substring(0, 5) }}{{ isTech() ? '' : ' · ' + s.booked + '/' + s.max }}
+                              </span>
+                            </button>
+                          }
+                          @if (items.length === 0 && day.isPast) {
                             <div class="slot slot-past">
                               <span class="slot-shift">{{ shift.label }}</span>
                               <span class="slot-none">—</span>
                             </div>
-                          } @else {
+                          } @else if (items.length === 0) {
                             <button type="button" class="slot slot-empty" [disabled]="openingForm()"
                                     (click)="openSlot(room.id, day.iso, shift.key)"
                                     [title]="'Xếp ca ' + shift.label + ' ' + day.short + ' tại ' + room.roomNumber">
                               <span class="slot-shift">{{ shift.label }}</span>
                               <span class="slot-add"><i class="bi bi-plus-lg"></i> Trống</span>
+                            </button>
+                          } @else if (isTech() && !day.isPast) {
+                            <!-- Phòng cận lâm sàng: một ca có thể thêm nhiều KTV -->
+                            <button type="button" class="slot-more" [disabled]="openingForm()"
+                                    (click)="openSlot(room.id, day.iso, shift.key)"
+                                    [title]="'Thêm KTV vào ca ' + shift.label + ' ' + day.short + ' tại ' + room.roomNumber">
+                              <i class="bi bi-plus-lg"></i> Thêm KTV
                             </button>
                           }
                         }
@@ -181,6 +255,9 @@ function lastOfMonth(date: Date): Date {
             <span><i class="legend-dot shift-evening"></i> Ca tối 18:00–21:00</span>
             <span><i class="legend-dot legend-empty"></i> Ô trống: bấm để xếp ca</span>
             <span><i class="bi bi-pencil-square"></i> Ca đã xếp: bấm để sửa</span>
+            @if (isTech()) {
+              <span><i class="bi bi-plus-lg"></i> Thêm KTV: một ca có thể có nhiều KTV</span>
+            }
           </div>
         }
       </div>
@@ -251,14 +328,15 @@ function lastOfMonth(date: Date): Date {
           </div>
           @if (isAdmin()) {
           <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-door-open"></i> Phòng khám</label>
+            <label class="filter-label"><i class="bi bi-door-open"></i> {{ roomLabel() }}</label>
             <select [(ngModel)]="filterRoomId" (change)="loadSchedules()" class="form-control">
-              <option [ngValue]="null">-- Tất cả phòng khám --</option>
+              <option [ngValue]="null">-- Tất cả phòng --</option>
               @for (room of rooms(); track room.id) {
                 <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }}</option>
               }
             </select>
           </div>
+          @if (!isTech()) {
           <div class="filter-item">
             <label class="filter-label"><i class="bi bi-diagram-3"></i> Chuyên khoa</label>
             <select [(ngModel)]="filterSpecialtyId" (change)="loadSchedules()" class="form-control">
@@ -268,6 +346,7 @@ function lastOfMonth(date: Date): Date {
               }
             </select>
           </div>
+          }
           }
         </div>
 
@@ -284,14 +363,25 @@ function lastOfMonth(date: Date): Date {
           <span class="stat-number">{{ schedules().length }}</span>
           <span class="stat-label">Tổng ca làm việc</span>
         </div>
-        <div class="stat-box stat-available">
-          <span class="stat-number">{{ listStats().available }}</span>
-          <span class="stat-label">Chỗ khám còn trống</span>
-        </div>
-        <div class="stat-box stat-booked">
-          <span class="stat-number">{{ listStats().booked }}</span>
-          <span class="stat-label">Đã được đặt trước</span>
-        </div>
+        @if (isTech()) {
+          <div class="stat-box stat-available">
+            <span class="stat-number">{{ listStats().people }}</span>
+            <span class="stat-label">Kỹ thuật viên tham gia</span>
+          </div>
+          <div class="stat-box stat-booked">
+            <span class="stat-number">{{ listStats().rooms }}</span>
+            <span class="stat-label">Phòng có người trực</span>
+          </div>
+        } @else {
+          <div class="stat-box stat-available">
+            <span class="stat-number">{{ listStats().available }}</span>
+            <span class="stat-label">Chỗ khám còn trống</span>
+          </div>
+          <div class="stat-box stat-booked">
+            <span class="stat-number">{{ listStats().booked }}</span>
+            <span class="stat-label">Đã được đặt trước</span>
+          </div>
+        }
       </div>
 
       <!-- Schedules Table -->
@@ -305,7 +395,7 @@ function lastOfMonth(date: Date): Date {
           <div class="empty-state">
             <i class="bi bi-calendar-x"></i>
             <h3>Không có ca làm việc nào phù hợp</h3>
-            <p>Hãy thay đổi bộ lọc hoặc đăng ký ca trực mới cho bác sĩ.</p>
+            <p>Hãy thay đổi bộ lọc{{ isAdmin() ? ' hoặc đăng ký ca trực mới cho ' + personLabel().toLowerCase() : '' }}.</p>
           </div>
         } @else {
           <table class="data-table">
@@ -313,10 +403,14 @@ function lastOfMonth(date: Date): Date {
               <tr>
                 <th>Ngày & Giờ</th>
                 <th>Ca trực</th>
-                <th>Bác sĩ phụ trách</th>
-                <th>Phòng khám</th>
-                <th>Lượng bệnh nhân (Đã đặt / Tối đa)</th>
-                <th>Trạng thái</th>
+                <th>{{ isTech() ? 'Kỹ thuật viên' : 'Bác sĩ phụ trách' }}</th>
+                <th>{{ roomLabel() }}</th>
+                @if (isTech()) {
+                  <th>Ghi chú</th>
+                } @else {
+                  <th>Lượng bệnh nhân (Đã đặt / Tối đa)</th>
+                  <th>Trạng thái</th>
+                }
                 @if (isAdmin()) {
                   <th class="text-right">Thao tác</th>
                 }
@@ -338,36 +432,40 @@ function lastOfMonth(date: Date): Date {
                   </td>
                   <td>
                     <div class="doctor-col">
-                      <strong>{{ item.doctorName }}</strong>
-                      <span class="doctor-sub">{{ item.academicTitle || 'Bác sĩ' }} • {{ item.specialtyName }}</span>
+                      <strong>{{ item.personName }}</strong>
+                      <span class="doctor-sub">{{ isTech() ? item.personSub : (item.personTitle || 'Bác sĩ') + ' • ' + item.personSub }}</span>
                     </div>
                   </td>
                   <td>
                     <div class="room-col">
                       <span class="room-badge">{{ item.roomNumber }}</span>
-                      <span class="room-desc">{{ item.roomName }} (Tầng {{ item.floor }})</span>
+                      <span class="room-desc">{{ item.roomName }}{{ item.floor ? ' (Tầng ' + item.floor + ')' : '' }}</span>
                     </div>
                   </td>
-                  <td>
-                    <div class="capacity-col">
-                      <div class="capacity-label">
-                        <span>{{ item.currentBookedCount }} / {{ item.maxPatients }}</span>
-                        <small>Còn {{ item.remainingSlots }} chỗ</small>
+                  @if (isTech()) {
+                    <td>{{ item.notes || '—' }}</td>
+                  } @else {
+                    <td>
+                      <div class="capacity-col">
+                        <div class="capacity-label">
+                          <span>{{ item.booked }} / {{ item.max }}</span>
+                          <small>Còn {{ item.remaining }} chỗ</small>
+                        </div>
+                        <div class="progress-bar-bg">
+                          <div
+                            class="progress-bar-fill"
+                            [style.width.%]="(item.booked / item.max) * 100"
+                            [ngClass]="getCapacityColorClass(item.booked, item.max)"
+                          ></div>
+                        </div>
                       </div>
-                      <div class="progress-bar-bg">
-                        <div
-                          class="progress-bar-fill"
-                          [style.width.%]="(item.currentBookedCount / item.maxPatients) * 100"
-                          [ngClass]="getCapacityColorClass(item.currentBookedCount, item.maxPatients)"
-                        ></div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="badge" [ngClass]="getStatusBadgeClass(item.status)">
-                      {{ getStatusDisplayName(item.status) }}
-                    </span>
-                  </td>
+                    </td>
+                    <td>
+                      <span class="badge" [ngClass]="getStatusBadgeClass(item.status)">
+                        {{ getStatusDisplayName(item.status) }}
+                      </span>
+                    </td>
+                  }
                   @if (isAdmin()) {
                     <td class="text-right">
                       <div class="row-actions">
@@ -376,14 +474,16 @@ function lastOfMonth(date: Date): Date {
                             <i class="bi bi-pencil-square"></i> Sửa
                           </button>
                         }
-                        @if (item.status !== 'CANCELLED') {
+                        @if (!isTech() && item.status !== 'CANCELLED') {
                           <button class="btn btn-sm btn-outline-warning" (click)="cancelSchedule(item)" title="Hủy ca trực">
                             <i class="bi bi-x-circle"></i> Hủy
                           </button>
                         }
-                        <button class="btn btn-sm btn-outline-danger" (click)="deleteSchedule(item)" title="Xóa ca">
-                          <i class="bi bi-trash3"></i>
-                        </button>
+                        @if (!isTech() || item.workDate >= todayIso) {
+                          <button class="btn btn-sm btn-outline-danger" (click)="deleteEntry(item)" title="Xóa ca">
+                            <i class="bi bi-trash3"></i>
+                          </button>
+                        }
                       </div>
                     </td>
                   }
@@ -469,14 +569,14 @@ function lastOfMonth(date: Date): Date {
       </div>
       }
 
-      <!-- Modal Thêm Ca Làm Việc Mới -->
+      <!-- Modal Đăng ký / Sửa ca trực -->
       @if (showModal()) {
         <div class="modal-backdrop" (click)="closeModal()">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">
-                <i class="bi" [ngClass]="editingSchedule() ? 'bi-pencil-square' : 'bi-calendar-plus'"></i>
-                {{ editingSchedule() ? 'Cập Nhật Ca Làm Việc' : 'Đăng Ký Ca Làm Việc Bác Sĩ' }}
+                <i class="bi" [ngClass]="editingEntry() ? 'bi-pencil-square' : 'bi-calendar-plus'"></i>
+                {{ editingEntry() ? 'Cập Nhật Ca Trực ' : 'Đăng Ký Ca Trực ' }}{{ personLabel() }}
               </h2>
               <button class="modal-close-btn" (click)="closeModal()">×</button>
             </div>
@@ -522,12 +622,15 @@ function lastOfMonth(date: Date): Date {
             } @else {
               <!-- Form input -->
               <div class="modal-body">
-                @if (editingSchedule(); as editing) {
+                @if (editingEntry(); as editing) {
                   <div class="edit-info-box">
                     <i class="bi bi-info-circle-fill"></i>
                     <div>
                       Đang sửa ca {{ editing.workDate | date:'dd/MM/yyyy' }} ({{ editing.startTime.substring(0, 5) }}–{{ editing.endTime.substring(0, 5) }})
-                      tại {{ editing.roomNumber }}. Đã có <strong>{{ editing.currentBookedCount }}</strong> lịch hẹn.
+                      tại {{ editing.roomNumber }}.
+                      @if (!isTech()) {
+                        Đã có <strong>{{ editing.booked }}</strong> lịch hẹn.
+                      }
                       @if (timeLocked()) {
                         <br />Ca đã có bệnh nhân đặt nên <strong>không đổi được ngày/giờ</strong>; đổi bác sĩ thì lịch hẹn chuyển sang bác sĩ mới.
                       }
@@ -546,34 +649,39 @@ function lastOfMonth(date: Date): Date {
 
                 <div class="form-row">
                   <div class="form-group flex-1">
-                    <label class="form-label required">Bác sĩ phụ trách</label>
-                    <select [(ngModel)]="activeDoctorId" class="form-control" required>
-                      <option [ngValue]="null">-- Chọn bác sĩ --</option>
-                      @for (doc of doctorList(); track doc.id) {
-                        @let busyRoom = doctorBusyRoom(doc.id);
-                        <option [ngValue]="doc.id" [disabled]="!!busyRoom">
-                          {{ doc.fullName }} ({{ doc.specialtyName }}){{ busyRoom ? ' — đang trực ' + busyRoom : '' }}
+                    <label class="form-label required">{{ isTech() ? 'Kỹ thuật viên (theo khoa của phòng)' : 'Bác sĩ phụ trách' }}</label>
+                    <select [(ngModel)]="activePersonId" class="form-control" required>
+                      <option [ngValue]="null">-- Chọn {{ personLabel().toLowerCase() }} --</option>
+                      @for (person of personList(); track person.id) {
+                        @let busyRoom = personBusyRoom(person.id);
+                        <option [ngValue]="person.id" [disabled]="!!busyRoom">
+                          {{ person.fullName }} ({{ person.sub }}){{ busyRoom ? ' — đang trực ' + busyRoom : '' }}
                         </option>
                       }
                     </select>
                   </div>
                   <div class="form-group flex-1">
-                    <label class="form-label required">Phòng khám điều trị</label>
-                    <select [(ngModel)]="activeRoomId" class="form-control" required>
-                      <option [ngValue]="null">-- Chọn phòng khám --</option>
+                    <label class="form-label required">{{ roomLabel() }}</label>
+                    <select [ngModel]="activeRoomId" (ngModelChange)="onRoomChange($event)" class="form-control" required>
+                      <option [ngValue]="null">-- Chọn phòng --</option>
                       @for (room of rooms(); track room.id) {
-                        @let busyDoctor = roomBusyDoctor(room.id);
-                        <option [ngValue]="room.id" [disabled]="!!busyDoctor">
-                          {{ room.roomNumber }} - {{ room.roomName }} (Tầng {{ room.floor }}){{ busyDoctor ? ' — ' + busyDoctor + ' đang trực' : '' }}
+                        @let roomNote = roomBusyNote(room.id);
+                        <option [ngValue]="room.id" [disabled]="!isTech() && !!roomNote">
+                          {{ room.roomNumber }} - {{ room.roomName }} (Tầng {{ room.floor }}){{ roomNote ? ' — ' + roomNote : '' }}
                         </option>
                       }
                     </select>
                   </div>
                 </div>
-                @if (scheduleMode === 'SINGLE' && freeDoctorCount() === 0 && doctorList().length > 0) {
+                @if (isTech() && activeRoomId && personList().length === 0) {
                   <div class="slot-warning">
                     <i class="bi bi-exclamation-triangle-fill"></i>
-                    Tất cả bác sĩ đều đã có ca giao nhau với khung giờ này. Hãy chọn khung giờ khác.
+                    Khoa của phòng này chưa có kỹ thuật viên nào.
+                  </div>
+                } @else if (scheduleMode === 'SINGLE' && freePersonCount() === 0 && personList().length > 0) {
+                  <div class="slot-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Tất cả {{ personLabel().toLowerCase() }} đều đã có ca giao nhau với khung giờ này. Hãy chọn khung giờ khác.
                   </div>
                 }
 
@@ -612,7 +720,7 @@ function lastOfMonth(date: Date): Date {
                 </div>
 
                 @if (scheduleMode === 'MULTI') {
-                  <!-- Lịch tháng của bác sĩ: tick từng ngày muốn xếp trực -->
+                  <!-- Lịch tháng của người được chọn: tick từng ngày muốn xếp trực -->
                   <div class="availability-box">
                     <div class="month-picker-row">
                       <div class="week-nav">
@@ -631,8 +739,8 @@ function lastOfMonth(date: Date): Date {
                       </div>
                     </div>
 
-                    @if (!activeDoctorId || !activeRoomId) {
-                      <div class="availability-loading">Chọn bác sĩ và phòng khám để xem các ngày còn trống.</div>
+                    @if (!activePersonId || !activeRoomId) {
+                      <div class="availability-loading">Chọn {{ personLabel().toLowerCase() }} và phòng để xem các ngày còn trống.</div>
                     } @else if (formChecking()) {
                       <div class="availability-loading"><span class="spinner-sm"></span> Đang kiểm tra lịch...</div>
                     } @else {
@@ -659,8 +767,10 @@ function lastOfMonth(date: Date): Date {
                       <div class="pick-legend">
                         <span><i class="legend-dot pick-legend-selected"></i> Đã chọn</span>
                         <span><i class="legend-dot pick-legend-free"></i> Còn trống</span>
-                        <span><i class="legend-dot pick-legend-doctor"></i> Bác sĩ đã có ca</span>
-                        <span><i class="legend-dot pick-legend-room"></i> Phòng đã có người</span>
+                        <span><i class="legend-dot pick-legend-doctor"></i> {{ personLabel() }} đã có ca</span>
+                        @if (!isTech()) {
+                          <span><i class="legend-dot pick-legend-room"></i> Phòng đã có người</span>
+                        }
                       </div>
                       <div class="days-helper-text">
                         <i class="bi bi-info-circle"></i>
@@ -679,10 +789,17 @@ function lastOfMonth(date: Date): Date {
                     <label class="form-label required">Giờ kết thúc</label>
                     <input type="time" [(ngModel)]="activeEndTime" [disabled]="timeLocked()" class="form-control" required />
                   </div>
-                  <div class="form-group flex-1">
-                    <label class="form-label required">Bệnh nhân tối đa / ca</label>
-                    <input type="number" [(ngModel)]="activeMaxPatients" min="1" max="100" class="form-control" required />
-                  </div>
+                  @if (isTech()) {
+                    <div class="form-group flex-1">
+                      <label class="form-label">Ghi chú</label>
+                      <input type="text" [(ngModel)]="activeNotes" maxlength="255" class="form-control" placeholder="Không bắt buộc" />
+                    </div>
+                  } @else {
+                    <div class="form-group flex-1">
+                      <label class="form-label required">Bệnh nhân tối đa / ca</label>
+                      <input type="number" [(ngModel)]="activeMaxPatients" min="1" max="100" class="form-control" required />
+                    </div>
+                  }
                 </div>
                 <div class="days-helper-text">
                   <i class="bi bi-info-circle"></i> Sửa giờ bắt đầu / kết thúc nếu cần khung giờ khác 3 ca mặc định.
@@ -690,12 +807,17 @@ function lastOfMonth(date: Date): Date {
               </div>
 
               <div class="modal-footer">
+                @if (editingEntry(); as editing) {
+                  <button class="btn btn-outline-danger footer-left" [disabled]="submitting()" (click)="deleteEntry(editing)">
+                    <i class="bi bi-trash3"></i> Xoá ca
+                  </button>
+                }
                 <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
                 <button class="btn btn-primary" [disabled]="submitting() || !isFormValid()" (click)="saveSchedule()">
                   @if (submitting()) {
                     <span class="spinner-sm"></span> Đang kiểm tra & tạo lịch...
                   } @else {
-                    <i class="bi bi-check-circle"></i> {{ editingSchedule() ? 'Lưu Thay Đổi' : scheduleMode === 'SINGLE' ? 'Xác Nhận Xếp Ca' : 'Xếp Ca Cho ' + selectedFreeDates().length + ' Ngày Đã Chọn' }}
+                    <i class="bi bi-check-circle"></i> {{ editingEntry() ? 'Lưu Thay Đổi' : scheduleMode === 'SINGLE' ? 'Xác Nhận Xếp Ca' : 'Xếp Ca Cho ' + selectedFreeDates().length + ' Ngày Đã Chọn' }}
                   }
                 </button>
               </div>
@@ -1885,8 +2007,29 @@ function lastOfMonth(date: Date): Date {
     .text-amber {
       color: #d97706;
     }
+
+    /* Phòng cận lâm sàng: thêm KTV vào ca đã có người */
+    .slot-more {
+      width: 100%;
+      margin-bottom: 0.35rem;
+      padding: 0.2rem 0.45rem;
+      border: 1px dashed #94a3b8;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #475569;
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .slot-more:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
+    .slot-more:disabled { cursor: wait; opacity: 0.6; }
+
+    .footer-left { margin-right: auto; }
   `]
 })
+
 export class SchedulesComponent implements OnInit {
   private readonly scheduleService = inject(ScheduleService);
   private readonly specialtyService = inject(SpecialtyService);
@@ -1895,10 +2038,20 @@ export class SchedulesComponent implements OnInit {
 
   readonly isAdmin = computed(() => this.authService.hasRole('ADMIN'));
 
-  readonly schedules = signal<WorkSchedule[]>([]);
-  readonly rooms = signal<ExaminationRoom[]>([]);
+  // Admin chuyển qua lại giữa lịch bác sĩ và lịch KTV; KTV đăng nhập chỉ xem ca của mình
+  readonly kind = signal<StaffKind>(
+    !this.authService.hasRole('ADMIN') && !this.authService.hasRole('DOCTOR') && this.authService.isLabTech() ? 'TECH' : 'DOCTOR');
+  readonly isTech = computed(() => this.kind() === 'TECH');
+  readonly personLabel = computed(() => this.isTech() ? 'Kỹ thuật viên' : 'Bác sĩ');
+  readonly roomLabel = computed(() => this.isTech() ? 'Phòng cận lâm sàng' : 'Phòng khám');
+
+  readonly schedules = signal<RosterEntry[]>([]);
+  private readonly examRooms = signal<ExaminationRoom[]>([]);
+  private readonly labRooms = signal<ExaminationRoom[]>([]);
+  readonly rooms = computed(() => this.isTech() ? this.labRooms() : this.examRooms());
   readonly specialties = signal<Specialty[]>([]);
-  readonly doctorList = signal<any[]>([]);
+  private readonly doctorList = signal<Person[]>([]);
+  private readonly techList = signal<Person[]>([]);
 
   readonly loading = signal(true);
   readonly submitting = signal(false);
@@ -1908,15 +2061,15 @@ export class SchedulesComponent implements OnInit {
   readonly alertMessage = signal<string | null>(null);
   readonly alertType = signal<'success' | 'danger'>('success');
 
-  // Bảng phân ca theo tuần (Admin): hàng = phòng khám, cột = ngày, mỗi ô 3 ca
+  // Bảng phân ca theo tuần (Admin): hàng = phòng, cột = ngày, mỗi ô 3 ca
   readonly viewMode = signal<'MONTH' | 'ROSTER' | 'LIST'>('ROSTER');
   readonly todayIso = toIsoDate(new Date());
   // Ca đang sửa (null = đang thêm mới)
-  readonly editingSchedule = signal<WorkSchedule | null>(null);
+  readonly editingEntry = signal<RosterEntry | null>(null);
 
   // Tổng quan tháng: mỗi ngày hiện số ca đã có người / tổng số ca (phòng × 3 ca)
   readonly monthStart = signal<string>(toIsoDate(firstOfMonth(new Date())));
-  readonly monthSchedules = signal<WorkSchedule[]>([]);
+  readonly monthSchedules = signal<RosterEntry[]>([]);
   readonly monthLoading = signal(false);
   readonly monthWeekdayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
@@ -1940,7 +2093,7 @@ export class SchedulesComponent implements OnInit {
     for (const s of this.monthSchedules()) {
       if (s.status === 'CANCELLED') continue;
       const set = filledByDate.get(s.workDate) ?? new Set<string>();
-      set.add(`${s.examinationRoomId}|${this.shiftKeyOf(s)}`);
+      set.add(`${s.roomId}|${this.shiftKeyOf(s)}`);
       filledByDate.set(s.workDate, set);
     }
 
@@ -1978,11 +2131,11 @@ export class SchedulesComponent implements OnInit {
     return { filled, empty };
   });
   readonly weekStart = signal<string>(toIsoDate(mondayOf(new Date())));
-  readonly weekSchedules = signal<WorkSchedule[]>([]);
+  readonly weekSchedules = signal<RosterEntry[]>([]);
   readonly weekLoading = signal(false);
   readonly highlightId = signal<number | null>(null);
   // Ca trực của khoảng ngày đang chọn trong form khi khoảng đó nằm ngoài tuần đang xem (null = dùng dữ liệu tuần)
-  readonly formSchedules = signal<WorkSchedule[] | null>(null);
+  readonly formSchedules = signal<RosterEntry[] | null>(null);
   readonly formChecking = signal(false);
   private formRangeKey = '';
 
@@ -2018,10 +2171,10 @@ export class SchedulesComponent implements OnInit {
 
   // Gom ca trực (chưa huỷ) theo khoá phòng|ngày|ca để tra ô nhanh khi vẽ bảng
   private readonly rosterMap = computed(() => {
-    const map = new Map<string, WorkSchedule[]>();
+    const map = new Map<string, RosterEntry[]>();
     for (const s of this.weekSchedules()) {
       if (s.status === 'CANCELLED') continue;
-      const key = `${s.examinationRoomId}|${s.workDate}|${this.shiftKeyOf(s)}`;
+      const key = `${s.roomId}|${s.workDate}|${this.shiftKeyOf(s)}`;
       const list = map.get(key);
       if (list) list.push(s); else map.set(key, [s]);
     }
@@ -2116,26 +2269,29 @@ export class SchedulesComponent implements OnInit {
     this.currentPage.set(1);
   }
 
-  // Form đăng ký: 1 ngày, hoặc nhiều ngày tick trên lịch tháng của bác sĩ
+  // Form đăng ký: 1 ngày, hoặc nhiều ngày tick trên lịch tháng của người được chọn
   scheduleMode: 'SINGLE' | 'MULTI' = 'SINGLE';
   formMonthStart = toIsoDate(firstOfMonth(new Date()));
   readonly currentMonthIso = toIsoDate(firstOfMonth(new Date()));
   selectedDates: string[] = [];
 
-  activeDoctorId: number | null = null;
+  activePersonId: number | null = null;
   activeRoomId: number | null = null;
   activeWorkDate = this.todayIso;
   activeStartTime = '07:30';
   activeEndTime = '12:00';
   activeMaxPatients = 20;
+  activeNotes = '';
 
-  readonly batchResult = signal<BatchWorkScheduleResponse | null>(null);
+  readonly batchResult = signal<BatchResult | null>(null);
 
   readonly listStats = computed(() => {
     const active = this.schedules().filter(s => s.status !== 'CANCELLED');
     return {
-      available: active.reduce((sum, s) => sum + s.remainingSlots, 0),
-      booked: active.reduce((sum, s) => sum + s.currentBookedCount, 0)
+      available: active.reduce((sum, s) => sum + s.remaining, 0),
+      booked: active.reduce((sum, s) => sum + s.booked, 0),
+      people: new Set(active.map(s => s.personId)).size,
+      rooms: new Set(active.map(s => s.roomId)).size
     };
   });
 
@@ -2157,13 +2313,28 @@ export class SchedulesComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Admin mở màn ở bảng phân ca tuần (cần phòng khám + ca trực trong tuần); bác sĩ chỉ xem lịch của mình
+    // Admin mở màn ở bảng phân ca tuần (cần phòng + ca trực trong tuần); bác sĩ / KTV chỉ xem lịch của mình
     if (this.isAdmin()) {
-      this.loadRooms();
+      this.ensureRooms().subscribe();
       this.loadWeek();
     } else {
       this.loadSchedules();
     }
+  }
+
+  // Đổi giữa lịch bác sĩ và lịch KTV, giữ nguyên chế độ xem / tuần / tháng đang chọn
+  setKind(kind: StaffKind): void {
+    if (this.kind() === kind) return;
+    this.kind.set(kind);
+    this.filterRoomId = null;
+    this.weekSchedules.set([]);
+    this.monthSchedules.set([]);
+    this.schedules.set([]);
+    this.ensureRooms().subscribe();
+    const mode = this.viewMode();
+    if (mode === 'LIST') this.loadSchedules();
+    else if (mode === 'MONTH') this.loadMonth();
+    else this.loadWeek();
   }
 
   setViewMode(mode: 'MONTH' | 'ROSTER' | 'LIST'): void {
@@ -2180,12 +2351,23 @@ export class SchedulesComponent implements OnInit {
     }
   }
 
+  // Ca trực trong khoảng ngày của loại nhân sự đang xem (Admin)
+  private fetchEntries(startDate?: string, endDate?: string, roomId?: number, specialtyId?: number): Observable<RosterEntry[]> {
+    if (this.isTech()) {
+      return this.scheduleService.getStaffShifts(startDate, endDate, roomId).pipe(map(res => (res.data || []).map(fromShift)));
+    }
+    return this.scheduleService.getSchedules({ startDate, endDate, roomId, specialtyId })
+      .pipe(map(res => (res.data || []).map(fromSchedule)));
+  }
+
   loadMonth(): void {
+    const kind = this.kind();
     this.monthLoading.set(true);
     const first = new Date(this.monthStart() + 'T00:00:00');
-    this.scheduleService.getSchedules({ startDate: this.monthStart(), endDate: toIsoDate(lastOfMonth(first)) }).subscribe({
-      next: res => {
-        this.monthSchedules.set(res.success && res.data ? res.data : []);
+    this.fetchEntries(this.monthStart(), toIsoDate(lastOfMonth(first))).subscribe({
+      next: entries => {
+        if (kind !== this.kind()) return;
+        this.monthSchedules.set(entries);
         this.monthLoading.set(false);
       },
       error: err => {
@@ -2225,7 +2407,7 @@ export class SchedulesComponent implements OnInit {
     this.loadFormSchedules();
   }
 
-  // Lịch tháng của bác sĩ đang chọn: ngày đã qua / bác sĩ đã có ca / phòng đã có người / còn trống
+  // Lịch tháng của người đang chọn: ngày đã qua / người đã có ca / phòng đã có người (chỉ phòng khám) / còn trống
   formMonthCells(): { iso: string; day: number; state: 'out' | 'past' | 'doctor' | 'room' | 'free'; note: string; selected: boolean }[] {
     const first = new Date(this.formMonthStart + 'T00:00:00');
     const gridEnd = addDays(mondayOf(lastOfMonth(first)), 6);
@@ -2241,15 +2423,15 @@ export class SchedulesComponent implements OnInit {
         state = 'past';
         note = 'Ngày đã qua';
       } else {
-        const doctorHit = this.overlapOn(iso, this.activeStartTime, this.activeEndTime, s => s.doctorId === this.activeDoctorId);
-        const roomHit = doctorHit ? undefined
-          : this.overlapOn(iso, this.activeStartTime, this.activeEndTime, s => s.examinationRoomId === this.activeRoomId);
-        if (doctorHit) {
+        const personHit = this.overlapOn(iso, this.activeStartTime, this.activeEndTime, s => s.personId === this.activePersonId);
+        const roomHit = personHit || this.isTech() ? undefined
+          : this.overlapOn(iso, this.activeStartTime, this.activeEndTime, s => s.roomId === this.activeRoomId);
+        if (personHit) {
           state = 'doctor';
-          note = 'Trực ' + doctorHit.roomNumber;
+          note = 'Trực ' + personHit.roomNumber;
         } else if (roomHit) {
           state = 'room';
-          note = roomHit.doctorName;
+          note = roomHit.personName;
         }
       }
       cells.push({ iso, day: d.getDate(), state, note, selected: state === 'free' && this.selectedDates.includes(iso) });
@@ -2274,38 +2456,41 @@ export class SchedulesComponent implements OnInit {
     this.selectedDates = [];
   }
 
-  // Chỉ gửi các ngày đã chọn mà vẫn còn trống (đổi bác sĩ / phòng / giờ có thể làm một số ngày bị trùng)
+  // Chỉ gửi các ngày đã chọn mà vẫn còn trống (đổi người / phòng / giờ có thể làm một số ngày bị trùng)
   selectedFreeDates(): string[] {
     return this.formMonthCells().filter(c => c.selected).map(c => c.iso);
   }
 
-  // Ca đã có bệnh nhân đặt thì không đổi được ngày/giờ (backend cũng chặn)
+  // Ca bác sĩ đã có bệnh nhân đặt thì không đổi được ngày/giờ (backend cũng chặn)
   timeLocked(): boolean {
-    const editing = this.editingSchedule();
-    return !!editing && editing.currentBookedCount > 0;
+    const editing = this.editingEntry();
+    return !!editing && editing.booked > 0;
   }
 
-  openEditModal(schedule: WorkSchedule): void {
+  openEditModal(entry: RosterEntry): void {
     this.openAddModal(undefined, () => {
-      this.editingSchedule.set(schedule);
+      this.editingEntry.set(entry);
       this.scheduleMode = 'SINGLE';
-      this.activeDoctorId = schedule.doctorId;
-      this.activeRoomId = schedule.examinationRoomId;
-      this.activeWorkDate = schedule.workDate;
-      this.activeStartTime = schedule.startTime.substring(0, 5);
-      this.activeEndTime = schedule.endTime.substring(0, 5);
-      this.activeMaxPatients = schedule.maxPatients;
+      this.activeRoomId = entry.roomId;
+      this.activePersonId = entry.personId;
+      this.activeWorkDate = entry.workDate;
+      this.activeStartTime = entry.startTime.substring(0, 5);
+      this.activeEndTime = entry.endTime.substring(0, 5);
+      this.activeMaxPatients = entry.max || 20;
+      this.activeNotes = entry.notes ?? '';
       this.formRangeKey = '';
       this.loadFormSchedules();
     });
   }
 
   loadWeek(): void {
+    const kind = this.kind();
     this.weekLoading.set(true);
     const days = this.weekDays();
-    this.scheduleService.getSchedules({ startDate: days[0].iso, endDate: days[6].iso }).subscribe({
-      next: res => {
-        this.weekSchedules.set(res.success && res.data ? res.data : []);
+    this.fetchEntries(days[0].iso, days[6].iso).subscribe({
+      next: entries => {
+        if (kind !== this.kind()) return;
+        this.weekSchedules.set(entries);
         this.weekLoading.set(false);
       },
       error: err => {
@@ -2326,29 +2511,50 @@ export class SchedulesComponent implements OnInit {
     this.loadWeek();
   }
 
-  slotSchedules(roomId: number, date: string, shiftKey: string): WorkSchedule[] {
-    return this.rosterMap().get(`${roomId}|${date}|${shiftKey}`) ?? NO_SCHEDULES;
+  slotEntries(roomId: number, date: string, shiftKey: string): RosterEntry[] {
+    return this.rosterMap().get(`${roomId}|${date}|${shiftKey}`) ?? NO_ENTRIES;
   }
 
-  // Bấm ô trống: mở form đã điền sẵn phòng, ngày, khung giờ của ca
+  // Bấm ô trống (hoặc "Thêm KTV"): mở form đã điền sẵn phòng, ngày, khung giờ của ca
   openSlot(roomId: number, date: string, shiftKey: string): void {
     this.openAddModal({ roomId, date, shiftKey });
   }
 
-  // Phòng mà bác sĩ đang trực ở khung giờ đang chọn (chỉ tra được trong tuần đang hiển thị)
-  doctorBusyRoom(doctorId: number): string | null {
-    const hit = this.findOverlap(s => s.doctorId === doctorId);
+  // Bác sĩ: tất cả; KTV: chỉ người thuộc khoa của phòng đang chọn
+  personList(): Person[] {
+    if (!this.isTech()) return this.doctorList();
+    const department = this.rooms().find(r => r.id === this.activeRoomId)?.roomType;
+    return this.techList().filter(t => !department || t.department === department);
+  }
+
+  // Đổi phòng ở chế độ KTV: người đang chọn khác khoa thì chọn lại KTV đầu tiên còn rảnh của khoa mới
+  onRoomChange(roomId: number | null): void {
+    this.activeRoomId = roomId;
+    if (this.isTech() && !this.personList().some(p => p.id === this.activePersonId)) {
+      this.activePersonId = this.firstFreePerson();
+    }
+  }
+
+  // Phòng mà người đó đang trực ở khung giờ đang chọn (chế độ 1 ngày)
+  personBusyRoom(personId: number): string | null {
+    const hit = this.findOverlap(s => s.personId === personId);
     return hit ? hit.roomNumber : null;
   }
 
-  // Bác sĩ đang trực tại phòng ở khung giờ đang chọn
-  roomBusyDoctor(roomId: number): string | null {
-    const hit = this.findOverlap(s => s.examinationRoomId === roomId);
-    return hit ? hit.doctorName : null;
+  // Phòng khám: bác sĩ đang trực (khoá phòng); phòng CLS: số KTV đã có trong ca (vẫn thêm được)
+  roomBusyNote(roomId: number): string | null {
+    if (this.scheduleMode !== 'SINGLE') return null;
+    const inRoom = this.overlapsOn(this.activeWorkDate, this.activeStartTime, this.activeEndTime, s => s.roomId === roomId);
+    if (inRoom.length === 0) return null;
+    return this.isTech() ? `đã có ${inRoom.length} KTV` : `${inRoom[0].personName} đang trực`;
   }
 
-  freeDoctorCount(): number {
-    return this.doctorList().filter(d => !this.doctorBusyRoom(d.id)).length;
+  freePersonCount(): number {
+    return this.personList().filter(p => !this.personBusyRoom(p.id)).length;
+  }
+
+  private firstFreePerson(): number | null {
+    return this.personList().find(p => !this.personBusyRoom(p.id))?.id ?? null;
   }
 
   onWorkDateChange(date: string): void {
@@ -2368,14 +2574,14 @@ export class SchedulesComponent implements OnInit {
       this.formChecking.set(false);
       return;
     }
-    const key = `${from}|${to}`;
+    const key = `${this.kind()}|${from}|${to}`;
     if (key === this.formRangeKey) return;
     this.formRangeKey = key;
     this.formChecking.set(true);
-    this.scheduleService.getSchedules({ startDate: from, endDate: to }).subscribe({
-      next: res => {
+    this.fetchEntries(from, to).subscribe({
+      next: entries => {
         if (this.formRangeKey !== key) return;
-        this.formSchedules.set(res.data || []);
+        this.formSchedules.set(entries);
         this.formChecking.set(false);
       },
       error: () => {
@@ -2386,25 +2592,28 @@ export class SchedulesComponent implements OnInit {
     });
   }
 
-  // 3 ca mặc định; chế độ 1 ngày kèm tình trạng của phòng / bác sĩ trong ngày đó
+  // 3 ca mặc định; chế độ 1 ngày kèm tình trạng của phòng / người trong ngày đó
   shiftOptions(): { key: string; label: string; start: string; end: string; state: 'free' | 'room' | 'doctor'; note: string }[] {
     return this.shiftSlots.map(slot => {
       const base = { key: slot.key, label: slot.label, start: slot.start, end: slot.end };
       if (this.scheduleMode !== 'SINGLE') return { ...base, state: 'free' as const, note: 'Bấm để chọn' };
-      const roomHit = this.activeRoomId
-        ? this.overlapOn(this.activeWorkDate, slot.start, slot.end, s => s.examinationRoomId === this.activeRoomId) : undefined;
-      if (roomHit) return { ...base, state: 'room' as const, note: roomHit.doctorName };
-      const doctorHit = this.activeDoctorId
-        ? this.overlapOn(this.activeWorkDate, slot.start, slot.end, s => s.doctorId === this.activeDoctorId) : undefined;
-      if (doctorHit) return { ...base, state: 'doctor' as const, note: 'BS đang trực ' + doctorHit.roomNumber };
-      return { ...base, state: 'free' as const, note: 'Còn trống' };
+      const inRoom = this.activeRoomId
+        ? this.overlapsOn(this.activeWorkDate, slot.start, slot.end, s => s.roomId === this.activeRoomId) : [];
+      // Phòng khám chỉ 1 bác sĩ / ca; phòng CLS nhận thêm KTV
+      if (!this.isTech() && inRoom.length) return { ...base, state: 'room' as const, note: inRoom[0].personName };
+      const personHit = this.activePersonId
+        ? this.overlapOn(this.activeWorkDate, slot.start, slot.end, s => s.personId === this.activePersonId) : undefined;
+      if (personHit) {
+        return { ...base, state: 'doctor' as const, note: (this.isTech() ? 'KTV' : 'BS') + ' đang trực ' + personHit.roomNumber };
+      }
+      return { ...base, state: 'free' as const, note: inRoom.length ? `Đã có ${inRoom.length} KTV` : 'Còn trống' };
     });
   }
 
-  private overlapOn(date: string, start: string, end: string, match: (s: WorkSchedule) => boolean): WorkSchedule | undefined {
-    if (!date || !start || !end) return undefined;
-    const editingId = this.editingSchedule()?.id;
-    return (this.formSchedules() ?? this.weekSchedules()).find(s =>
+  private overlapsOn(date: string, start: string, end: string, match: (s: RosterEntry) => boolean): RosterEntry[] {
+    if (!date || !start || !end) return NO_ENTRIES;
+    const editingId = this.editingEntry()?.id;
+    return (this.formSchedules() ?? this.weekSchedules()).filter(s =>
       s.status !== 'CANCELLED'
       && s.id !== editingId
       && s.workDate === date
@@ -2413,46 +2622,67 @@ export class SchedulesComponent implements OnInit {
       && s.endTime.substring(0, 5) > start);
   }
 
+  private overlapOn(date: string, start: string, end: string, match: (s: RosterEntry) => boolean): RosterEntry | undefined {
+    return this.overlapsOn(date, start, end, match)[0];
+  }
+
   // Sau khi lưu: chuyển bảng phân ca tới tuần chứa ca mới và làm nổi bật ô vừa xếp
-  private focusWeekOf(date: string, scheduleId: number | null): void {
+  private focusWeekOf(date: string, entryId: number | null): void {
     if (!this.isAdmin() || !date) return;
     const target = new Date(date + 'T00:00:00');
     this.weekStart.set(toIsoDate(mondayOf(target)));
     this.monthStart.set(toIsoDate(firstOfMonth(target)));
-    this.highlightId.set(scheduleId);
-    if (scheduleId !== null) {
+    this.highlightId.set(entryId);
+    if (entryId !== null) {
       setTimeout(() => {
-        if (this.highlightId() === scheduleId) this.highlightId.set(null);
+        if (this.highlightId() === entryId) this.highlightId.set(null);
       }, 4000);
     }
   }
 
-  private findOverlap(match: (s: WorkSchedule) => boolean): WorkSchedule | undefined {
+  private findOverlap(match: (s: RosterEntry) => boolean): RosterEntry | undefined {
     if (this.scheduleMode !== 'SINGLE') return undefined;
     return this.overlapOn(this.activeWorkDate, this.activeStartTime, this.activeEndTime, match);
   }
 
-  private shiftKeyOf(s: WorkSchedule): string {
+  private shiftKeyOf(s: RosterEntry): string {
     if (this.shiftSlots.some(slot => slot.key === s.shiftType)) return s.shiftType;
     const hour = Number(s.startTime.substring(0, 2));
     return hour < 12 ? 'CA_SÁNG' : hour < 18 ? 'CA_CHIỀU' : 'CA_TỐI';
   }
 
-  // Sau khi thêm / huỷ / xoá ca: tải lại bảng phân ca, và danh sách nếu đang xem danh sách
+  // Sau khi thêm / sửa / huỷ / xoá ca: tải lại bảng phân ca, và danh sách nếu đang xem danh sách
   private reloadAfterChange(): void {
     if (this.isAdmin()) this.loadWeek();
     if (this.isAdmin() && this.viewMode() === 'MONTH') this.loadMonth();
     if (!this.isAdmin() || this.viewMode() === 'LIST') this.loadSchedules();
   }
 
-  loadRooms(): void {
-    this.scheduleService.getAllRooms().subscribe({
-      next: res => {
-        if (res.success && res.data) {
-          this.rooms.set(res.data);
-        }
-      }
-    });
+  // Phòng khám (bác sĩ) / phòng cận lâm sàng (KTV), chỉ tải lần đầu
+  private ensureRooms(): Observable<ExaminationRoom[]> {
+    if (this.rooms().length) return of(this.rooms());
+    const tech = this.isTech();
+    return (tech ? this.scheduleService.getLabRooms() : this.scheduleService.getAllRooms()).pipe(
+      map(res => res.data || []),
+      tap(rooms => (tech ? this.labRooms : this.examRooms).set(rooms))
+    );
+  }
+
+  // Danh sách bác sĩ / KTV để chọn trong form, chỉ tải lần đầu
+  private ensurePeople(): Observable<unknown> {
+    if (this.isTech()) {
+      return this.techList().length ? of(null) : this.scheduleService.getLabTechs().pipe(
+        tap(res => this.techList.set((res.data || []).map(t => ({
+          id: t.id,
+          fullName: t.fullName,
+          sub: DEPARTMENT_LABELS[t.department] ?? t.department,
+          department: t.department
+        })))));
+    }
+    return this.doctorList().length ? of(null) : this.doctorService.getDoctors().pipe(
+      tap(res => this.doctorList.set((res.data || [])
+        .filter(d => d.status !== 'LOCKED')
+        .map(d => ({ id: d.id, fullName: d.fullName, sub: d.specialtyName || 'Chưa phân khoa' })))));
   }
 
   loadSpecialties(): void {
@@ -2466,21 +2696,23 @@ export class SchedulesComponent implements OnInit {
   }
 
   loadSchedules(): void {
+    const kind = this.kind();
     this.loading.set(true);
-    const request$ = this.isAdmin()
-      ? this.scheduleService.getSchedules({
-          startDate: this.filterStartDate || undefined,
-          endDate: this.filterEndDate || undefined,
-          roomId: this.filterRoomId || undefined,
-          specialtyId: this.filterSpecialtyId || undefined
-        })
-      : this.scheduleService.getMySchedules(this.filterStartDate || undefined, this.filterEndDate || undefined);
+    const start = this.filterStartDate || undefined;
+    const end = this.filterEndDate || undefined;
+    let request$: Observable<RosterEntry[]>;
+    if (this.isAdmin()) {
+      request$ = this.fetchEntries(start, end, this.filterRoomId || undefined, this.filterSpecialtyId || undefined);
+    } else if (this.isTech()) {
+      request$ = this.scheduleService.getMyStaffShifts(start, end).pipe(map(res => (res.data || []).map(fromShift)));
+    } else {
+      request$ = this.scheduleService.getMySchedules(start, end).pipe(map(res => (res.data || []).map(fromSchedule)));
+    }
     request$.subscribe({
-      next: res => {
-        if (res.success && res.data) {
-          this.schedules.set(res.data);
-          this.currentPage.set(1);
-        }
+      next: entries => {
+        if (kind !== this.kind()) return;
+        this.schedules.set(entries);
+        this.currentPage.set(1);
         this.loading.set(false);
       },
       error: err => {
@@ -2499,53 +2731,41 @@ export class SchedulesComponent implements OnInit {
     this.loadSchedules();
   }
 
-  // Danh sách bác sĩ tải ở lần mở form đầu tiên; phòng khám dùng lại danh sách đã tải khi mở màn
+  // Danh sách người trực và phòng tải ở lần mở form đầu tiên của mỗi loại
   openAddModal(prefill?: { roomId: number; date: string; shiftKey: string }, afterShow?: () => void): void {
     this.openingForm.set(true);
-    forkJoin({
-      doctors: this.doctorList().length ? of(null) : this.doctorService.getDoctors(),
-      rooms: this.rooms().length ? of({ data: this.rooms() }) : this.scheduleService.getAllRooms()
-    }).subscribe({
-      next: ({ doctors, rooms }) => {
-        if (doctors) {
-          this.doctorList.set((doctors.data || [])
-            .filter(d => d.status !== 'LOCKED')
-            .map(d => ({
-              id: d.id,
-              fullName: d.fullName,
-              specialtyName: d.specialtyName || 'Chưa phân khoa'
-            })));
-        }
-        this.rooms.set(rooms.data || []);
+    forkJoin({ people: this.ensurePeople(), rooms: this.ensureRooms() }).subscribe({
+      next: () => {
         this.openingForm.set(false);
         this.showAddForm(prefill);
         afterShow?.();
       },
       error: err => {
         this.openingForm.set(false);
-        this.showAlert(err.error?.message || 'Không tải được danh sách bác sĩ / phòng khám', 'danger');
+        this.showAlert(err.error?.message || `Không tải được danh sách ${this.personLabel().toLowerCase()} / phòng`, 'danger');
       }
     });
   }
 
   private showAddForm(prefill?: { roomId: number; date: string; shiftKey: string }): void {
     this.batchResult.set(null);
-    this.editingSchedule.set(null);
+    this.editingEntry.set(null);
     this.selectedDates = [];
-    this.activeDoctorId = this.doctorList()[0]?.id ?? null;
     this.activeRoomId = this.rooms()[0]?.id ?? null;
+    this.activePersonId = this.personList()[0]?.id ?? null;
     this.activeMaxPatients = 20;
+    this.activeNotes = '';
     this.selectShift('CA_SÁNG');
     this.formRangeKey = '';
     this.formSchedules.set(null);
 
     if (prefill) {
-      // Bấm ô trống trên bảng tuần: điền sẵn phòng, ngày, ca và bác sĩ đầu tiên còn rảnh
+      // Bấm ô trên bảng tuần: điền sẵn phòng, ngày, ca và người đầu tiên còn rảnh
       this.scheduleMode = 'SINGLE';
       this.activeRoomId = prefill.roomId;
       this.activeWorkDate = prefill.date;
       this.selectShift(prefill.shiftKey);
-      this.activeDoctorId = this.doctorList().find(d => !this.doctorBusyRoom(d.id))?.id ?? null;
+      this.activePersonId = this.firstFreePerson();
     } else if (this.isAdmin() && this.viewMode() === 'MONTH') {
       // Đang xem lịch tháng: mở chế độ nhiều ngày đúng tháng đó
       this.scheduleMode = 'MULTI';
@@ -2566,7 +2786,7 @@ export class SchedulesComponent implements OnInit {
   closeModal(): void {
     this.showModal.set(false);
     this.batchResult.set(null);
-    this.editingSchedule.set(null);
+    this.editingEntry.set(null);
   }
 
   closeBatchResult(): void {
@@ -2575,7 +2795,8 @@ export class SchedulesComponent implements OnInit {
   }
 
   isFormValid(): boolean {
-    if (!this.activeDoctorId || !this.activeRoomId || this.activeMaxPatients <= 0) return false;
+    if (!this.activePersonId || !this.activeRoomId) return false;
+    if (!this.isTech() && this.activeMaxPatients <= 0) return false;
     if (!this.activeStartTime || !this.activeEndTime || this.activeStartTime >= this.activeEndTime) return false;
     return this.scheduleMode === 'SINGLE' ? !!this.activeWorkDate : this.selectedFreeDates().length > 0;
   }
@@ -2583,30 +2804,16 @@ export class SchedulesComponent implements OnInit {
   saveSchedule(): void {
     if (!this.isFormValid()) return;
     this.submitting.set(true);
-    const shift = {
-      shiftType: this.activeShiftKey(),
-      startTime: this.activeStartTime,
-      endTime: this.activeEndTime,
-      maxPatients: this.activeMaxPatients
-    };
 
     if (this.scheduleMode === 'SINGLE') {
-      const request: WorkScheduleRequest = {
-        doctorId: this.activeDoctorId!,
-        examinationRoomId: this.activeRoomId!,
-        workDate: this.activeWorkDate,
-        ...shift
-      };
-      const editing = this.editingSchedule();
-      const request$ = editing
-        ? this.scheduleService.updateSchedule(editing.id, request)
-        : this.scheduleService.createSchedule(request);
-      request$.subscribe({
-        next: res => {
+      const editing = this.editingEntry();
+      const workDate = this.activeWorkDate;
+      this.saveSingle$(editing).subscribe({
+        next: entry => {
           this.showAlert(editing ? 'Cập nhật ca làm việc thành công!' : 'Đăng ký ca làm việc thành công!', 'success');
           this.submitting.set(false);
           this.closeModal();
-          this.focusWeekOf(request.workDate, res.data?.id ?? null);
+          this.focusWeekOf(workDate, entry.id);
           this.reloadAfterChange();
         },
         error: err => {
@@ -2617,22 +2824,16 @@ export class SchedulesComponent implements OnInit {
       return;
     }
 
-    const request: BatchWorkScheduleRequest = {
-      doctorId: this.activeDoctorId!,
-      examinationRoomId: this.activeRoomId!,
-      workDates: this.selectedFreeDates(),
-      ...shift
-    };
-    this.scheduleService.createBatchSchedules(request).subscribe({
-      next: res => {
+    const firstDate = this.selectedFreeDates()[0];
+    this.saveBatch$().subscribe({
+      next: data => {
         this.submitting.set(false);
-        this.focusWeekOf(request.workDates[0], null);
-        const data = res.data;
+        this.focusWeekOf(firstDate, null);
         if (data && data.conflictCount > 0) {
           // Có ngày bị người khác xếp trước trong lúc đang chọn: hiện chi tiết
           this.batchResult.set(data);
         } else {
-          this.showAlert(`Đã xếp ${data?.successCount ?? request.workDates.length} ca trực thành công!`, 'success');
+          this.showAlert(`Đã xếp ${data?.successCount ?? 0} ca trực thành công!`, 'success');
           this.closeModal();
         }
         this.reloadAfterChange();
@@ -2644,8 +2845,51 @@ export class SchedulesComponent implements OnInit {
     });
   }
 
-  cancelSchedule(item: WorkSchedule): void {
-    const reason = prompt('Nhập lý do hủy ca trực của bác sĩ ' + item.doctorName + ':', 'Bác sĩ có lịch công tác đột xuất');
+  // Tạo / sửa 1 ca: ca bác sĩ gửi kèm số bệnh nhân tối đa, ca KTV gửi kèm ghi chú
+  private saveSingle$(editing: RosterEntry | null): Observable<RosterEntry> {
+    const base = {
+      workDate: this.activeWorkDate,
+      shiftType: this.activeShiftKey(),
+      startTime: this.activeStartTime,
+      endTime: this.activeEndTime
+    };
+    if (this.isTech()) {
+      const request: StaffShiftRequest = {
+        ...base, employeeId: this.activePersonId!, roomId: this.activeRoomId!, notes: this.activeNotes.trim() || undefined
+      };
+      const request$ = editing
+        ? this.scheduleService.updateStaffShift(editing.id, request)
+        : this.scheduleService.createStaffShift(request);
+      return request$.pipe(map(res => fromShift(res.data)));
+    }
+    const request: WorkScheduleRequest = {
+      ...base, doctorId: this.activePersonId!, examinationRoomId: this.activeRoomId!, maxPatients: this.activeMaxPatients
+    };
+    const request$ = editing
+      ? this.scheduleService.updateSchedule(editing.id, request)
+      : this.scheduleService.createSchedule(request);
+    return request$.pipe(map(res => fromSchedule(res.data)));
+  }
+
+  private saveBatch$(): Observable<BatchResult> {
+    const base = {
+      workDates: this.selectedFreeDates(),
+      shiftType: this.activeShiftKey(),
+      startTime: this.activeStartTime,
+      endTime: this.activeEndTime
+    };
+    if (this.isTech()) {
+      return this.scheduleService.createBatchStaffShifts({
+        ...base, employeeId: this.activePersonId!, roomId: this.activeRoomId!, notes: this.activeNotes.trim() || undefined
+      }).pipe(map(res => res.data));
+    }
+    return this.scheduleService.createBatchSchedules({
+      ...base, doctorId: this.activePersonId!, examinationRoomId: this.activeRoomId!, maxPatients: this.activeMaxPatients
+    }).pipe(map(res => res.data));
+  }
+
+  cancelSchedule(item: RosterEntry): void {
+    const reason = prompt('Nhập lý do hủy ca trực của bác sĩ ' + item.personName + ':', 'Bác sĩ có lịch công tác đột xuất');
     if (reason !== null) {
       this.scheduleService.cancelSchedule(item.id, reason).subscribe({
         next: () => {
@@ -2659,18 +2903,23 @@ export class SchedulesComponent implements OnInit {
     }
   }
 
-  deleteSchedule(item: WorkSchedule): void {
-    if (confirm(`Bạn có chắc muốn xóa vĩnh viễn ca làm việc ngày ${item.workDate} của bác sĩ ${item.doctorName}?`)) {
-      this.scheduleService.deleteSchedule(item.id).subscribe({
-        next: () => {
-          this.showAlert('Đã xóa ca làm việc thành công!', 'success');
-          this.reloadAfterChange();
-        },
-        error: err => {
-          this.showAlert(err.error?.message || 'Không thể xóa ca làm việc này.', 'danger');
-        }
-      });
+  deleteEntry(item: RosterEntry): void {
+    if (!confirm(`Bạn có chắc muốn xóa ca làm việc ngày ${item.workDate} của ${this.personLabel().toLowerCase()} ${item.personName}?`)) {
+      return;
     }
+    const request$ = this.isTech()
+      ? this.scheduleService.deleteStaffShift(item.id)
+      : this.scheduleService.deleteSchedule(item.id);
+    request$.subscribe({
+      next: () => {
+        this.showAlert('Đã xóa ca làm việc thành công!', 'success');
+        if (this.showModal()) this.closeModal();
+        this.reloadAfterChange();
+      },
+      error: err => {
+        this.showAlert(err.error?.message || 'Không thể xóa ca làm việc này.', 'danger');
+      }
+    });
   }
 
   getShiftBadgeClass(shift: string): string {

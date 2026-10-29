@@ -49,6 +49,14 @@ import { SidebarService } from '../../services/sidebar.service';
             <div class="nav-icon"><i class="bi bi-diagram-3"></i></div>
             <span class="nav-label">QUẢN LÝ CHUYÊN KHOA</span>
           </a>
+          <a routerLink="/admin/doctors" routerLinkActive="active" class="nav-link-item" title="Quản lý bác sĩ">
+            <div class="nav-icon"><i class="bi bi-person-badge"></i></div>
+            <span class="nav-label">QUẢN LÝ BÁC SĨ</span>
+          </a>
+          <a routerLink="/admin/staff" routerLinkActive="active" class="nav-link-item" title="Quản lý lễ tân">
+            <div class="nav-icon"><i class="bi bi-person-vcard"></i></div>
+            <span class="nav-label">QUẢN LÝ LỄ TÂN</span>
+          </a>
           <a routerLink="/admin/medicines" routerLinkActive="active" class="nav-link-item" title="Quản lý kho dược phẩm">
             <div class="nav-icon"><i class="bi bi-capsule"></i></div>
             <span class="nav-label">KHO DƯỢC &amp; THUỐC</span>
@@ -96,6 +104,10 @@ import { SidebarService } from '../../services/sidebar.service';
           <a routerLink="/lab/services" routerLinkActive="active" class="nav-link-item" title="Danh mục & chỉ số chuẩn">
             <div class="nav-icon"><i class="bi bi-journal-medical"></i></div>
             <span class="nav-label">DANH MỤC &amp; CHỈ SỐ</span>
+          </a>
+          <a routerLink="/lab/my-shifts" routerLinkActive="active" class="nav-link-item" title="Ca trực của tôi">
+            <div class="nav-icon"><i class="bi bi-calendar2-week-fill"></i></div>
+            <span class="nav-label">CA TRỰC CỦA TÔI</span>
           </a>
         } @else {
           <!-- 4. STAFF / CHUNG MENU (Lễ tân, Điều phối hoặc Fallback an toàn) -->

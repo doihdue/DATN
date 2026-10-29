@@ -135,6 +135,12 @@ export const routes: Routes = [
     canActivate: [labTechGuard]
   },
   {
+    path: 'lab/my-shifts',
+    component: SchedulesComponent,
+    title: 'Ca trực của tôi - MedQueue',
+    canActivate: [labTechGuard]
+  },
+  {
     path: 'lab/services',
     component: LabServicesComponent,
     title: 'Danh Mục Xét Nghiệm & Chỉ Số Chuẩn - MedQueue',

@@ -18,7 +18,13 @@ public interface ExaminationRoomRepository extends JpaRepository<ExaminationRoom
 
     boolean existsByRoomNumber(String roomNumber);
 
-    List<ExaminationRoom> findAllByOrderByRoomNumberAsc();
+    // Phòng khám của bác sĩ (dữ liệu cũ chưa có loại phòng cũng là phòng khám)
+    @Query("SELECT r FROM ExaminationRoom r WHERE r.roomType IS NULL OR r.roomType = 'KHAM' ORDER BY r.roomNumber")
+    List<ExaminationRoom> findExamRooms();
+
+    // Phòng cận lâm sàng để xếp ca KTV
+    @Query("SELECT r FROM ExaminationRoom r WHERE r.roomType IN ('XET_NGHIEM', 'CHAN_DOAN_HINH_ANH') ORDER BY r.roomType DESC, r.roomNumber")
+    List<ExaminationRoom> findLabRooms();
 
     // Khoá dòng phòng khám khi cấp số để 2 quầy cấp cùng lúc không sinh trùng số thứ tự
     @Lock(LockModeType.PESSIMISTIC_WRITE)

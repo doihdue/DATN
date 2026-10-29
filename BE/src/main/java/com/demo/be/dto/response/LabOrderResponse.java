@@ -1,6 +1,7 @@
 package com.demo.be.dto.response;
 
 import com.demo.be.model.LabOrder;
+import com.demo.be.model.QueueTicket;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -38,6 +39,7 @@ public class LabOrderResponse {
     // Thông tin ca khám / bệnh nhân đi kèm
     private Long queueTicketId;
     private String ticketNumber;
+    private String roomNumber; // Phòng khám ra chỉ định
     private Long patientId;
     private String patientName;
     private String patientGender;
@@ -62,6 +64,18 @@ public class LabOrderResponse {
             if (entity.getMedicalRecord().getQueueTicket() != null) {
                 builder.queueTicketId(entity.getMedicalRecord().getQueueTicket().getId());
                 builder.ticketNumber(entity.getMedicalRecord().getQueueTicket().getTicketNumber());
+                if (entity.getMedicalRecord().getQueueTicket().getExaminationRoom() != null) {
+                    builder.roomNumber(entity.getMedicalRecord().getQueueTicket().getExaminationRoom().getRoomNumber());
+                }
+            }
+            QueueTicket ticket = entity.getMedicalRecord().getQueueTicket();
+            if (entity.getMedicalRecord().getPatient() == null && ticket != null) {
+                // Khách vãng lai: chưa có hồ sơ bệnh nhân, thông tin chỉ nằm trên vé
+                builder.patientName(ticket.getPatientName());
+                builder.patientGender(ticket.getPatientGender());
+                if (ticket.getPatientDob() != null) {
+                    builder.patientYearOfBirth(ticket.getPatientDob().getYear());
+                }
             }
             if (entity.getMedicalRecord().getPatient() != null) {
                 builder.patientId(entity.getMedicalRecord().getPatient().getId());

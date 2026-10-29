@@ -8,11 +8,13 @@ import com.demo.be.dto.response.MedicalRecordResponse;
 import com.demo.be.service.LabOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -48,20 +50,26 @@ public class LabOrderController {
         return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách chỉ định xét nghiệm thành công"));
     }
 
-    // 4. Lấy danh sách chỉ định cho màn hình phòng Lab (có filter status)
+    // 4. Danh sách làm việc của phòng Lab: chỉ định trong ngày + chỉ định còn dang dở
     @GetMapping
-    @PreAuthorize("hasAnyRole('DOCTOR', 'STAFF', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<LabOrderResponse>>> getOrders(
-            @RequestParam(required = false) String status) {
-        List<LabOrderResponse> list = (status != null && !status.isBlank())
-                ? labOrderService.getOrdersByStatus(status.trim().toUpperCase())
-                : labOrderService.getAllOrders();
+    @PreAuthorize("hasAnyRole('LAB_TECH', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<LabOrderResponse>>> getWorklist(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<LabOrderResponse> list = labOrderService.getWorklist(date);
         return ResponseEntity.ok(ApiResponse.success(list, "Lấy danh sách chỉ định xét nghiệm thành công"));
     }
 
-    // 5. Phòng Lab / KTV nhập kết quả xét nghiệm & Ký duyệt
+    // 5. KTV tiếp nhận mẫu bệnh phẩm
+    @PutMapping("/{id}/start")
+    @PreAuthorize("hasRole('LAB_TECH')")
+    public ResponseEntity<ApiResponse<LabOrderResponse>> startProcessing(@PathVariable Long id) {
+        LabOrderResponse res = labOrderService.startProcessing(id);
+        return ResponseEntity.ok(ApiResponse.success(res, "Đã tiếp nhận mẫu xét nghiệm"));
+    }
+
+    // 6. KTV nhập kết quả xét nghiệm & Ký duyệt
     @PutMapping("/{id}/result")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'STAFF', 'ADMIN')")
+    @PreAuthorize("hasRole('LAB_TECH')")
     public ResponseEntity<ApiResponse<LabOrderResponse>> updateOrderResult(
             @PathVariable Long id,
             @Valid @RequestBody UpdateLabOrderResultRequest request) {
@@ -69,7 +77,7 @@ public class LabOrderController {
         return ResponseEntity.ok(ApiResponse.success(res, "Đã cập nhật kết quả xét nghiệm thành công"));
     }
 
-    // 6. Hủy chỉ định xét nghiệm (khi còn PENDING)
+    // 7. Hủy chỉ định xét nghiệm (khi chưa có kết quả)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> cancelOrder(@PathVariable Long id) {
