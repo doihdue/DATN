@@ -92,13 +92,13 @@ import { AuthService } from '../../services/auth.service';
               <i class="bi bi-search search-icon"></i>
               <input
                 type="text"
-                [(ngModel)]="medicineSearchKeyword"
-                (ngModelChange)="onFilterChange()"
+                [ngModel]="medicineSearchKeyword()"
+                (ngModelChange)="medicineSearchKeyword.set($event); onFilterChange()"
                 placeholder="Tìm kiếm theo mã thuốc, tên biệt dược, hoạt chất..."
                 class="search-input"
               />
-              @if (medicineSearchKeyword) {
-                <button class="btn-clear-search" (click)="medicineSearchKeyword = ''; onFilterChange()">
+              @if (medicineSearchKeyword()) {
+                <button type="button" class="btn-clear-search" (click)="medicineSearchKeyword.set(''); onFilterChange()">
                   <i class="bi bi-x-circle-fill"></i>
                 </button>
               }
@@ -107,7 +107,7 @@ import { AuthService } from '../../services/auth.service';
             <!-- Category Filter -->
             <div class="filter-select-group">
               <label class="filter-label"><i class="bi bi-funnel-fill text-primary"></i> Nhóm thuốc:</label>
-              <select [(ngModel)]="selectedCategoryId" (ngModelChange)="onFilterChange()" class="form-select">
+              <select [ngModel]="selectedCategoryId()" (ngModelChange)="selectedCategoryId.set($event); onFilterChange()" class="form-select">
                 <option [ngValue]="null">-- Tất cả nhóm thuốc --</option>
                 @for (c of categories(); track c.id) {
                   <option [ngValue]="c.id">{{ c.name }}</option>
@@ -118,14 +118,14 @@ import { AuthService } from '../../services/auth.service';
             <!-- Status Filter -->
             <div class="filter-select-group">
               <label class="filter-label"><i class="bi bi-activity text-primary"></i> Trạng thái:</label>
-              <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()" class="form-select">
+              <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); onFilterChange()" class="form-select">
                 <option value="ALL">Tất cả trạng thái</option>
                 <option value="ACTIVE">Đang hoạt động</option>
                 <option value="INACTIVE">Tạm ngừng sử dụng</option>
               </select>
             </div>
 
-            @if (medicineSearchKeyword || selectedCategoryId !== null || statusFilter !== 'ALL') {
+            @if (medicineSearchKeyword() || selectedCategoryId() !== null || statusFilter() !== 'ALL') {
               <button class="btn-reset-filters" (click)="resetMedicineFilters()" title="Đặt lại toàn bộ bộ lọc">
                 <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
               </button>
@@ -322,20 +322,35 @@ import { AuthService } from '../../services/auth.service';
               <i class="bi bi-search search-icon"></i>
               <input
                 type="text"
-                [(ngModel)]="categorySearchKeyword"
-                (ngModelChange)="onCategoryFilterChange()"
+                [ngModel]="categorySearchKeyword()"
+                (ngModelChange)="categorySearchKeyword.set($event); onCategoryFilterChange()"
                 placeholder="Tìm kiếm theo mã nhóm, tên nhóm thuốc hoặc công dụng điều trị..."
                 class="search-input"
               />
-              @if (categorySearchKeyword) {
-                <button class="btn-clear-search" (click)="categorySearchKeyword = ''; onCategoryFilterChange()">
+              @if (categorySearchKeyword()) {
+                <button type="button" class="btn-clear-search" (click)="categorySearchKeyword.set(''); onCategoryFilterChange()" title="Xóa từ khóa tìm kiếm">
                   <i class="bi bi-x-circle-fill"></i>
                 </button>
               }
             </div>
-            @if (categorySearchKeyword) {
-              <button class="btn-reset-filters" (click)="categorySearchKeyword = ''; onCategoryFilterChange()" title="Đặt lại tìm kiếm">
-                <i class="bi bi-arrow-counterclockwise"></i> Đặt lại
+
+            <!-- Status Filter for Category -->
+            <div class="filter-select-group">
+              <label class="filter-label"><i class="bi bi-activity text-primary"></i> Trạng thái:</label>
+              <select
+                [ngModel]="categoryStatusFilter()"
+                (ngModelChange)="categoryStatusFilter.set($event); onCategoryFilterChange()"
+                class="form-select"
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="INACTIVE">Tạm ngừng sử dụng</option>
+              </select>
+            </div>
+
+            @if (categorySearchKeyword() || categoryStatusFilter() !== 'ALL') {
+              <button type="button" class="btn-reset-filters" (click)="resetCategoryFilters()" title="Đặt lại toàn bộ bộ lọc">
+                <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
               </button>
             }
           </div>
@@ -432,7 +447,7 @@ import { AuthService } from '../../services/auth.service';
                   <select
                     id="catPageSizeSelect"
                     [ngModel]="categoryPageSize()"
-                    (ngModelChange)="onPageSizeChange($event)"
+                    (ngModelChange)="onCategoryPageSizeChange($event)"
                     class="form-select-sm"
                   >
                     @for (opt of categoryPageSizeOptions; track opt) {
@@ -1785,9 +1800,9 @@ export class MedicinesComponent implements OnInit {
   submitting = signal<boolean>(false);
 
   // Filters for Medicines
-  medicineSearchKeyword = '';
-  selectedCategoryId: number | null = null;
-  statusFilter = 'ALL'; // ALL | ACTIVE | INACTIVE
+  medicineSearchKeyword = signal<string>('');
+  selectedCategoryId = signal<number | null>(null);
+  statusFilter = signal<string>('ALL'); // ALL | ACTIVE | INACTIVE
 
   // Pagination for Medicines
   currentPage = signal<number>(1);
@@ -1795,7 +1810,8 @@ export class MedicinesComponent implements OnInit {
   readonly pageSizeOptions = [5, 10, 15, 20, 50];
 
   // Filters & Pagination for Categories
-  categorySearchKeyword = '';
+  categorySearchKeyword = signal<string>('');
+  categoryStatusFilter = signal<string>('ALL'); // ALL | ACTIVE | INACTIVE
   categoryCurrentPage = signal<number>(1);
   categoryPageSize = signal<number>(6);
   readonly categoryPageSizeOptions = [6, 12, 24];
@@ -1826,23 +1842,45 @@ export class MedicinesComponent implements OnInit {
   lowStockMedicines = computed(() => this.medicines().filter(m => (m.stockQuantity || 0) < 100).length);
   totalCategories = computed(() => this.categories().length);
 
+  normalizeText(str: string | null | undefined): string {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd')
+      .trim();
+  }
+
   // Filtered lists
   filteredMedicines = computed(() => {
     let list = this.medicines();
-    const kw = this.medicineSearchKeyword.trim().toLowerCase();
-    if (kw) {
-      list = list.filter(m =>
-        m.name.toLowerCase().includes(kw) ||
-        (m.code && m.code.toLowerCase().includes(kw)) ||
-        (m.activeIngredient && m.activeIngredient.toLowerCase().includes(kw))
-      );
+    const rawKw = this.medicineSearchKeyword().trim().toLowerCase();
+    const normKw = this.normalizeText(rawKw);
+    if (rawKw) {
+      list = list.filter(m => {
+        const name = m.name || '';
+        const code = m.code || '';
+        const ing = m.activeIngredient || '';
+        return (
+          name.toLowerCase().includes(rawKw) ||
+          code.toLowerCase().includes(rawKw) ||
+          ing.toLowerCase().includes(rawKw) ||
+          this.normalizeText(name).includes(normKw) ||
+          this.normalizeText(code).includes(normKw) ||
+          this.normalizeText(ing).includes(normKw)
+        );
+      });
     }
-    if (this.selectedCategoryId) {
-      list = list.filter(m => m.categoryId === this.selectedCategoryId);
+    const catId = this.selectedCategoryId();
+    if (catId) {
+      list = list.filter(m => m.categoryId === catId);
     }
-    if (this.statusFilter === 'ACTIVE') {
+    const status = this.statusFilter();
+    if (status === 'ACTIVE') {
       list = list.filter(m => m.isActive === true);
-    } else if (this.statusFilter === 'INACTIVE') {
+    } else if (status === 'INACTIVE') {
       list = list.filter(m => m.isActive === false);
     }
     return list;
@@ -1901,13 +1939,28 @@ export class MedicinesComponent implements OnInit {
 
   filteredCategories = computed(() => {
     let list = this.categories();
-    const kw = this.categorySearchKeyword.trim().toLowerCase();
-    if (kw) {
-      list = list.filter(c =>
-        c.name.toLowerCase().includes(kw) ||
-        (c.code && c.code.toLowerCase().includes(kw)) ||
-        (c.description && c.description.toLowerCase().includes(kw))
-      );
+    const rawKw = this.categorySearchKeyword().trim().toLowerCase();
+    const normKw = this.normalizeText(rawKw);
+    if (rawKw) {
+      list = list.filter(c => {
+        const name = c.name || '';
+        const code = c.code || '';
+        const desc = c.description || '';
+        return (
+          name.toLowerCase().includes(rawKw) ||
+          code.toLowerCase().includes(rawKw) ||
+          desc.toLowerCase().includes(rawKw) ||
+          this.normalizeText(name).includes(normKw) ||
+          this.normalizeText(code).includes(normKw) ||
+          this.normalizeText(desc).includes(normKw)
+        );
+      });
+    }
+    const status = this.categoryStatusFilter();
+    if (status === 'ACTIVE') {
+      list = list.filter(c => c.isActive === true);
+    } else if (status === 'INACTIVE') {
+      list = list.filter(c => c.isActive === false);
     }
     return list;
   });
@@ -1998,10 +2051,16 @@ export class MedicinesComponent implements OnInit {
   }
 
   resetMedicineFilters(): void {
-    this.medicineSearchKeyword = '';
-    this.selectedCategoryId = null;
-    this.statusFilter = 'ALL';
+    this.medicineSearchKeyword.set('');
+    this.selectedCategoryId.set(null);
+    this.statusFilter.set('ALL');
     this.onFilterChange();
+  }
+
+  resetCategoryFilters(): void {
+    this.categorySearchKeyword.set('');
+    this.categoryStatusFilter.set('ALL');
+    this.onCategoryFilterChange();
   }
 
   onPageSizeChange(newSize: number): void {
@@ -2037,7 +2096,7 @@ export class MedicinesComponent implements OnInit {
   }
 
   filterMedicinesByCategory(categoryId: number): void {
-    this.selectedCategoryId = categoryId;
+    this.selectedCategoryId.set(categoryId);
     this.switchTab('medicines');
     this.onFilterChange();
   }
