@@ -1,6 +1,8 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { ScheduleService } from '../../services/schedule.service';
 import { SpecialtyService } from '../../services/specialty.service';
 import { DoctorService } from '../../services/doctor.service';
@@ -87,10 +89,10 @@ function lastOfMonth(date: Date): Date {
       <div class="page-header">
         <div class="header-left">
           <div class="header-badge">
-            <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
-            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : isTech() ? 'Lịch Trực Kỹ Thuật Viên' : 'Lịch Trực Ca Bác Sĩ' }}
+            <i class="bi" [ngClass]="isTech() ? 'bi-eyedropper' : 'bi-person-badge'"></i>
+            {{ isAdmin() ? (isTech() ? 'Lịch Trực Kỹ Thuật Viên Cận Lâm Sàng' : 'Lịch Trực Bác Sĩ Phòng Khám') : isTech() ? 'Lịch Trực Kỹ Thuật Viên' : 'Lịch Trực Ca Bác Sĩ' }}
           </div>
-          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc' : 'Lịch Trực Của Tôi' }}</h1>
+          <h1 class="page-title">{{ isAdmin() ? (isTech() ? 'Quản Lý Lịch Trực Kỹ Thuật Viên' : 'Quản Lý Lịch Trực Bác Sĩ') : 'Lịch Trực Của Tôi' }}</h1>
           <p class="page-subtitle">
             @if (isAdmin()) {
               {{ isTech()
@@ -105,14 +107,6 @@ function lastOfMonth(date: Date): Date {
         </div>
         @if (isAdmin()) {
           <div class="header-actions">
-            <div class="view-toggle" role="tablist" aria-label="Loại nhân sự">
-              <button type="button" class="view-toggle-btn" [class.active]="!isTech()" (click)="setKind('DOCTOR')">
-                <i class="bi bi-person-badge"></i> Bác sĩ
-              </button>
-              <button type="button" class="view-toggle-btn" [class.active]="isTech()" (click)="setKind('TECH')">
-                <i class="bi bi-eyedropper"></i> Kỹ thuật viên
-              </button>
-            </div>
             <div class="view-toggle" role="tablist" aria-label="Chế độ xem">
               <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'MONTH'" (click)="setViewMode('MONTH')">
                 <i class="bi bi-calendar3"></i> Tháng
@@ -2034,6 +2028,7 @@ export class SchedulesComponent implements OnInit {
   private readonly scheduleService = inject(ScheduleService);
   private readonly specialtyService = inject(SpecialtyService);
   private readonly doctorService = inject(DoctorService);
+  private readonly router = inject(Router);
   readonly authService = inject(AuthService);
 
   readonly isAdmin = computed(() => this.authService.hasRole('ADMIN'));
@@ -2315,16 +2310,29 @@ export class SchedulesComponent implements OnInit {
   ngOnInit(): void {
     // Admin mở màn ở bảng phân ca tuần (cần phòng + ca trực trong tuần); bác sĩ / KTV chỉ xem lịch của mình
     if (this.isAdmin()) {
+      const url = this.router.url;
+      const initialKind: StaffKind = url.includes('/technicians') || url.includes('/tech') ? 'TECH' : 'DOCTOR';
+      this.kind.set(initialKind);
       this.ensureRooms().subscribe();
       this.loadWeek();
+
+      this.router.events
+        .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+        .subscribe((e) => {
+          const currentUrl = e.urlAfterRedirects || e.url;
+          const targetKind: StaffKind = currentUrl.includes('/technicians') || currentUrl.includes('/tech') ? 'TECH' : 'DOCTOR';
+          if (this.kind() !== targetKind) {
+            this.setKind(targetKind, false);
+          }
+        });
     } else {
       this.loadSchedules();
     }
   }
 
   // Đổi giữa lịch bác sĩ và lịch KTV, giữ nguyên chế độ xem / tuần / tháng đang chọn
-  setKind(kind: StaffKind): void {
-    if (this.kind() === kind) return;
+  setKind(kind: StaffKind, navigate: boolean = true): void {
+    if (this.kind() === kind && !navigate) return;
     this.kind.set(kind);
     this.filterRoomId = null;
     this.weekSchedules.set([]);
@@ -2335,6 +2343,13 @@ export class SchedulesComponent implements OnInit {
     if (mode === 'LIST') this.loadSchedules();
     else if (mode === 'MONTH') this.loadMonth();
     else this.loadWeek();
+
+    if (navigate && this.isAdmin()) {
+      const targetPath = kind === 'TECH' ? '/admin/schedules/technicians' : '/admin/schedules/doctors';
+      if (!this.router.url.includes(targetPath)) {
+        this.router.navigateByUrl(targetPath);
+      }
+    }
   }
 
   setViewMode(mode: 'MONTH' | 'ROSTER' | 'LIST'): void {

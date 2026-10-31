@@ -19,5 +19,7 @@ public interface StaffShiftRepository extends JpaRepository<StaffShift, Long> {
     @Query("SELECT s FROM StaffShift s JOIN FETCH s.technician JOIN FETCH s.room " +
            "WHERE s.technician.id = :technicianId AND s.workDate BETWEEN :from AND :to ORDER BY s.workDate, s.startTime")
     List<StaffShift> findTechnicianShifts(@Param("technicianId") Long technicianId,
-                                        @Param("from") LocalDate from, @Param("to") LocalDate to);
+                                         @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    boolean existsByTechnicianId(Long technicianId);
 }
