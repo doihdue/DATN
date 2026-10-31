@@ -1,6 +1,8 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { MedicineService } from '../../services/medicine.service';
 import { MedicineCategoryService } from '../../services/medicine-category.service';
 import { Medicine, MedicineRequest } from '../../models/medicine.model';
@@ -17,11 +19,11 @@ import { AuthService } from '../../services/auth.service';
       <div class="page-header">
         <div class="header-left">
           <div class="header-badge">
-            <i class="bi bi-capsule-pill"></i> Phân Hệ Quản Trị Dược Phẩm
+            <i class="bi" [ngClass]="activeTab() === 'medicines' ? 'bi-capsule-pill' : 'bi-folder2-open'"></i> {{ activeTab() === 'medicines' ? 'Kho Thuốc & Biệt Dược Toàn Viện' : 'Phân Loại & Nhóm Dược Lý' }}
           </div>
-          <h1 class="page-title">Quản Lý Danh Mục Thuốc & Dược Phẩm</h1>
+          <h1 class="page-title">{{ activeTab() === 'medicines' ? 'Quản Lý Kho Thuốc & Biệt Dược' : 'Quản Lý Nhóm & Danh Mục Thuốc' }}</h1>
           <p class="page-subtitle">
-            Cấu hình phân loại nhóm dược lý, tra cứu biệt dược, hoạt chất, quy cách, đơn giá và định mức tồn kho
+            {{ activeTab() === 'medicines' ? 'Tra cứu biệt dược, hoạt chất, quy cách, đơn vị tính, đơn giá bán và định mức tồn kho khả dụng' : 'Cấu hình và phân loại hệ thống nhóm thuốc, tác dụng dược lý và danh mục điều trị' }}
           </p>
         </div>
         @if (isAdmin()) {
@@ -41,27 +43,6 @@ import { AuthService } from '../../services/auth.service';
 
       <!-- Navigation Tabs & Stats Card -->
       <div class="tab-controls-card">
-        <div class="nav-tabs-wrapper">
-          <button
-            class="tab-btn"
-            [class.active]="activeTab() === 'medicines'"
-            (click)="switchTab('medicines')"
-          >
-            <i class="bi bi-capsule"></i>
-            Kho Thuốc & Biệt Dược
-            <span class="tab-count-badge">{{ medicines().length }}</span>
-          </button>
-          <button
-            class="tab-btn"
-            [class.active]="activeTab() === 'categories'"
-            (click)="switchTab('categories')"
-          >
-            <i class="bi bi-folder2-open"></i>
-            Nhóm & Danh Mục Thuốc
-            <span class="tab-count-badge">{{ categories().length }}</span>
-          </button>
-        </div>
-
         <!-- Quick Stats Overview -->
         <div class="stats-overview">
           <div class="stat-pill">
@@ -1788,6 +1769,7 @@ import { AuthService } from '../../services/auth.service';
   `]
 })
 export class MedicinesComponent implements OnInit {
+  private readonly router = inject(Router);
   private readonly medicineService = inject(MedicineService);
   private readonly categoryService = inject(MedicineCategoryService);
   readonly authService = inject(AuthService);
@@ -1971,15 +1953,43 @@ export class MedicinesComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.syncTabFromUrl(this.router.url);
     this.loadData();
+
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => {
+        this.syncTabFromUrl(e.urlAfterRedirects || e.url);
+      });
   }
 
-  switchTab(tab: 'medicines' | 'categories'): void {
+  private syncTabFromUrl(url: string): void {
+    if (url.includes('/categories')) {
+      if (this.activeTab() !== 'categories') {
+        this.activeTab.set('categories');
+        this.categoryCurrentPage.set(1);
+      }
+    } else {
+      if (this.activeTab() !== 'medicines') {
+        this.activeTab.set('medicines');
+        this.currentPage.set(1);
+      }
+    }
+  }
+
+  switchTab(tab: 'medicines' | 'categories', navigate: boolean = true): void {
     this.activeTab.set(tab);
     if (tab === 'medicines') {
       this.currentPage.set(1);
     } else {
       this.categoryCurrentPage.set(1);
+    }
+
+    if (navigate && this.isAdmin()) {
+      const targetPath = tab === 'categories' ? '/admin/medicines/categories' : '/admin/medicines/list';
+      if (!this.router.url.includes(targetPath)) {
+        this.router.navigateByUrl(targetPath);
+      }
     }
   }
 

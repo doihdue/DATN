@@ -33,4 +33,6 @@ public interface LabOrderRepository extends JpaRepository<LabOrder, Long> {
            "OR lo.status IN ('PENDING', 'PROCESSING') " +
            "ORDER BY lo.orderTime ASC")
     List<LabOrder> findWorklist(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    boolean existsByPerformerId(Long performerId);
 }

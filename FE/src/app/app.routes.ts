@@ -16,6 +16,7 @@ import { MyAppointmentsComponent } from './pages/my-appointments/my-appointments
 import { AppointmentManagementComponent } from './pages/appointment-management/appointment-management.component';
 import { DoctorsComponent } from './pages/doctors/doctors.component';
 import { StaffComponent } from './pages/staff/staff.component';
+import { LabTechniciansComponent } from './pages/lab-technicians/lab-technicians.component';
 import { LabManagementComponent } from './pages/lab-management/lab-management.component';
 import { LabServicesComponent } from './pages/lab-services/lab-services.component';
 import { DoctorHistoryComponent } from './pages/doctor-history/doctor-history.component';
@@ -57,16 +58,57 @@ export const routes: Routes = [
     canActivate: [roleGuard(['ADMIN'])]
   },
   {
+    path: 'admin/lab-technicians',
+    component: LabTechniciansComponent,
+    title: 'Quản lý Kỹ thuật viên - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/lab-techs',
+    redirectTo: 'admin/lab-technicians'
+  },
+  {
+    path: 'admin/personnel',
+    redirectTo: 'admin/doctors',
+    pathMatch: 'full'
+  },
+  {
     path: 'admin/medicines',
+    redirectTo: 'admin/medicines/list',
+    pathMatch: 'full'
+  },
+  {
+    path: 'admin/medicines/list',
     component: MedicinesComponent,
-    title: 'Quản lý Dược phẩm & Thuốc - MedQueue',
+    title: 'Kho Thuốc & Biệt Dược - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/medicines/categories',
+    component: MedicinesComponent,
+    title: 'Nhóm & Danh Mục Thuốc - MedQueue',
     canActivate: [roleGuard(['ADMIN'])]
   },
   {
     path: 'admin/schedules',
+    redirectTo: 'admin/schedules/doctors',
+    pathMatch: 'full'
+  },
+  {
+    path: 'admin/schedules/doctors',
     component: SchedulesComponent,
-    title: 'Quản lý Lịch làm việc - MedQueue',
+    title: 'Lịch trực Bác sĩ - MedQueue',
     canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/schedules/technicians',
+    component: SchedulesComponent,
+    title: 'Lịch trực Kỹ thuật viên - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/schedules/techs',
+    redirectTo: 'admin/schedules/technicians'
   },
 
   // ========================
