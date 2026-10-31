@@ -1,11 +1,83 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { ScheduleService } from '../../services/schedule.service';
 import { SpecialtyService } from '../../services/specialty.service';
+import { DoctorService } from '../../services/doctor.service';
 import { AuthService } from '../../services/auth.service';
-import { ExaminationRoom, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
+import { ExaminationRoom, StaffShift, StaffShiftRequest, WorkSchedule, WorkScheduleRequest } from '../../models/schedule.model';
 import { Specialty } from '../../models/specialty.model';
+import { toIsoDate, addDays } from '../../utils/date.utils';
+import { forkJoin, Observable, of, map, tap } from 'rxjs';
+
+// Lịch trực dùng chung cho bác sĩ (ca tại phòng khám) và kỹ thuật viên (ca tại phòng cận lâm sàng)
+type StaffKind = 'DOCTOR' | 'TECH';
+
+// Một ca trên bảng phân ca: chuyển từ WorkSchedule (bác sĩ) hoặc StaffShift (KTV) về cùng một dạng
+interface RosterEntry {
+  id: number;
+  personId: number;
+  personName: string;
+  personTitle?: string;
+  personSub: string; // Chuyên khoa của bác sĩ / khoa của KTV
+  roomId: number;
+  roomNumber: string;
+  roomName: string;
+  floor?: number;
+  workDate: string;
+  shiftType: string;
+  startTime: string;
+  endTime: string;
+  status: 'AVAILABLE' | 'FULL' | 'CANCELLED';
+  booked: number;
+  max: number;
+  remaining: number;
+  notes?: string;
+}
+
+interface Person { id: number; fullName: string; sub: string; department?: string; }
+
+interface BatchResult { totalRequested: number; successCount: number; conflictCount: number; conflictMessages: string[]; }
+
+const NO_ENTRIES: RosterEntry[] = [];
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  XET_NGHIEM: 'Khoa Xét nghiệm',
+  CHAN_DOAN_HINH_ANH: 'Khoa Chẩn đoán hình ảnh'
+};
+
+function fromSchedule(s: WorkSchedule): RosterEntry {
+  return {
+    id: s.id, personId: s.doctorId, personName: s.doctorName, personTitle: s.academicTitle, personSub: s.specialtyName,
+    roomId: s.examinationRoomId, roomNumber: s.roomNumber, roomName: s.roomName, floor: s.floor,
+    workDate: s.workDate, shiftType: s.shiftType, startTime: s.startTime, endTime: s.endTime,
+    status: s.status, booked: s.currentBookedCount, max: s.maxPatients, remaining: s.remainingSlots
+  };
+}
+
+function fromShift(s: StaffShift): RosterEntry {
+  return {
+    id: s.id, personId: s.employeeId, personName: s.employeeName, personSub: DEPARTMENT_LABELS[s.department] ?? s.department,
+    roomId: s.roomId, roomNumber: s.roomNumber, roomName: s.roomName,
+    workDate: s.workDate, shiftType: s.shiftType, startTime: s.startTime, endTime: s.endTime,
+    status: 'AVAILABLE', booked: 0, max: 0, remaining: 0, notes: s.notes
+  };
+}
+
+// Thứ Hai của tuần chứa ngày đã cho
+function mondayOf(date: Date): Date {
+  return addDays(date, -((date.getDay() + 6) % 7));
+}
+
+function firstOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function lastOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
 
 @Component({
   selector: 'app-schedules',
@@ -17,77 +89,44 @@ import { Specialty } from '../../models/specialty.model';
       <div class="page-header">
         <div class="header-left">
           <div class="header-badge">
-            <i class="bi" [ngClass]="isAdmin() ? 'bi-calendar-check-fill' : 'bi-calendar-week-fill'"></i>
-            {{ isAdmin() ? 'Tầng Kế Hoạch & Xếp Lịch' : 'Lịch Trực Ca Bác Sĩ' }}
+            <i class="bi" [ngClass]="isTech() ? 'bi-eyedropper' : 'bi-person-badge'"></i>
+            {{ isAdmin() ? (isTech() ? 'Lịch Trực Kỹ Thuật Viên Cận Lâm Sàng' : 'Lịch Trực Bác Sĩ Phòng Khám') : isTech() ? 'Lịch Trực Kỹ Thuật Viên' : 'Lịch Trực Ca Bác Sĩ' }}
           </div>
-          <h1 class="page-title">{{ isAdmin() ? 'Quản Lý Lịch Làm Việc Bác Sĩ' : 'Danh Sách Ca Làm Việc & Trực Khám' }}</h1>
+          <h1 class="page-title">{{ isAdmin() ? (isTech() ? 'Quản Lý Lịch Trực Kỹ Thuật Viên' : 'Quản Lý Lịch Trực Bác Sĩ') : 'Lịch Trực Của Tôi' }}</h1>
           <p class="page-subtitle">
-            {{ isAdmin() 
-              ? 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' 
-              : 'Theo dõi các ca trực phân công, phòng khám và số lượng bệnh nhân đã tiếp nhận' }}
+            @if (isAdmin()) {
+              {{ isTech()
+                ? 'Xếp kỹ thuật viên vào phòng xét nghiệm / chẩn đoán hình ảnh. Mỗi ca có thể có nhiều KTV, chỉ chọn được KTV đúng khoa của phòng'
+                : 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' }}
+            } @else {
+              {{ isTech()
+                ? 'Theo dõi các ca trực được phân công cho bạn tại phòng cận lâm sàng'
+                : 'Theo dõi các ca trực được phân công cho bạn, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
+            }
           </p>
         </div>
         @if (isAdmin()) {
           <div class="header-actions">
-            <button class="btn btn-primary" (click)="openAddModal()">
-              <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực Mới
+            <div class="view-toggle" role="tablist" aria-label="Chế độ xem">
+              <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'MONTH'" (click)="setViewMode('MONTH')">
+                <i class="bi bi-calendar3"></i> Tháng
+              </button>
+              <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'ROSTER'" (click)="setViewMode('ROSTER')">
+                <i class="bi bi-grid-3x3-gap-fill"></i> Tuần
+              </button>
+              <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'LIST'" (click)="setViewMode('LIST')">
+                <i class="bi bi-list-ul"></i> Danh sách
+              </button>
+            </div>
+            <button class="btn btn-primary" [disabled]="openingForm()" (click)="openAddModal()">
+              @if (openingForm()) {
+                <span class="spinner-sm"></span> Đang tải dữ liệu...
+              } @else {
+                <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực
+              }
             </button>
           </div>
         }
-      </div>
-
-      <!-- Filters Bar -->
-      <div class="filters-card">
-        <div class="filters-grid">
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-calendar3"></i> Từ ngày</label>
-            <input type="date" [(ngModel)]="filterStartDate" (change)="loadSchedules()" class="form-control" />
-          </div>
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-calendar3"></i> Đến ngày</label>
-            <input type="date" [(ngModel)]="filterEndDate" (change)="loadSchedules()" class="form-control" />
-          </div>
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-door-open"></i> Phòng khám</label>
-            <select [(ngModel)]="filterRoomId" (change)="loadSchedules()" class="form-control">
-              <option [ngValue]="null">-- Tất cả phòng khám --</option>
-              @for (room of rooms(); track room.id) {
-                <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }}</option>
-              }
-            </select>
-          </div>
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-diagram-3"></i> Chuyên khoa</label>
-            <select [(ngModel)]="filterSpecialtyId" (change)="loadSchedules()" class="form-control">
-              <option [ngValue]="null">-- Tất cả chuyên khoa --</option>
-              @for (spec of specialties(); track spec.id) {
-                <option [ngValue]="spec.id">{{ spec.name }}</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <div class="filter-actions">
-          <button class="btn btn-outline btn-sm" (click)="resetFilters()">
-            <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
-          </button>
-        </div>
-      </div>
-
-      <!-- Stats Summary Strip -->
-      <div class="stats-strip">
-        <div class="stat-box">
-          <span class="stat-number">{{ schedules().length }}</span>
-          <span class="stat-label">Tổng ca làm việc</span>
-        </div>
-        <div class="stat-box stat-available">
-          <span class="stat-number">{{ totalAvailableSlots() }}</span>
-          <span class="stat-label">Chỗ khám còn trống</span>
-        </div>
-        <div class="stat-box stat-booked">
-          <span class="stat-number">{{ totalBookedCount() }}</span>
-          <span class="stat-label">Đã được đặt trước</span>
-        </div>
       </div>
 
       <!-- Feedback Alerts (Top-Right Floating Toast) -->
@@ -108,6 +147,237 @@ import { Specialty } from '../../models/specialty.model';
         </div>
       }
 
+      @if (isAdmin() && viewMode() === 'ROSTER') {
+      <!-- Bảng phân ca theo tuần: hàng = phòng, cột = ngày, mỗi ô gồm 3 ca -->
+      <div class="roster-card">
+        <div class="roster-toolbar">
+          <div class="week-nav">
+            <button type="button" class="btn btn-outline btn-sm" (click)="shiftWeek(-1)" title="Tuần trước" aria-label="Tuần trước">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" [disabled]="isCurrentWeek()" (click)="goToCurrentWeek()">Tuần này</button>
+            <button type="button" class="btn btn-outline btn-sm" (click)="shiftWeek(1)" title="Tuần sau" aria-label="Tuần sau">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+            <span class="week-label">{{ weekLabel() }}</span>
+          </div>
+          <div class="roster-summary">
+            <span class="sum-chip sum-filled"><i class="bi bi-person-check-fill"></i> {{ rosterStats().filled }} ca đã xếp</span>
+            <span class="sum-chip sum-empty"><i class="bi bi-exclamation-circle-fill"></i> {{ rosterStats().empty }} ca còn trống</span>
+          </div>
+        </div>
+
+        @if (weekLoading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Đang tải bảng phân ca...</p>
+          </div>
+        } @else if (rooms().length === 0) {
+          <div class="empty-state">
+            <i class="bi bi-door-closed"></i>
+            <h3>Chưa có {{ roomLabel().toLowerCase() }} nào</h3>
+            <p>Hãy thêm {{ roomLabel().toLowerCase() }} trước khi xếp lịch trực.</p>
+          </div>
+        } @else {
+          <div class="roster-scroll">
+            <table class="roster-table">
+              <thead>
+                <tr>
+                  <th class="roster-room-col">{{ roomLabel() }}</th>
+                  @for (day of weekDays(); track day.iso) {
+                    <th [class.is-today]="day.isToday" [class.is-past]="day.isPast">
+                      <span class="day-name">{{ day.weekday }}</span>
+                      <span class="day-date">{{ day.short }}</span>
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (room of rooms(); track room.id) {
+                  <tr>
+                    <th class="roster-room-col">
+                      <span class="room-badge">{{ room.roomNumber }}</span>
+                      <span class="roster-room-name">{{ room.roomName }}</span>
+                    </th>
+                    @for (day of weekDays(); track day.iso) {
+                      <td [class.is-today]="day.isToday" [class.is-past]="day.isPast">
+                        @for (shift of shiftSlots; track shift.key) {
+                          @let items = slotEntries(room.id, day.iso, shift.key);
+                          @for (s of items; track s.id) {
+                            <button type="button" class="slot slot-filled" [ngClass]="shift.css" [class.slot-new]="s.id === highlightId()"
+                                    [disabled]="day.isPast || openingForm()" (click)="openEditModal(s)"
+                                    [title]="shift.label + ' ' + day.short + ' · ' + s.personName + ' (' + s.personSub + ')' + (day.isPast ? '' : ' · Bấm để sửa')">
+                              <span class="slot-shift">{{ shift.label }}</span>
+                              <span class="slot-doctor">{{ s.personName }}</span>
+                              <span class="slot-meta">
+                                {{ s.startTime.substring(0, 5) }}–{{ s.endTime.substring(0, 5) }}{{ isTech() ? '' : ' · ' + s.booked + '/' + s.max }}
+                              </span>
+                            </button>
+                          }
+                          @if (items.length === 0 && day.isPast) {
+                            <div class="slot slot-past">
+                              <span class="slot-shift">{{ shift.label }}</span>
+                              <span class="slot-none">—</span>
+                            </div>
+                          } @else if (items.length === 0) {
+                            <button type="button" class="slot slot-empty" [disabled]="openingForm()"
+                                    (click)="openSlot(room.id, day.iso, shift.key)"
+                                    [title]="'Xếp ca ' + shift.label + ' ' + day.short + ' tại ' + room.roomNumber">
+                              <span class="slot-shift">{{ shift.label }}</span>
+                              <span class="slot-add"><i class="bi bi-plus-lg"></i> Trống</span>
+                            </button>
+                          } @else if (isTech() && !day.isPast) {
+                            <!-- Phòng cận lâm sàng: một ca có thể thêm nhiều KTV -->
+                            <button type="button" class="slot-more" [disabled]="openingForm()"
+                                    (click)="openSlot(room.id, day.iso, shift.key)"
+                                    [title]="'Thêm KTV vào ca ' + shift.label + ' ' + day.short + ' tại ' + room.roomNumber">
+                              <i class="bi bi-plus-lg"></i> Thêm KTV
+                            </button>
+                          }
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="roster-legend">
+            <span><i class="legend-dot shift-morning"></i> Ca sáng 07:30–12:00</span>
+            <span><i class="legend-dot shift-afternoon"></i> Ca chiều 13:30–17:30</span>
+            <span><i class="legend-dot shift-evening"></i> Ca tối 18:00–21:00</span>
+            <span><i class="legend-dot legend-empty"></i> Ô trống: bấm để xếp ca</span>
+            <span><i class="bi bi-pencil-square"></i> Ca đã xếp: bấm để sửa</span>
+            @if (isTech()) {
+              <span><i class="bi bi-plus-lg"></i> Thêm KTV: một ca có thể có nhiều KTV</span>
+            }
+          </div>
+        }
+      </div>
+      } @else if (isAdmin() && viewMode() === 'MONTH') {
+      <!-- Tổng quan tháng: mỗi ngày hiện số ca đã có người / tổng số ca (phòng × 3 ca) -->
+      <div class="roster-card">
+        <div class="roster-toolbar">
+          <div class="week-nav">
+            <button type="button" class="btn btn-outline btn-sm" (click)="shiftMonth(-1)" title="Tháng trước" aria-label="Tháng trước">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" [disabled]="isCurrentMonth()" (click)="goToCurrentMonth()">Tháng này</button>
+            <button type="button" class="btn btn-outline btn-sm" (click)="shiftMonth(1)" title="Tháng sau" aria-label="Tháng sau">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+            <span class="week-label">{{ monthLabel() }}</span>
+          </div>
+          <div class="roster-summary">
+            <span class="sum-chip sum-filled"><i class="bi bi-person-check-fill"></i> {{ monthStats().filled }} ca đã xếp</span>
+            <span class="sum-chip sum-empty"><i class="bi bi-exclamation-circle-fill"></i> {{ monthStats().empty }} ca còn trống</span>
+          </div>
+        </div>
+
+        @if (monthLoading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Đang tải lịch tháng...</p>
+          </div>
+        } @else {
+          <div class="month-grid">
+            @for (label of monthWeekdayLabels; track label) {
+              <div class="month-head">{{ label }}</div>
+            }
+            @for (cell of monthCells(); track cell.iso) {
+              <button type="button" class="month-cell" [ngClass]="cell.coverage"
+                      [class.out-month]="!cell.inMonth" [class.is-today]="cell.isToday"
+                      [disabled]="!cell.inMonth" (click)="openWeekOf(cell.iso)"
+                      [title]="cell.inMonth ? 'Xem bảng phân ca tuần chứa ngày ' + cell.label : ''">
+                <span class="month-day">{{ cell.day }}</span>
+                @if (cell.inMonth) {
+                  <span class="month-count">{{ cell.filled }}/{{ cell.total }} ca</span>
+                  <span class="month-bar"><span [style.width.%]="cell.total ? (cell.filled / cell.total) * 100 : 0"></span></span>
+                }
+              </button>
+            }
+          </div>
+
+          <div class="roster-legend">
+            <span><i class="legend-dot cov-full"></i> Đủ người trực</span>
+            <span><i class="legend-dot cov-partial"></i> Thiếu một vài ca</span>
+            <span><i class="legend-dot cov-low"></i> Thiếu nhiều ca</span>
+            <span><i class="bi bi-hand-index"></i> Bấm vào ngày để xếp chi tiết theo tuần</span>
+          </div>
+        }
+      </div>
+      } @else {
+
+      <!-- Filters Bar -->
+      <div class="filters-card">
+        <div class="filters-grid">
+          <div class="filter-item">
+            <label class="filter-label"><i class="bi bi-calendar3"></i> Từ ngày</label>
+            <input type="date" [(ngModel)]="filterStartDate" (change)="loadSchedules()" class="form-control" />
+          </div>
+          <div class="filter-item">
+            <label class="filter-label"><i class="bi bi-calendar3"></i> Đến ngày</label>
+            <input type="date" [(ngModel)]="filterEndDate" (change)="loadSchedules()" class="form-control" />
+          </div>
+          @if (isAdmin()) {
+          <div class="filter-item">
+            <label class="filter-label"><i class="bi bi-door-open"></i> {{ roomLabel() }}</label>
+            <select [(ngModel)]="filterRoomId" (change)="loadSchedules()" class="form-control">
+              <option [ngValue]="null">-- Tất cả phòng --</option>
+              @for (room of rooms(); track room.id) {
+                <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }}</option>
+              }
+            </select>
+          </div>
+          @if (!isTech()) {
+          <div class="filter-item">
+            <label class="filter-label"><i class="bi bi-diagram-3"></i> Chuyên khoa</label>
+            <select [(ngModel)]="filterSpecialtyId" (change)="loadSchedules()" class="form-control">
+              <option [ngValue]="null">-- Tất cả chuyên khoa --</option>
+              @for (spec of specialties(); track spec.id) {
+                <option [ngValue]="spec.id">{{ spec.name }}</option>
+              }
+            </select>
+          </div>
+          }
+          }
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-outline btn-sm" (click)="resetFilters()">
+            <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Summary Strip -->
+      <div class="stats-strip">
+        <div class="stat-box">
+          <span class="stat-number">{{ schedules().length }}</span>
+          <span class="stat-label">Tổng ca làm việc</span>
+        </div>
+        @if (isTech()) {
+          <div class="stat-box stat-available">
+            <span class="stat-number">{{ listStats().people }}</span>
+            <span class="stat-label">Kỹ thuật viên tham gia</span>
+          </div>
+          <div class="stat-box stat-booked">
+            <span class="stat-number">{{ listStats().rooms }}</span>
+            <span class="stat-label">Phòng có người trực</span>
+          </div>
+        } @else {
+          <div class="stat-box stat-available">
+            <span class="stat-number">{{ listStats().available }}</span>
+            <span class="stat-label">Chỗ khám còn trống</span>
+          </div>
+          <div class="stat-box stat-booked">
+            <span class="stat-number">{{ listStats().booked }}</span>
+            <span class="stat-label">Đã được đặt trước</span>
+          </div>
+        }
+      </div>
+
       <!-- Schedules Table -->
       <div class="table-container">
         @if (loading()) {
@@ -119,7 +389,7 @@ import { Specialty } from '../../models/specialty.model';
           <div class="empty-state">
             <i class="bi bi-calendar-x"></i>
             <h3>Không có ca làm việc nào phù hợp</h3>
-            <p>Hãy thay đổi bộ lọc hoặc đăng ký ca trực mới cho bác sĩ.</p>
+            <p>Hãy thay đổi bộ lọc{{ isAdmin() ? ' hoặc đăng ký ca trực mới cho ' + personLabel().toLowerCase() : '' }}.</p>
           </div>
         } @else {
           <table class="data-table">
@@ -127,10 +397,14 @@ import { Specialty } from '../../models/specialty.model';
               <tr>
                 <th>Ngày & Giờ</th>
                 <th>Ca trực</th>
-                <th>Bác sĩ phụ trách</th>
-                <th>Phòng khám</th>
-                <th>Lượng bệnh nhân (Đã đặt / Tối đa)</th>
-                <th>Trạng thái</th>
+                <th>{{ isTech() ? 'Kỹ thuật viên' : 'Bác sĩ phụ trách' }}</th>
+                <th>{{ roomLabel() }}</th>
+                @if (isTech()) {
+                  <th>Ghi chú</th>
+                } @else {
+                  <th>Lượng bệnh nhân (Đã đặt / Tối đa)</th>
+                  <th>Trạng thái</th>
+                }
                 @if (isAdmin()) {
                   <th class="text-right">Thao tác</th>
                 }
@@ -152,47 +426,58 @@ import { Specialty } from '../../models/specialty.model';
                   </td>
                   <td>
                     <div class="doctor-col">
-                      <strong>{{ item.doctorName }}</strong>
-                      <span class="doctor-sub">{{ item.academicTitle || 'Bác sĩ' }} • {{ item.specialtyName }}</span>
+                      <strong>{{ item.personName }}</strong>
+                      <span class="doctor-sub">{{ isTech() ? item.personSub : (item.personTitle || 'Bác sĩ') + ' • ' + item.personSub }}</span>
                     </div>
                   </td>
                   <td>
                     <div class="room-col">
                       <span class="room-badge">{{ item.roomNumber }}</span>
-                      <span class="room-desc">{{ item.roomName }} (Tầng {{ item.floor }})</span>
+                      <span class="room-desc">{{ item.roomName }}{{ item.floor ? ' (Tầng ' + item.floor + ')' : '' }}</span>
                     </div>
                   </td>
-                  <td>
-                    <div class="capacity-col">
-                      <div class="capacity-label">
-                        <span>{{ item.currentBookedCount }} / {{ item.maxPatients }}</span>
-                        <small>Còn {{ item.remainingSlots }} chỗ</small>
+                  @if (isTech()) {
+                    <td>{{ item.notes || '—' }}</td>
+                  } @else {
+                    <td>
+                      <div class="capacity-col">
+                        <div class="capacity-label">
+                          <span>{{ item.booked }} / {{ item.max }}</span>
+                          <small>Còn {{ item.remaining }} chỗ</small>
+                        </div>
+                        <div class="progress-bar-bg">
+                          <div
+                            class="progress-bar-fill"
+                            [style.width.%]="(item.booked / item.max) * 100"
+                            [ngClass]="getCapacityColorClass(item.booked, item.max)"
+                          ></div>
+                        </div>
                       </div>
-                      <div class="progress-bar-bg">
-                        <div
-                          class="progress-bar-fill"
-                          [style.width.%]="(item.currentBookedCount / item.maxPatients) * 100"
-                          [ngClass]="getCapacityColorClass(item.currentBookedCount, item.maxPatients)"
-                        ></div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="badge" [ngClass]="getStatusBadgeClass(item.status)">
-                      {{ getStatusDisplayName(item.status) }}
-                    </span>
-                  </td>
+                    </td>
+                    <td>
+                      <span class="badge" [ngClass]="getStatusBadgeClass(item.status)">
+                        {{ getStatusDisplayName(item.status) }}
+                      </span>
+                    </td>
+                  }
                   @if (isAdmin()) {
                     <td class="text-right">
                       <div class="row-actions">
-                        @if (item.status !== 'CANCELLED') {
+                        @if (item.status !== 'CANCELLED' && item.workDate >= todayIso) {
+                          <button class="btn btn-sm btn-outline" [disabled]="openingForm()" (click)="openEditModal(item)" title="Sửa ca trực">
+                            <i class="bi bi-pencil-square"></i> Sửa
+                          </button>
+                        }
+                        @if (!isTech() && item.status !== 'CANCELLED') {
                           <button class="btn btn-sm btn-outline-warning" (click)="cancelSchedule(item)" title="Hủy ca trực">
                             <i class="bi bi-x-circle"></i> Hủy
                           </button>
                         }
-                        <button class="btn btn-sm btn-outline-danger" (click)="deleteSchedule(item)" title="Xóa ca">
-                          <i class="bi bi-trash3"></i>
-                        </button>
+                        @if (!isTech() || item.workDate >= todayIso) {
+                          <button class="btn btn-sm btn-outline-danger" (click)="deleteEntry(item)" title="Xóa ca">
+                            <i class="bi bi-trash3"></i>
+                          </button>
+                        }
                       </div>
                     </td>
                   }
@@ -276,85 +561,261 @@ import { Specialty } from '../../models/specialty.model';
           </div>
         }
       </div>
+      }
 
-      <!-- Modal Thêm Ca Làm Việc Mới -->
+      <!-- Modal Đăng ký / Sửa ca trực -->
       @if (showModal()) {
         <div class="modal-backdrop" (click)="closeModal()">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">
-                <i class="bi bi-calendar-plus"></i> Đăng Ký Ca Làm Việc Bác Sĩ
+                <i class="bi" [ngClass]="editingEntry() ? 'bi-pencil-square' : 'bi-calendar-plus'"></i>
+                {{ editingEntry() ? 'Cập Nhật Ca Trực ' : 'Đăng Ký Ca Trực ' }}{{ personLabel() }}
               </h2>
               <button class="modal-close-btn" (click)="closeModal()">×</button>
             </div>
-            <div class="modal-body">
-              <div class="conflict-alert-box">
-                <i class="bi bi-shield-check"></i>
-                <small>Hệ thống tự động phát hiện xung đột: Ngăn chặn 1 bác sĩ trùng giờ ở 2 nơi, hoặc 2 bác sĩ trùng giờ trong cùng 1 phòng khám.</small>
-              </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label required">Bác sĩ phụ trách</label>
-                  <select [(ngModel)]="formData.doctorId" class="form-control" required>
-                    <option [ngValue]="null">-- Chọn bác sĩ --</option>
-                    @for (doc of doctorList(); track doc.id) {
-                      <option [ngValue]="doc.id">{{ doc.fullName }} ({{ doc.specialtyName }})</option>
-                    }
-                  </select>
+            @if (batchResult()) {
+              <!-- Summary Report after Batch Execution -->
+              <div class="modal-body">
+                <div class="batch-result-header">
+                  <div class="result-icon" [ngClass]="batchResult()!.successCount > 0 ? 'icon-success' : 'icon-warning'">
+                    <i class="bi" [ngClass]="batchResult()!.successCount > 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
+                  </div>
+                  <h3 class="result-title">Kết Quả Đăng Ký Lịch Làm Việc</h3>
+                  <p class="result-desc">Tổng số ngày theo lịch: <strong>{{ batchResult()!.totalRequested }} ngày</strong></p>
                 </div>
-                <div class="form-group flex-1">
-                  <label class="form-label required">Phòng khám điều trị</label>
-                  <select [(ngModel)]="formData.examinationRoomId" class="form-control" required>
-                    <option [ngValue]="null">-- Chọn phòng khám --</option>
-                    @for (room of rooms(); track room.id) {
-                      <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }} (Tầng {{ room.floor }})</option>
-                    }
-                  </select>
-                </div>
-              </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label required">Ngày làm việc</label>
-                  <input type="date" [(ngModel)]="formData.workDate" class="form-control" required />
+                <div class="result-stats-row">
+                  <div class="result-stat-box stat-box-green">
+                    <span class="result-number">{{ batchResult()!.successCount }}</span>
+                    <span class="result-label">Ca trực tạo thành công</span>
+                  </div>
+                  <div class="result-stat-box stat-box-amber">
+                    <span class="result-number">{{ batchResult()!.conflictCount }}</span>
+                    <span class="result-label">Ngày bị trùng lịch (Đã bỏ qua)</span>
+                  </div>
                 </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">Loại ca trực</label>
-                  <select [(ngModel)]="formData.shiftType" class="form-control">
-                    <option value="CA_SÁNG">Ca Sáng (07:30 - 12:00)</option>
-                    <option value="CA_CHIỀU">Ca Chiều (13:30 - 17:30)</option>
-                    <option value="CA_TỐI">Ca Tối (18:00 - 21:00)</option>
-                    <option value="TỰ_DO">Khung giờ tùy chỉnh</option>
-                  </select>
-                </div>
-              </div>
 
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label required">Giờ bắt đầu</label>
-                  <input type="time" [(ngModel)]="formData.startTime" class="form-control" required />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label required">Giờ kết thúc</label>
-                  <input type="time" [(ngModel)]="formData.endTime" class="form-control" required />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label required">Số bệnh nhân tối đa</label>
-                  <input type="number" [(ngModel)]="formData.maxPatients" min="1" max="100" class="form-control" required />
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
-              <button class="btn btn-primary" [disabled]="submitting() || !isFormValid()" (click)="saveSchedule()">
-                @if (submitting()) {
-                  <span class="spinner-sm"></span> Đang kiểm tra & lưu...
-                } @else {
-                  <i class="bi bi-check-circle"></i> Xác Nhận Xếp Ca
+                @if (batchResult()!.conflictMessages.length > 0) {
+                  <div class="conflict-list-container">
+                    <h4 class="conflict-list-title"><i class="bi bi-info-circle-fill"></i> Chi tiết các ngày bị trùng lịch đã được bỏ qua:</h4>
+                    <ul class="conflict-ul">
+                      @for (msg of batchResult()!.conflictMessages; track msg) {
+                        <li><i class="bi bi-exclamation-circle text-amber"></i> {{ msg }}</li>
+                      }
+                    </ul>
+                  </div>
                 }
-              </button>
-            </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-primary" (click)="closeBatchResult()">
+                  <i class="bi bi-check-lg"></i> Đóng
+                </button>
+              </div>
+            } @else {
+              <!-- Form input -->
+              <div class="modal-body">
+                @if (editingEntry(); as editing) {
+                  <div class="edit-info-box">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <div>
+                      Đang sửa ca {{ editing.workDate | date:'dd/MM/yyyy' }} ({{ editing.startTime.substring(0, 5) }}–{{ editing.endTime.substring(0, 5) }})
+                      tại {{ editing.roomNumber }}.
+                      @if (!isTech()) {
+                        Đã có <strong>{{ editing.booked }}</strong> lịch hẹn.
+                      }
+                      @if (timeLocked()) {
+                        <br />Ca đã có bệnh nhân đặt nên <strong>không đổi được ngày/giờ</strong>; đổi bác sĩ thì lịch hẹn chuyển sang bác sĩ mới.
+                      }
+                    </div>
+                  </div>
+                } @else {
+                  <div class="mode-tabs">
+                    <button type="button" class="mode-tab-btn" [class.active]="scheduleMode === 'SINGLE'" (click)="setScheduleMode('SINGLE')">
+                      <i class="bi bi-calendar-event"></i> 1 Ngày
+                    </button>
+                    <button type="button" class="mode-tab-btn" [class.active]="scheduleMode === 'MULTI'" (click)="setScheduleMode('MULTI')">
+                      <i class="bi bi-calendar-month"></i> Nhiều Ngày (Chọn Trên Lịch)
+                    </button>
+                  </div>
+                }
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label class="form-label required">{{ isTech() ? 'Kỹ thuật viên (theo khoa của phòng)' : 'Bác sĩ phụ trách' }}</label>
+                    <select [(ngModel)]="activePersonId" class="form-control" required>
+                      <option [ngValue]="null">-- Chọn {{ personLabel().toLowerCase() }} --</option>
+                      @for (person of personList(); track person.id) {
+                        @let busyRoom = personBusyRoom(person.id);
+                        <option [ngValue]="person.id" [disabled]="!!busyRoom">
+                          {{ person.fullName }} ({{ person.sub }}){{ busyRoom ? ' — đang trực ' + busyRoom : '' }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label required">{{ roomLabel() }}</label>
+                    <select [ngModel]="activeRoomId" (ngModelChange)="onRoomChange($event)" class="form-control" required>
+                      <option [ngValue]="null">-- Chọn phòng --</option>
+                      @for (room of rooms(); track room.id) {
+                        @let roomNote = roomBusyNote(room.id);
+                        <option [ngValue]="room.id" [disabled]="!isTech() && !!roomNote">
+                          {{ room.roomNumber }} - {{ room.roomName }} (Tầng {{ room.floor }}){{ roomNote ? ' — ' + roomNote : '' }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                </div>
+                @if (isTech() && activeRoomId && personList().length === 0) {
+                  <div class="slot-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Khoa của phòng này chưa có kỹ thuật viên nào.
+                  </div>
+                } @else if (scheduleMode === 'SINGLE' && freePersonCount() === 0 && personList().length > 0) {
+                  <div class="slot-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Tất cả {{ personLabel().toLowerCase() }} đều đã có ca giao nhau với khung giờ này. Hãy chọn khung giờ khác.
+                  </div>
+                }
+
+                @if (scheduleMode === 'SINGLE') {
+                  <div class="form-group">
+                    <label class="form-label required">Ngày làm việc</label>
+                    <input type="date" [ngModel]="activeWorkDate" (ngModelChange)="onWorkDateChange($event)" [disabled]="timeLocked()" class="form-control" required />
+                  </div>
+                }
+
+                <!-- Chọn ca: chế độ 1 ngày hiện luôn tình trạng từng ca của phòng trong ngày đó -->
+                <div class="availability-box">
+                  <div class="availability-title">
+                    <i class="bi bi-clock"></i>
+                    @if (scheduleMode === 'SINGLE') {
+                      Ca trực ngày {{ activeWorkDate | date:'dd/MM/yyyy' }} tại phòng đã chọn
+                    } @else {
+                      Ca trực áp dụng cho các ngày chọn bên dưới
+                    }
+                  </div>
+                  @if (scheduleMode === 'SINGLE' && formChecking()) {
+                    <div class="availability-loading"><span class="spinner-sm"></span> Đang kiểm tra lịch...</div>
+                  } @else {
+                    <div class="availability-chips">
+                      @for (st of shiftOptions(); track st.key) {
+                        <button type="button" class="avail-chip" [ngClass]="'avail-' + st.state"
+                                [class.selected]="activeShiftKey() === st.key"
+                                [disabled]="st.state !== 'free' || timeLocked()"
+                                (click)="selectShift(st.key)">
+                          <strong>Ca {{ st.label }} · {{ st.start }}–{{ st.end }}</strong>
+                          <span>{{ st.note }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+
+                @if (scheduleMode === 'MULTI') {
+                  <!-- Lịch tháng của người được chọn: tick từng ngày muốn xếp trực -->
+                  <div class="availability-box">
+                    <div class="month-picker-row">
+                      <div class="week-nav">
+                        <button type="button" class="btn btn-outline btn-sm" [disabled]="formMonthStart <= currentMonthIso" (click)="shiftFormMonth(-1)" title="Tháng trước" aria-label="Tháng trước">
+                          <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <strong class="week-label">{{ formMonthLabel() }}</strong>
+                        <button type="button" class="btn btn-outline btn-sm" (click)="shiftFormMonth(1)" title="Tháng sau" aria-label="Tháng sau">
+                          <i class="bi bi-chevron-right"></i>
+                        </button>
+                      </div>
+                      <div class="days-shortcuts">
+                        <button type="button" class="btn-shortcut" (click)="selectFreeDates(false)">Chọn tất cả ngày trống</button>
+                        <button type="button" class="btn-shortcut" (click)="selectFreeDates(true)">Chỉ T2 - T6</button>
+                        <button type="button" class="btn-shortcut" (click)="clearDates()">Bỏ chọn</button>
+                      </div>
+                    </div>
+
+                    @if (!activePersonId || !activeRoomId) {
+                      <div class="availability-loading">Chọn {{ personLabel().toLowerCase() }} và phòng để xem các ngày còn trống.</div>
+                    } @else if (formChecking()) {
+                      <div class="availability-loading"><span class="spinner-sm"></span> Đang kiểm tra lịch...</div>
+                    } @else {
+                      <div class="pick-grid">
+                        @for (label of monthWeekdayLabels; track label) {
+                          <div class="month-head">{{ label }}</div>
+                        }
+                        @for (cell of formMonthCells(); track cell.iso) {
+                          @if (cell.state === 'out') {
+                            <div class="pick-cell pick-out"></div>
+                          } @else {
+                            <button type="button" class="pick-cell" [ngClass]="'pick-' + cell.state" [class.selected]="cell.selected"
+                                    [disabled]="cell.state !== 'free'" (click)="toggleDate(cell.iso)" [title]="cell.note">
+                              <span class="pick-day">{{ cell.day }}</span>
+                              @if (cell.selected) {
+                                <i class="bi bi-check-circle-fill"></i>
+                              } @else if (cell.state === 'doctor' || cell.state === 'room') {
+                                <span class="pick-note">{{ cell.note }}</span>
+                              }
+                            </button>
+                          }
+                        }
+                      </div>
+                      <div class="pick-legend">
+                        <span><i class="legend-dot pick-legend-selected"></i> Đã chọn</span>
+                        <span><i class="legend-dot pick-legend-free"></i> Còn trống</span>
+                        <span><i class="legend-dot pick-legend-doctor"></i> {{ personLabel() }} đã có ca</span>
+                        @if (!isTech()) {
+                          <span><i class="legend-dot pick-legend-room"></i> Phòng đã có người</span>
+                        }
+                      </div>
+                      <div class="days-helper-text">
+                        <i class="bi bi-info-circle"></i>
+                        Đã chọn <strong>{{ selectedFreeDates().length }}</strong> ngày, ca {{ activeStartTime }}–{{ activeEndTime }}. Bấm vào ngày để chọn / bỏ chọn.
+                      </div>
+                    }
+                  </div>
+                }
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Giờ bắt đầu</label>
+                    <input type="time" [(ngModel)]="activeStartTime" [disabled]="timeLocked()" class="form-control" required />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label class="form-label required">Giờ kết thúc</label>
+                    <input type="time" [(ngModel)]="activeEndTime" [disabled]="timeLocked()" class="form-control" required />
+                  </div>
+                  @if (isTech()) {
+                    <div class="form-group flex-1">
+                      <label class="form-label">Ghi chú</label>
+                      <input type="text" [(ngModel)]="activeNotes" maxlength="255" class="form-control" placeholder="Không bắt buộc" />
+                    </div>
+                  } @else {
+                    <div class="form-group flex-1">
+                      <label class="form-label required">Bệnh nhân tối đa / ca</label>
+                      <input type="number" [(ngModel)]="activeMaxPatients" min="1" max="100" class="form-control" required />
+                    </div>
+                  }
+                </div>
+                <div class="days-helper-text">
+                  <i class="bi bi-info-circle"></i> Sửa giờ bắt đầu / kết thúc nếu cần khung giờ khác 3 ca mặc định.
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                @if (editingEntry(); as editing) {
+                  <button class="btn btn-outline-danger footer-left" [disabled]="submitting()" (click)="deleteEntry(editing)">
+                    <i class="bi bi-trash3"></i> Xoá ca
+                  </button>
+                }
+                <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
+                <button class="btn btn-primary" [disabled]="submitting() || !isFormValid()" (click)="saveSchedule()">
+                  @if (submitting()) {
+                    <span class="spinner-sm"></span> Đang kiểm tra & tạo lịch...
+                  } @else {
+                    <i class="bi bi-check-circle"></i> {{ editingEntry() ? 'Lưu Thay Đổi' : scheduleMode === 'SINGLE' ? 'Xác Nhận Xếp Ca' : 'Xếp Ca Cho ' + selectedFreeDates().length + ' Ngày Đã Chọn' }}
+                  }
+                </button>
+              </div>
+            }
           </div>
         </div>
       }
@@ -634,6 +1095,513 @@ import { Specialty } from '../../models/specialty.model';
 
     .text-right { text-align: right; }
 
+    /* View toggle */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .view-toggle {
+      display: inline-flex;
+      background: #f1f5f9;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 3px;
+    }
+
+    .view-toggle-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: calc(var(--radius-md) - 2px);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .view-toggle-btn.active {
+      background: #ffffff;
+      color: var(--primary-700);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+
+    /* Weekly roster */
+    .roster-card {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
+    }
+
+    .roster-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .week-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .week-label {
+      font-weight: 700;
+      color: var(--text-main);
+      margin-left: 0.5rem;
+    }
+
+    .roster-summary {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .sum-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 0.3rem 0.7rem;
+      border-radius: var(--radius-full);
+    }
+
+    .sum-filled { background: #ecfdf5; color: #047857; }
+    .sum-empty { background: #fef2f2; color: #b91c1c; }
+
+    /* Nhiều phòng: bảng cuộn trong khung, dòng ngày và cột phòng đứng yên */
+    .roster-scroll {
+      overflow: auto;
+      max-height: 72vh;
+    }
+
+    .roster-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .roster-table .roster-room-col {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+    }
+
+    .roster-table thead .roster-room-col {
+      z-index: 3;
+    }
+
+    .slot-new {
+      animation: slot-pulse 1.2s ease-in-out 3;
+      box-shadow: 0 0 0 2px #10b981;
+    }
+
+    @keyframes slot-pulse {
+      0%, 100% { box-shadow: 0 0 0 2px #10b981; }
+      50% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.35); }
+    }
+
+    .roster-table {
+      width: 100%;
+      min-width: 980px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .roster-table th,
+    .roster-table td {
+      border-bottom: 1px solid #f1f5f9;
+      border-right: 1px solid #f1f5f9;
+      padding: 0.5rem;
+      vertical-align: top;
+    }
+
+    .roster-table thead th {
+      background: #f8fafc;
+      text-align: center;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .day-name { display: block; font-size: 0.85rem; }
+    .day-date { display: block; font-size: 0.75rem; font-weight: 600; }
+
+    .roster-table thead th.is-today {
+      background: var(--primary-50);
+      color: var(--primary-700);
+    }
+
+    .roster-table td.is-today { background: #fbfdff; }
+    .roster-table td.is-past { background: #fafafa; }
+
+    .roster-room-col {
+      width: 140px;
+      text-align: left;
+      background: #f8fafc;
+    }
+
+    .roster-room-name {
+      display: block;
+      margin-top: 0.3rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .slot {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      min-height: 52px;
+      margin-bottom: 0.35rem;
+      padding: 0.3rem 0.45rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 0.75rem;
+      text-align: left;
+      line-height: 1.3;
+    }
+
+    .slot:last-child { margin-bottom: 0; }
+
+    .slot-shift {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      opacity: 0.8;
+    }
+
+    .slot-doctor {
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .slot-meta { font-size: 0.7rem; opacity: 0.85; }
+
+    .slot-filled.shift-morning { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+    .slot-filled.shift-afternoon { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+    .slot-filled.shift-evening { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
+
+    .slot-empty {
+      background: #ffffff;
+      border: 1px dashed #fca5a5;
+      color: #b91c1c;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .slot-empty:hover:not(:disabled) {
+      background: #fef2f2;
+      border-color: #ef4444;
+    }
+
+    .slot-empty:disabled { cursor: wait; opacity: 0.6; }
+
+    .slot-add { font-weight: 700; }
+
+    .slot-past {
+      background: #f8fafc;
+      color: #94a3b8;
+      border-color: #f1f5f9;
+    }
+
+    .slot-none { font-weight: 700; }
+
+    .roster-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      padding: 0.85rem 1.25rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .roster-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .legend-dot.shift-morning { background: #bae6fd; }
+    .legend-dot.shift-afternoon { background: #fde68a; }
+    .legend-dot.shift-evening { background: #e9d5ff; }
+    .legend-dot.legend-empty { border: 1px dashed #ef4444; background: #ffffff; }
+
+    /* Ca đã xếp là nút bấm để sửa */
+    button.slot-filled {
+      font-family: inherit;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+
+    button.slot-filled:hover:not(:disabled) { filter: brightness(0.96); }
+    button.slot-filled:disabled { cursor: default; }
+
+    /* Tổng quan tháng */
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.4rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .month-head {
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding-bottom: 0.25rem;
+    }
+
+    .month-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.3rem;
+      min-height: 78px;
+      padding: 0.45rem 0.55rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .month-cell:hover:not(:disabled) {
+      border-color: var(--primary-400, #60a5fa);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+    }
+
+    .month-cell.out-month {
+      background: transparent;
+      border-style: dashed;
+      color: #cbd5e1;
+      cursor: default;
+    }
+
+    .month-cell.is-today { box-shadow: 0 0 0 2px var(--primary-500, #3b82f6); }
+
+    .month-day { font-weight: 800; font-size: 0.95rem; color: var(--text-main); }
+    .month-count { font-size: 0.75rem; font-weight: 700; }
+
+    .month-bar {
+      width: 100%;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-top: auto;
+    }
+
+    .month-bar span { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+
+    .month-cell.cov-full { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .month-cell.cov-partial { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+    .month-cell.cov-low { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+    .month-cell.cov-past { background: #f8fafc; color: #94a3b8; }
+
+    .legend-dot.cov-full { background: #a7f3d0; }
+    .legend-dot.cov-partial { background: #fde68a; }
+    .legend-dot.cov-low { background: #fecaca; }
+
+    /* Form sửa ca & chọn nhanh khoảng ngày */
+    .edit-info-box {
+      display: flex;
+      gap: 0.6rem;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      border-radius: var(--radius-md);
+      padding: 0.7rem 0.9rem;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Chọn ngày trên lịch tháng của bác sĩ */
+    .month-picker-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .pick-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.3rem;
+    }
+
+    .pick-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.1rem;
+      min-height: 50px;
+      padding: 0.3rem 0.4rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      font-family: inherit;
+      font-size: 0.7rem;
+      text-align: left;
+      overflow: hidden;
+    }
+
+    .pick-day { font-size: 0.85rem; font-weight: 800; }
+
+    .pick-note {
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pick-out { border: none; background: transparent; }
+    .pick-past { background: #f8fafc; color: #cbd5e1; }
+
+    .pick-free {
+      color: #047857;
+      border-color: #a7f3d0;
+      cursor: pointer;
+    }
+
+    .pick-free:hover { background: #ecfdf5; }
+
+    .pick-free.selected {
+      background: #10b981;
+      border-color: #059669;
+      color: #ffffff;
+    }
+
+    .pick-doctor { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+    .pick-room { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+
+    .pick-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 0.6rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .pick-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .legend-dot.pick-legend-selected { background: #10b981; }
+    .legend-dot.pick-legend-free { background: #ffffff; border: 1px solid #a7f3d0; }
+    .legend-dot.pick-legend-doctor { background: #fed7aa; }
+    .legend-dot.pick-legend-room { background: #e2e8f0; }
+
+    /* Tình trạng ca trong form */
+    .availability-box {
+      border: 1px solid var(--border-color);
+      background: #f8fafc;
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .availability-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .availability-loading {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .availability-chips {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .avail-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.15rem;
+      padding: 0.5rem 0.7rem;
+      border-radius: var(--radius-md);
+      border: 1px solid;
+      font-family: inherit;
+      font-size: 0.8rem;
+      text-align: left;
+    }
+
+    .avail-free {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+      color: #047857;
+      cursor: pointer;
+    }
+
+    .avail-free:hover { border-color: #10b981; }
+
+    .avail-free.selected {
+      border-color: #059669;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35);
+    }
+
+    .avail-room,
+    .avail-doctor {
+      background: #f1f5f9;
+      border-color: #e2e8f0;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+
+    .avail-doctor { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+
+    .slot-warning {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-md);
+      padding: 0.6rem 0.85rem;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
     /* ==================== PAGINATION BAR ==================== */
     .pagination-footer {
       padding: 0.95rem 1.35rem;
@@ -797,18 +1765,6 @@ import { Specialty } from '../../models/specialty.model';
       background: #f8fafc;
     }
 
-    .conflict-alert-box {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      margin-bottom: 1.25rem;
-    }
-
     .form-row {
       display: flex;
       gap: 1rem;
@@ -857,42 +1813,386 @@ import { Specialty } from '../../models/specialty.model';
       color: var(--text-muted);
     }
 
-    .alert {
-      padding: 0.85rem 1.25rem;
+    /* Mode Switcher Tabs */
+    .mode-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #f1f5f9;
+      padding: 0.35rem;
+      border-radius: var(--radius-lg);
+      margin-bottom: 1.25rem;
+    }
+
+    .mode-tab-btn {
+      flex: 1;
+      padding: 0.65rem 1rem;
       border-radius: var(--radius-md);
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .mode-tab-btn:hover:not(.active) {
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .mode-tab-btn.active {
+      background: #ffffff;
+      color: var(--primary-700);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .days-shortcuts {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-shortcut {
+      font-size: 0.78rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #475569;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-shortcut:hover {
+      border-color: #0284c7;
+      color: #0284c7;
+      background: #f0f9ff;
+    }
+
+    .days-helper-text {
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Batch Result Summary View */
+    .batch-result-header {
+      text-align: center;
       margin-bottom: 1.5rem;
     }
 
-    .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-    .alert-danger { background: #fff1f2; color: #9f1239; border: 1px solid #fecdd3; }
-    .alert-close { margin-left: auto; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: inherit; }
+    .result-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      margin: 0 auto 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+    }
+
+    .icon-success {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .icon-warning {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .result-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 0.25rem;
+    }
+
+    .result-desc {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin: 0;
+    }
+
+    .result-stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-stat-box {
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .stat-box-green {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+    }
+
+    .stat-box-green .result-number {
+      color: #059669;
+    }
+
+    .stat-box-amber {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+    }
+
+    .stat-box-amber .result-number {
+      color: #d97706;
+    }
+
+    .result-number {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .result-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .conflict-list-container {
+      background: #fafaf9;
+      border: 1px solid #e7e5e4;
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .conflict-list-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #b45309;
+      margin: 0 0 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .conflict-ul {
+      margin: 0;
+      padding-left: 1rem;
+      font-size: 0.82rem;
+      color: #44403c;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .text-amber {
+      color: #d97706;
+    }
+
+    /* Phòng cận lâm sàng: thêm KTV vào ca đã có người */
+    .slot-more {
+      width: 100%;
+      margin-bottom: 0.35rem;
+      padding: 0.2rem 0.45rem;
+      border: 1px dashed #94a3b8;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #475569;
+      font-size: 0.7rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .slot-more:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
+    .slot-more:disabled { cursor: wait; opacity: 0.6; }
+
+    .footer-left { margin-right: auto; }
   `]
 })
+
 export class SchedulesComponent implements OnInit {
   private readonly scheduleService = inject(ScheduleService);
   private readonly specialtyService = inject(SpecialtyService);
+  private readonly doctorService = inject(DoctorService);
+  private readonly router = inject(Router);
   readonly authService = inject(AuthService);
 
   readonly isAdmin = computed(() => this.authService.hasRole('ADMIN'));
-  readonly isDoctor = computed(() => this.authService.hasRole('DOCTOR'));
 
-  readonly schedules = signal<WorkSchedule[]>([]);
-  readonly rooms = signal<ExaminationRoom[]>([]);
+  // Admin chuyển qua lại giữa lịch bác sĩ và lịch KTV; KTV đăng nhập chỉ xem ca của mình
+  readonly kind = signal<StaffKind>(
+    !this.authService.hasRole('ADMIN') && !this.authService.hasRole('DOCTOR') && this.authService.isLabTech() ? 'TECH' : 'DOCTOR');
+  readonly isTech = computed(() => this.kind() === 'TECH');
+  readonly personLabel = computed(() => this.isTech() ? 'Kỹ thuật viên' : 'Bác sĩ');
+  readonly roomLabel = computed(() => this.isTech() ? 'Phòng cận lâm sàng' : 'Phòng khám');
+
+  readonly schedules = signal<RosterEntry[]>([]);
+  private readonly examRooms = signal<ExaminationRoom[]>([]);
+  private readonly labRooms = signal<ExaminationRoom[]>([]);
+  readonly rooms = computed(() => this.isTech() ? this.labRooms() : this.examRooms());
   readonly specialties = signal<Specialty[]>([]);
-  readonly doctorList = signal<any[]>([]);
+  private readonly doctorList = signal<Person[]>([]);
+  private readonly techList = signal<Person[]>([]);
 
   readonly loading = signal(true);
   readonly submitting = signal(false);
+  readonly openingForm = signal(false);
   readonly showModal = signal(false);
 
   readonly alertMessage = signal<string | null>(null);
   readonly alertType = signal<'success' | 'danger'>('success');
 
+  // Bảng phân ca theo tuần (Admin): hàng = phòng, cột = ngày, mỗi ô 3 ca
+  readonly viewMode = signal<'MONTH' | 'ROSTER' | 'LIST'>('ROSTER');
+  readonly todayIso = toIsoDate(new Date());
+  // Ca đang sửa (null = đang thêm mới)
+  readonly editingEntry = signal<RosterEntry | null>(null);
+
+  // Tổng quan tháng: mỗi ngày hiện số ca đã có người / tổng số ca (phòng × 3 ca)
+  readonly monthStart = signal<string>(toIsoDate(firstOfMonth(new Date())));
+  readonly monthSchedules = signal<RosterEntry[]>([]);
+  readonly monthLoading = signal(false);
+  readonly monthWeekdayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+  readonly monthLabel = computed(() => {
+    const first = new Date(this.monthStart() + 'T00:00:00');
+    return `Tháng ${first.getMonth() + 1}/${first.getFullYear()}`;
+  });
+
+  readonly isCurrentMonth = computed(() => this.monthStart() === toIsoDate(firstOfMonth(new Date())));
+
+  readonly monthCells = computed(() => {
+    const first = new Date(this.monthStart() + 'T00:00:00');
+    const last = lastOfMonth(first);
+    const gridStart = mondayOf(first);
+    const gridEnd = addDays(mondayOf(last), 6);
+    const total = this.rooms().length * this.shiftSlots.length;
+    const today = this.todayIso;
+
+    // Đếm số ô (phòng × ca) đã có người trực theo từng ngày
+    const filledByDate = new Map<string, Set<string>>();
+    for (const s of this.monthSchedules()) {
+      if (s.status === 'CANCELLED') continue;
+      const set = filledByDate.get(s.workDate) ?? new Set<string>();
+      set.add(`${s.roomId}|${this.shiftKeyOf(s)}`);
+      filledByDate.set(s.workDate, set);
+    }
+
+    const cells = [];
+    for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
+      const iso = toIsoDate(d);
+      const inMonth = d.getMonth() === first.getMonth();
+      const filled = filledByDate.get(iso)?.size ?? 0;
+      const isPast = iso < today;
+      const ratio = total ? filled / total : 0;
+      const coverage = !inMonth ? '' : isPast ? 'cov-past' : ratio >= 1 ? 'cov-full' : ratio >= 0.5 ? 'cov-partial' : 'cov-low';
+      cells.push({
+        iso,
+        day: d.getDate(),
+        label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
+        inMonth,
+        isToday: iso === today,
+        isPast,
+        filled,
+        total,
+        coverage
+      });
+    }
+    return cells;
+  });
+
+  readonly monthStats = computed(() => {
+    let filled = 0;
+    let empty = 0;
+    for (const cell of this.monthCells()) {
+      if (!cell.inMonth) continue;
+      filled += cell.filled;
+      if (!cell.isPast) empty += cell.total - cell.filled;
+    }
+    return { filled, empty };
+  });
+  readonly weekStart = signal<string>(toIsoDate(mondayOf(new Date())));
+  readonly weekSchedules = signal<RosterEntry[]>([]);
+  readonly weekLoading = signal(false);
+  readonly highlightId = signal<number | null>(null);
+  // Ca trực của khoảng ngày đang chọn trong form khi khoảng đó nằm ngoài tuần đang xem (null = dùng dữ liệu tuần)
+  readonly formSchedules = signal<RosterEntry[] | null>(null);
+  readonly formChecking = signal(false);
+  private formRangeKey = '';
+
+  readonly shiftSlots = [
+    { key: 'CA_SÁNG', label: 'Sáng', css: 'shift-morning', start: '07:30', end: '12:00' },
+    { key: 'CA_CHIỀU', label: 'Chiều', css: 'shift-afternoon', start: '13:30', end: '17:30' },
+    { key: 'CA_TỐI', label: 'Tối', css: 'shift-evening', start: '18:00', end: '21:00' }
+  ];
+
+  readonly weekDays = computed(() => {
+    const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    const today = toIsoDate(new Date());
+    const monday = new Date(this.weekStart() + 'T00:00:00');
+    return labels.map((weekday, i) => {
+      const date = addDays(monday, i);
+      const iso = toIsoDate(date);
+      return {
+        iso,
+        weekday,
+        short: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`,
+        isToday: iso === today,
+        isPast: iso < today
+      };
+    });
+  });
+
+  readonly weekLabel = computed(() => {
+    const days = this.weekDays();
+    return `${days[0].short} – ${days[6].short}/${days[6].iso.substring(0, 4)}`;
+  });
+
+  readonly isCurrentWeek = computed(() => this.weekStart() === toIsoDate(mondayOf(new Date())));
+
+  // Gom ca trực (chưa huỷ) theo khoá phòng|ngày|ca để tra ô nhanh khi vẽ bảng
+  private readonly rosterMap = computed(() => {
+    const map = new Map<string, RosterEntry[]>();
+    for (const s of this.weekSchedules()) {
+      if (s.status === 'CANCELLED') continue;
+      const key = `${s.roomId}|${s.workDate}|${this.shiftKeyOf(s)}`;
+      const list = map.get(key);
+      if (list) list.push(s); else map.set(key, [s]);
+    }
+    return map;
+  });
+
+  readonly rosterStats = computed(() => {
+    const map = this.rosterMap();
+    let empty = 0;
+    for (const room of this.rooms()) {
+      for (const day of this.weekDays()) {
+        if (day.isPast) continue;
+        for (const shift of this.shiftSlots) {
+          if (!map.has(`${room.id}|${day.iso}|${shift.key}`)) empty++;
+        }
+      }
+    }
+    const filled = this.weekSchedules().filter(s => s.status !== 'CANCELLED').length;
+    return { filled, empty };
+  });
+
   // Filters
-  filterStartDate = new Date().toISOString().substring(0, 10);
+  filterStartDate = toIsoDate(new Date());
   filterEndDate = '';
   filterRoomId: number | null = null;
   filterSpecialtyId: number | null = null;
@@ -964,42 +2264,440 @@ export class SchedulesComponent implements OnInit {
     this.currentPage.set(1);
   }
 
-  formData: WorkScheduleRequest = {
-    doctorId: 0,
-    examinationRoomId: 0,
-    workDate: new Date().toISOString().substring(0, 10),
-    shiftType: 'CA_SÁNG',
-    startTime: '08:00',
-    endTime: '12:00',
-    maxPatients: 20
-  };
+  // Form đăng ký: 1 ngày, hoặc nhiều ngày tick trên lịch tháng của người được chọn
+  scheduleMode: 'SINGLE' | 'MULTI' = 'SINGLE';
+  formMonthStart = toIsoDate(firstOfMonth(new Date()));
+  readonly currentMonthIso = toIsoDate(firstOfMonth(new Date()));
+  selectedDates: string[] = [];
 
-  get totalAvailableSlots(): () => number {
-    return () => this.schedules()
-      .filter(s => s.status !== 'CANCELLED')
-      .reduce((sum, s) => sum + s.remainingSlots, 0);
+  activePersonId: number | null = null;
+  activeRoomId: number | null = null;
+  activeWorkDate = this.todayIso;
+  activeStartTime = '07:30';
+  activeEndTime = '12:00';
+  activeMaxPatients = 20;
+  activeNotes = '';
+
+  readonly batchResult = signal<BatchResult | null>(null);
+
+  readonly listStats = computed(() => {
+    const active = this.schedules().filter(s => s.status !== 'CANCELLED');
+    return {
+      available: active.reduce((sum, s) => sum + s.remaining, 0),
+      booked: active.reduce((sum, s) => sum + s.booked, 0),
+      people: new Set(active.map(s => s.personId)).size,
+      rooms: new Set(active.map(s => s.roomId)).size
+    };
+  });
+
+  setScheduleMode(mode: 'SINGLE' | 'MULTI'): void {
+    this.scheduleMode = mode;
+    this.loadFormSchedules();
   }
 
-  get totalBookedCount(): () => number {
-    return () => this.schedules()
-      .filter(s => s.status !== 'CANCELLED')
-      .reduce((sum, s) => sum + s.currentBookedCount, 0);
+  selectShift(key: string): void {
+    const slot = this.shiftSlots.find(s => s.key === key);
+    if (!slot) return;
+    this.activeStartTime = slot.start;
+    this.activeEndTime = slot.end;
+  }
+
+  // Ca mặc định khớp với giờ đang nhập; giờ khác 3 ca mặc định là khung giờ tùy chỉnh
+  activeShiftKey(): string {
+    return this.shiftSlots.find(s => s.start === this.activeStartTime && s.end === this.activeEndTime)?.key ?? 'TỰ_DO';
   }
 
   ngOnInit(): void {
-    this.loadRooms();
-    this.loadSpecialties();
-    this.loadSchedules();
+    // Admin mở màn ở bảng phân ca tuần (cần phòng + ca trực trong tuần); bác sĩ / KTV chỉ xem lịch của mình
+    if (this.isAdmin()) {
+      const url = this.router.url;
+      const initialKind: StaffKind = url.includes('/technicians') || url.includes('/tech') ? 'TECH' : 'DOCTOR';
+      this.kind.set(initialKind);
+      this.ensureRooms().subscribe();
+      this.loadWeek();
+
+      this.router.events
+        .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+        .subscribe((e) => {
+          const currentUrl = e.urlAfterRedirects || e.url;
+          const targetKind: StaffKind = currentUrl.includes('/technicians') || currentUrl.includes('/tech') ? 'TECH' : 'DOCTOR';
+          if (this.kind() !== targetKind) {
+            this.setKind(targetKind, false);
+          }
+        });
+    } else {
+      this.loadSchedules();
+    }
   }
 
-  loadRooms(): void {
-    this.scheduleService.getAllRooms().subscribe({
-      next: res => {
-        if (res.success && res.data) {
-          this.rooms.set(res.data);
-        }
+  // Đổi giữa lịch bác sĩ và lịch KTV, giữ nguyên chế độ xem / tuần / tháng đang chọn
+  setKind(kind: StaffKind, navigate: boolean = true): void {
+    if (this.kind() === kind && !navigate) return;
+    this.kind.set(kind);
+    this.filterRoomId = null;
+    this.weekSchedules.set([]);
+    this.monthSchedules.set([]);
+    this.schedules.set([]);
+    this.ensureRooms().subscribe();
+    const mode = this.viewMode();
+    if (mode === 'LIST') this.loadSchedules();
+    else if (mode === 'MONTH') this.loadMonth();
+    else this.loadWeek();
+
+    if (navigate && this.isAdmin()) {
+      const targetPath = kind === 'TECH' ? '/admin/schedules/technicians' : '/admin/schedules/doctors';
+      if (!this.router.url.includes(targetPath)) {
+        this.router.navigateByUrl(targetPath);
+      }
+    }
+  }
+
+  setViewMode(mode: 'MONTH' | 'ROSTER' | 'LIST'): void {
+    if (this.viewMode() === mode) return;
+    this.viewMode.set(mode);
+    if (mode === 'LIST') {
+      // Bộ lọc chuyên khoa và danh sách chỉ cần khi chuyển sang chế độ danh sách
+      if (this.specialties().length === 0) this.loadSpecialties();
+      this.loadSchedules();
+    } else if (mode === 'MONTH') {
+      this.loadMonth();
+    } else {
+      this.loadWeek();
+    }
+  }
+
+  // Ca trực trong khoảng ngày của loại nhân sự đang xem (Admin)
+  private fetchEntries(startDate?: string, endDate?: string, roomId?: number, specialtyId?: number): Observable<RosterEntry[]> {
+    if (this.isTech()) {
+      return this.scheduleService.getStaffShifts(startDate, endDate, roomId).pipe(map(res => (res.data || []).map(fromShift)));
+    }
+    return this.scheduleService.getSchedules({ startDate, endDate, roomId, specialtyId })
+      .pipe(map(res => (res.data || []).map(fromSchedule)));
+  }
+
+  loadMonth(): void {
+    const kind = this.kind();
+    this.monthLoading.set(true);
+    const first = new Date(this.monthStart() + 'T00:00:00');
+    this.fetchEntries(this.monthStart(), toIsoDate(lastOfMonth(first))).subscribe({
+      next: entries => {
+        if (kind !== this.kind()) return;
+        this.monthSchedules.set(entries);
+        this.monthLoading.set(false);
+      },
+      error: err => {
+        this.showAlert(err.error?.message || 'Không thể tải lịch tháng', 'danger');
+        this.monthLoading.set(false);
       }
     });
+  }
+
+  shiftMonth(offset: number): void {
+    const first = new Date(this.monthStart() + 'T00:00:00');
+    this.monthStart.set(toIsoDate(new Date(first.getFullYear(), first.getMonth() + offset, 1)));
+    this.loadMonth();
+  }
+
+  goToCurrentMonth(): void {
+    this.monthStart.set(toIsoDate(firstOfMonth(new Date())));
+    this.loadMonth();
+  }
+
+  // Bấm một ngày trong lịch tháng: chuyển sang bảng phân ca của tuần chứa ngày đó
+  openWeekOf(date: string): void {
+    this.weekStart.set(toIsoDate(mondayOf(new Date(date + 'T00:00:00'))));
+    this.viewMode.set('ROSTER');
+    this.loadWeek();
+  }
+
+  formMonthLabel(): string {
+    const first = new Date(this.formMonthStart + 'T00:00:00');
+    return `Tháng ${first.getMonth() + 1}/${first.getFullYear()}`;
+  }
+
+  shiftFormMonth(offset: number): void {
+    const first = new Date(this.formMonthStart + 'T00:00:00');
+    this.formMonthStart = toIsoDate(new Date(first.getFullYear(), first.getMonth() + offset, 1));
+    this.selectedDates = [];
+    this.loadFormSchedules();
+  }
+
+  // Lịch tháng của người đang chọn: ngày đã qua / người đã có ca / phòng đã có người (chỉ phòng khám) / còn trống
+  formMonthCells(): { iso: string; day: number; state: 'out' | 'past' | 'doctor' | 'room' | 'free'; note: string; selected: boolean }[] {
+    const first = new Date(this.formMonthStart + 'T00:00:00');
+    const gridEnd = addDays(mondayOf(lastOfMonth(first)), 6);
+    const cells = [];
+    for (let d = mondayOf(first); d <= gridEnd; d = addDays(d, 1)) {
+      const iso = toIsoDate(d);
+      let state: 'out' | 'past' | 'doctor' | 'room' | 'free' = 'free';
+      let note = 'Còn trống';
+      if (d.getMonth() !== first.getMonth()) {
+        state = 'out';
+        note = '';
+      } else if (iso < this.todayIso) {
+        state = 'past';
+        note = 'Ngày đã qua';
+      } else {
+        const personHit = this.overlapOn(iso, this.activeStartTime, this.activeEndTime, s => s.personId === this.activePersonId);
+        const roomHit = personHit || this.isTech() ? undefined
+          : this.overlapOn(iso, this.activeStartTime, this.activeEndTime, s => s.roomId === this.activeRoomId);
+        if (personHit) {
+          state = 'doctor';
+          note = 'Trực ' + personHit.roomNumber;
+        } else if (roomHit) {
+          state = 'room';
+          note = roomHit.personName;
+        }
+      }
+      cells.push({ iso, day: d.getDate(), state, note, selected: state === 'free' && this.selectedDates.includes(iso) });
+    }
+    return cells;
+  }
+
+  toggleDate(iso: string): void {
+    this.selectedDates = this.selectedDates.includes(iso)
+      ? this.selectedDates.filter(d => d !== iso)
+      : [...this.selectedDates, iso].sort();
+  }
+
+  selectFreeDates(weekdaysOnly: boolean): void {
+    this.selectedDates = this.formMonthCells()
+      .filter(c => c.state === 'free')
+      .filter(c => !weekdaysOnly || [1, 2, 3, 4, 5].includes(new Date(c.iso + 'T00:00:00').getDay()))
+      .map(c => c.iso);
+  }
+
+  clearDates(): void {
+    this.selectedDates = [];
+  }
+
+  // Chỉ gửi các ngày đã chọn mà vẫn còn trống (đổi người / phòng / giờ có thể làm một số ngày bị trùng)
+  selectedFreeDates(): string[] {
+    return this.formMonthCells().filter(c => c.selected).map(c => c.iso);
+  }
+
+  // Ca bác sĩ đã có bệnh nhân đặt thì không đổi được ngày/giờ (backend cũng chặn)
+  timeLocked(): boolean {
+    const editing = this.editingEntry();
+    return !!editing && editing.booked > 0;
+  }
+
+  openEditModal(entry: RosterEntry): void {
+    this.openAddModal(undefined, () => {
+      this.editingEntry.set(entry);
+      this.scheduleMode = 'SINGLE';
+      this.activeRoomId = entry.roomId;
+      this.activePersonId = entry.personId;
+      this.activeWorkDate = entry.workDate;
+      this.activeStartTime = entry.startTime.substring(0, 5);
+      this.activeEndTime = entry.endTime.substring(0, 5);
+      this.activeMaxPatients = entry.max || 20;
+      this.activeNotes = entry.notes ?? '';
+      this.formRangeKey = '';
+      this.loadFormSchedules();
+    });
+  }
+
+  loadWeek(): void {
+    const kind = this.kind();
+    this.weekLoading.set(true);
+    const days = this.weekDays();
+    this.fetchEntries(days[0].iso, days[6].iso).subscribe({
+      next: entries => {
+        if (kind !== this.kind()) return;
+        this.weekSchedules.set(entries);
+        this.weekLoading.set(false);
+      },
+      error: err => {
+        this.showAlert(err.error?.message || 'Không thể tải bảng phân ca', 'danger');
+        this.weekLoading.set(false);
+      }
+    });
+  }
+
+  shiftWeek(offset: number): void {
+    const monday = new Date(this.weekStart() + 'T00:00:00');
+    this.weekStart.set(toIsoDate(addDays(monday, offset * 7)));
+    this.loadWeek();
+  }
+
+  goToCurrentWeek(): void {
+    this.weekStart.set(toIsoDate(mondayOf(new Date())));
+    this.loadWeek();
+  }
+
+  slotEntries(roomId: number, date: string, shiftKey: string): RosterEntry[] {
+    return this.rosterMap().get(`${roomId}|${date}|${shiftKey}`) ?? NO_ENTRIES;
+  }
+
+  // Bấm ô trống (hoặc "Thêm KTV"): mở form đã điền sẵn phòng, ngày, khung giờ của ca
+  openSlot(roomId: number, date: string, shiftKey: string): void {
+    this.openAddModal({ roomId, date, shiftKey });
+  }
+
+  // Bác sĩ: tất cả; KTV: chỉ người thuộc khoa của phòng đang chọn
+  personList(): Person[] {
+    if (!this.isTech()) return this.doctorList();
+    const department = this.rooms().find(r => r.id === this.activeRoomId)?.roomType;
+    return this.techList().filter(t => !department || t.department === department);
+  }
+
+  // Đổi phòng ở chế độ KTV: người đang chọn khác khoa thì chọn lại KTV đầu tiên còn rảnh của khoa mới
+  onRoomChange(roomId: number | null): void {
+    this.activeRoomId = roomId;
+    if (this.isTech() && !this.personList().some(p => p.id === this.activePersonId)) {
+      this.activePersonId = this.firstFreePerson();
+    }
+  }
+
+  // Phòng mà người đó đang trực ở khung giờ đang chọn (chế độ 1 ngày)
+  personBusyRoom(personId: number): string | null {
+    const hit = this.findOverlap(s => s.personId === personId);
+    return hit ? hit.roomNumber : null;
+  }
+
+  // Phòng khám: bác sĩ đang trực (khoá phòng); phòng CLS: số KTV đã có trong ca (vẫn thêm được)
+  roomBusyNote(roomId: number): string | null {
+    if (this.scheduleMode !== 'SINGLE') return null;
+    const inRoom = this.overlapsOn(this.activeWorkDate, this.activeStartTime, this.activeEndTime, s => s.roomId === roomId);
+    if (inRoom.length === 0) return null;
+    return this.isTech() ? `đã có ${inRoom.length} KTV` : `${inRoom[0].personName} đang trực`;
+  }
+
+  freePersonCount(): number {
+    return this.personList().filter(p => !this.personBusyRoom(p.id)).length;
+  }
+
+  private firstFreePerson(): number | null {
+    return this.personList().find(p => !this.personBusyRoom(p.id))?.id ?? null;
+  }
+
+  onWorkDateChange(date: string): void {
+    this.activeWorkDate = date;
+    this.loadFormSchedules();
+  }
+
+  // Ngày / tháng của form nằm ngoài tuần đang xem thì tải riêng ca trực của khoảng đó để biết ca nào trống / ai đang bận
+  private loadFormSchedules(): void {
+    const [from, to] = this.scheduleMode === 'SINGLE'
+      ? [this.activeWorkDate, this.activeWorkDate]
+      : [this.formMonthStart, toIsoDate(lastOfMonth(new Date(this.formMonthStart + 'T00:00:00')))];
+    const days = this.weekDays();
+    if (!this.isAdmin() || !from || (from >= days[0].iso && to <= days[6].iso)) {
+      this.formRangeKey = '';
+      this.formSchedules.set(null);
+      this.formChecking.set(false);
+      return;
+    }
+    const key = `${this.kind()}|${from}|${to}`;
+    if (key === this.formRangeKey) return;
+    this.formRangeKey = key;
+    this.formChecking.set(true);
+    this.fetchEntries(from, to).subscribe({
+      next: entries => {
+        if (this.formRangeKey !== key) return;
+        this.formSchedules.set(entries);
+        this.formChecking.set(false);
+      },
+      error: () => {
+        if (this.formRangeKey !== key) return;
+        this.formSchedules.set(null);
+        this.formChecking.set(false);
+      }
+    });
+  }
+
+  // 3 ca mặc định; chế độ 1 ngày kèm tình trạng của phòng / người trong ngày đó
+  shiftOptions(): { key: string; label: string; start: string; end: string; state: 'free' | 'room' | 'doctor'; note: string }[] {
+    return this.shiftSlots.map(slot => {
+      const base = { key: slot.key, label: slot.label, start: slot.start, end: slot.end };
+      if (this.scheduleMode !== 'SINGLE') return { ...base, state: 'free' as const, note: 'Bấm để chọn' };
+      const inRoom = this.activeRoomId
+        ? this.overlapsOn(this.activeWorkDate, slot.start, slot.end, s => s.roomId === this.activeRoomId) : [];
+      // Phòng khám chỉ 1 bác sĩ / ca; phòng CLS nhận thêm KTV
+      if (!this.isTech() && inRoom.length) return { ...base, state: 'room' as const, note: inRoom[0].personName };
+      const personHit = this.activePersonId
+        ? this.overlapOn(this.activeWorkDate, slot.start, slot.end, s => s.personId === this.activePersonId) : undefined;
+      if (personHit) {
+        return { ...base, state: 'doctor' as const, note: (this.isTech() ? 'KTV' : 'BS') + ' đang trực ' + personHit.roomNumber };
+      }
+      return { ...base, state: 'free' as const, note: inRoom.length ? `Đã có ${inRoom.length} KTV` : 'Còn trống' };
+    });
+  }
+
+  private overlapsOn(date: string, start: string, end: string, match: (s: RosterEntry) => boolean): RosterEntry[] {
+    if (!date || !start || !end) return NO_ENTRIES;
+    const editingId = this.editingEntry()?.id;
+    return (this.formSchedules() ?? this.weekSchedules()).filter(s =>
+      s.status !== 'CANCELLED'
+      && s.id !== editingId
+      && s.workDate === date
+      && match(s)
+      && s.startTime.substring(0, 5) < end
+      && s.endTime.substring(0, 5) > start);
+  }
+
+  private overlapOn(date: string, start: string, end: string, match: (s: RosterEntry) => boolean): RosterEntry | undefined {
+    return this.overlapsOn(date, start, end, match)[0];
+  }
+
+  // Sau khi lưu: chuyển bảng phân ca tới tuần chứa ca mới và làm nổi bật ô vừa xếp
+  private focusWeekOf(date: string, entryId: number | null): void {
+    if (!this.isAdmin() || !date) return;
+    const target = new Date(date + 'T00:00:00');
+    this.weekStart.set(toIsoDate(mondayOf(target)));
+    this.monthStart.set(toIsoDate(firstOfMonth(target)));
+    this.highlightId.set(entryId);
+    if (entryId !== null) {
+      setTimeout(() => {
+        if (this.highlightId() === entryId) this.highlightId.set(null);
+      }, 4000);
+    }
+  }
+
+  private findOverlap(match: (s: RosterEntry) => boolean): RosterEntry | undefined {
+    if (this.scheduleMode !== 'SINGLE') return undefined;
+    return this.overlapOn(this.activeWorkDate, this.activeStartTime, this.activeEndTime, match);
+  }
+
+  private shiftKeyOf(s: RosterEntry): string {
+    if (this.shiftSlots.some(slot => slot.key === s.shiftType)) return s.shiftType;
+    const hour = Number(s.startTime.substring(0, 2));
+    return hour < 12 ? 'CA_SÁNG' : hour < 18 ? 'CA_CHIỀU' : 'CA_TỐI';
+  }
+
+  // Sau khi thêm / sửa / huỷ / xoá ca: tải lại bảng phân ca, và danh sách nếu đang xem danh sách
+  private reloadAfterChange(): void {
+    if (this.isAdmin()) this.loadWeek();
+    if (this.isAdmin() && this.viewMode() === 'MONTH') this.loadMonth();
+    if (!this.isAdmin() || this.viewMode() === 'LIST') this.loadSchedules();
+  }
+
+  // Phòng khám (bác sĩ) / phòng cận lâm sàng (KTV), chỉ tải lần đầu
+  private ensureRooms(): Observable<ExaminationRoom[]> {
+    if (this.rooms().length) return of(this.rooms());
+    const tech = this.isTech();
+    return (tech ? this.scheduleService.getLabRooms() : this.scheduleService.getAllRooms()).pipe(
+      map(res => res.data || []),
+      tap(rooms => (tech ? this.labRooms : this.examRooms).set(rooms))
+    );
+  }
+
+  // Danh sách bác sĩ / KTV để chọn trong form, chỉ tải lần đầu
+  private ensurePeople(): Observable<unknown> {
+    if (this.isTech()) {
+      return this.techList().length ? of(null) : this.scheduleService.getLabTechs().pipe(
+        tap(res => this.techList.set((res.data || []).map(t => ({
+          id: t.id,
+          fullName: t.fullName,
+          sub: DEPARTMENT_LABELS[t.department] ?? t.department,
+          department: t.department
+        })))));
+    }
+    return this.doctorList().length ? of(null) : this.doctorService.getDoctors().pipe(
+      tap(res => this.doctorList.set((res.data || [])
+        .filter(d => d.status !== 'LOCKED')
+        .map(d => ({ id: d.id, fullName: d.fullName, sub: d.specialtyName || 'Chưa phân khoa' })))));
   }
 
   loadSpecialties(): void {
@@ -1007,42 +2705,29 @@ export class SchedulesComponent implements OnInit {
       next: res => {
         if (res.success && res.data) {
           this.specialties.set(res.data);
-          // Thu thập danh sách bác sĩ từ từng chuyên khoa
-          const allDocs: any[] = [];
-          res.data.forEach(spec => {
-            this.specialtyService.getSpecialtyById(spec.id).subscribe({
-              next: detailRes => {
-                if (detailRes.success && detailRes.data) {
-                  detailRes.data.doctors.forEach(d => {
-                    allDocs.push({
-                      id: d.id,
-                      fullName: d.fullName,
-                      specialtyName: spec.name
-                    });
-                  });
-                  this.doctorList.set([...allDocs]);
-                }
-              }
-            });
-          });
         }
       }
     });
   }
 
   loadSchedules(): void {
+    const kind = this.kind();
     this.loading.set(true);
-    this.scheduleService.getSchedules({
-      startDate: this.filterStartDate || undefined,
-      endDate: this.filterEndDate || undefined,
-      roomId: this.filterRoomId || undefined,
-      specialtyId: this.filterSpecialtyId || undefined
-    }).subscribe({
-      next: res => {
-        if (res.success && res.data) {
-          this.schedules.set(res.data);
-          this.currentPage.set(1);
-        }
+    const start = this.filterStartDate || undefined;
+    const end = this.filterEndDate || undefined;
+    let request$: Observable<RosterEntry[]>;
+    if (this.isAdmin()) {
+      request$ = this.fetchEntries(start, end, this.filterRoomId || undefined, this.filterSpecialtyId || undefined);
+    } else if (this.isTech()) {
+      request$ = this.scheduleService.getMyStaffShifts(start, end).pipe(map(res => (res.data || []).map(fromShift)));
+    } else {
+      request$ = this.scheduleService.getMySchedules(start, end).pipe(map(res => (res.data || []).map(fromSchedule)));
+    }
+    request$.subscribe({
+      next: entries => {
+        if (kind !== this.kind()) return;
+        this.schedules.set(entries);
+        this.currentPage.set(1);
         this.loading.set(false);
       },
       error: err => {
@@ -1053,7 +2738,7 @@ export class SchedulesComponent implements OnInit {
   }
 
   resetFilters(): void {
-    this.filterStartDate = new Date().toISOString().substring(0, 10);
+    this.filterStartDate = toIsoDate(new Date());
     this.filterEndDate = '';
     this.filterRoomId = null;
     this.filterSpecialtyId = null;
@@ -1061,93 +2746,170 @@ export class SchedulesComponent implements OnInit {
     this.loadSchedules();
   }
 
-  openAddModal(): void {
-    this.formData = {
-      doctorId: this.doctorList().length > 0 ? this.doctorList()[0].id : 0,
-      examinationRoomId: this.rooms().length > 0 ? this.rooms()[0].id : 0,
-      workDate: new Date().toISOString().substring(0, 10),
-      shiftType: 'CA_SÁNG',
-      startTime: '08:00',
-      endTime: '12:00',
-      maxPatients: 20
-    };
+  // Danh sách người trực và phòng tải ở lần mở form đầu tiên của mỗi loại
+  openAddModal(prefill?: { roomId: number; date: string; shiftKey: string }, afterShow?: () => void): void {
+    this.openingForm.set(true);
+    forkJoin({ people: this.ensurePeople(), rooms: this.ensureRooms() }).subscribe({
+      next: () => {
+        this.openingForm.set(false);
+        this.showAddForm(prefill);
+        afterShow?.();
+      },
+      error: err => {
+        this.openingForm.set(false);
+        this.showAlert(err.error?.message || `Không tải được danh sách ${this.personLabel().toLowerCase()} / phòng`, 'danger');
+      }
+    });
+  }
+
+  private showAddForm(prefill?: { roomId: number; date: string; shiftKey: string }): void {
+    this.batchResult.set(null);
+    this.editingEntry.set(null);
+    this.selectedDates = [];
+    this.activeRoomId = this.rooms()[0]?.id ?? null;
+    this.activePersonId = this.personList()[0]?.id ?? null;
+    this.activeMaxPatients = 20;
+    this.activeNotes = '';
+    this.selectShift('CA_SÁNG');
+    this.formRangeKey = '';
+    this.formSchedules.set(null);
+
+    if (prefill) {
+      // Bấm ô trên bảng tuần: điền sẵn phòng, ngày, ca và người đầu tiên còn rảnh
+      this.scheduleMode = 'SINGLE';
+      this.activeRoomId = prefill.roomId;
+      this.activeWorkDate = prefill.date;
+      this.selectShift(prefill.shiftKey);
+      this.activePersonId = this.firstFreePerson();
+    } else if (this.isAdmin() && this.viewMode() === 'MONTH') {
+      // Đang xem lịch tháng: mở chế độ nhiều ngày đúng tháng đó
+      this.scheduleMode = 'MULTI';
+      this.formMonthStart = this.monthStart() < this.currentMonthIso ? this.currentMonthIso : this.monthStart();
+      this.loadFormSchedules();
+    } else {
+      // Đang xem tuần / danh sách: 1 ngày, lấy ngày đầu tiên chưa qua của tuần đang xem
+      this.scheduleMode = 'SINGLE';
+      const weekFirstDay = this.weekDays()[0].iso;
+      this.activeWorkDate = weekFirstDay > this.todayIso ? weekFirstDay : this.todayIso;
+      this.formMonthStart = toIsoDate(firstOfMonth(new Date(this.activeWorkDate + 'T00:00:00')));
+      this.loadFormSchedules();
+    }
+
     this.showModal.set(true);
   }
 
   closeModal(): void {
     this.showModal.set(false);
+    this.batchResult.set(null);
+    this.editingEntry.set(null);
+  }
+
+  closeBatchResult(): void {
+    this.closeModal();
+    this.reloadAfterChange();
   }
 
   isFormValid(): boolean {
-    return !!(
-      this.formData.doctorId &&
-      this.formData.examinationRoomId &&
-      this.formData.workDate &&
-      this.formData.startTime &&
-      this.formData.endTime &&
-      this.formData.maxPatients > 0
-    );
+    if (!this.activePersonId || !this.activeRoomId) return false;
+    if (!this.isTech() && this.activeMaxPatients <= 0) return false;
+    if (!this.activeStartTime || !this.activeEndTime || this.activeStartTime >= this.activeEndTime) return false;
+    return this.scheduleMode === 'SINGLE' ? !!this.activeWorkDate : this.selectedFreeDates().length > 0;
   }
 
   saveSchedule(): void {
-    if (!this.formData.doctorId) {
-      this.showAlert('Vui lòng chọn bác sĩ phụ trách ca trực!', 'danger');
-      return;
-    }
-
-    if (!this.formData.examinationRoomId) {
-      this.showAlert('Vui lòng chọn phòng khám!', 'danger');
-      return;
-    }
-
-    if (!this.formData.workDate) {
-      this.showAlert('Vui lòng chọn ngày làm việc!', 'danger');
-      return;
-    }
-
-    if (!this.formData.startTime) {
-      this.showAlert('Vui lòng chọn giờ bắt đầu ca trực!', 'danger');
-      return;
-    }
-
-    if (!this.formData.endTime) {
-      this.showAlert('Vui lòng chọn giờ kết thúc ca trực!', 'danger');
-      return;
-    }
-
-    if (this.formData.startTime >= this.formData.endTime) {
-      this.showAlert('Giờ kết thúc ca trực phải sau giờ bắt đầu!', 'danger');
-      return;
-    }
-
-    if (!this.formData.maxPatients || this.formData.maxPatients <= 0) {
-      this.showAlert('Số lượng bệnh nhân tiếp nhận tối đa phải lớn hơn 0!', 'danger');
-      return;
-    }
-
+    if (!this.isFormValid()) return;
     this.submitting.set(true);
-    this.scheduleService.createSchedule(this.formData).subscribe({
-      next: () => {
-        this.showAlert('Đăng ký ca làm việc thành công!', 'success');
+
+    if (this.scheduleMode === 'SINGLE') {
+      const editing = this.editingEntry();
+      const workDate = this.activeWorkDate;
+      this.saveSingle$(editing).subscribe({
+        next: entry => {
+          this.showAlert(editing ? 'Cập nhật ca làm việc thành công!' : 'Đăng ký ca làm việc thành công!', 'success');
+          this.submitting.set(false);
+          this.closeModal();
+          this.focusWeekOf(workDate, entry.id);
+          this.reloadAfterChange();
+        },
+        error: err => {
+          this.showAlert(err.error?.message || 'Lỗi khi xếp ca trực. Vui lòng kiểm tra lại giờ làm việc.', 'danger');
+          this.submitting.set(false);
+        }
+      });
+      return;
+    }
+
+    const firstDate = this.selectedFreeDates()[0];
+    this.saveBatch$().subscribe({
+      next: data => {
         this.submitting.set(false);
-        this.closeModal();
-        this.loadSchedules();
+        this.focusWeekOf(firstDate, null);
+        if (data && data.conflictCount > 0) {
+          // Có ngày bị người khác xếp trước trong lúc đang chọn: hiện chi tiết
+          this.batchResult.set(data);
+        } else {
+          this.showAlert(`Đã xếp ${data?.successCount ?? 0} ca trực thành công!`, 'success');
+          this.closeModal();
+        }
+        this.reloadAfterChange();
       },
       error: err => {
-        // Hiển thị lỗi xung đột lịch rất rõ ràng cho người dùng
-        this.showAlert(err.error?.message || 'Lỗi khi xếp ca trực. Vui lòng kiểm tra lại giờ làm việc.', 'danger');
+        this.showAlert(err.error?.message || 'Lỗi khi xếp ca trực nhiều ngày.', 'danger');
         this.submitting.set(false);
       }
     });
   }
 
-  cancelSchedule(item: WorkSchedule): void {
-    const reason = prompt('Nhập lý do hủy ca trực của bác sĩ ' + item.doctorName + ':', 'Bác sĩ có lịch công tác đột xuất');
+  // Tạo / sửa 1 ca: ca bác sĩ gửi kèm số bệnh nhân tối đa, ca KTV gửi kèm ghi chú
+  private saveSingle$(editing: RosterEntry | null): Observable<RosterEntry> {
+    const base = {
+      workDate: this.activeWorkDate,
+      shiftType: this.activeShiftKey(),
+      startTime: this.activeStartTime,
+      endTime: this.activeEndTime
+    };
+    if (this.isTech()) {
+      const request: StaffShiftRequest = {
+        ...base, employeeId: this.activePersonId!, roomId: this.activeRoomId!, notes: this.activeNotes.trim() || undefined
+      };
+      const request$ = editing
+        ? this.scheduleService.updateStaffShift(editing.id, request)
+        : this.scheduleService.createStaffShift(request);
+      return request$.pipe(map(res => fromShift(res.data)));
+    }
+    const request: WorkScheduleRequest = {
+      ...base, doctorId: this.activePersonId!, examinationRoomId: this.activeRoomId!, maxPatients: this.activeMaxPatients
+    };
+    const request$ = editing
+      ? this.scheduleService.updateSchedule(editing.id, request)
+      : this.scheduleService.createSchedule(request);
+    return request$.pipe(map(res => fromSchedule(res.data)));
+  }
+
+  private saveBatch$(): Observable<BatchResult> {
+    const base = {
+      workDates: this.selectedFreeDates(),
+      shiftType: this.activeShiftKey(),
+      startTime: this.activeStartTime,
+      endTime: this.activeEndTime
+    };
+    if (this.isTech()) {
+      return this.scheduleService.createBatchStaffShifts({
+        ...base, employeeId: this.activePersonId!, roomId: this.activeRoomId!, notes: this.activeNotes.trim() || undefined
+      }).pipe(map(res => res.data));
+    }
+    return this.scheduleService.createBatchSchedules({
+      ...base, doctorId: this.activePersonId!, examinationRoomId: this.activeRoomId!, maxPatients: this.activeMaxPatients
+    }).pipe(map(res => res.data));
+  }
+
+  cancelSchedule(item: RosterEntry): void {
+    const reason = prompt('Nhập lý do hủy ca trực của bác sĩ ' + item.personName + ':', 'Bác sĩ có lịch công tác đột xuất');
     if (reason !== null) {
       this.scheduleService.cancelSchedule(item.id, reason).subscribe({
         next: () => {
           this.showAlert(`Đã hủy ca trực ngày ${item.workDate} thành công!`, 'success');
-          this.loadSchedules();
+          this.reloadAfterChange();
         },
         error: err => {
           this.showAlert(err.error?.message || 'Không thể hủy ca trực', 'danger');
@@ -1156,18 +2918,23 @@ export class SchedulesComponent implements OnInit {
     }
   }
 
-  deleteSchedule(item: WorkSchedule): void {
-    if (confirm(`Bạn có chắc muốn xóa vĩnh viễn ca làm việc ngày ${item.workDate} của bác sĩ ${item.doctorName}?`)) {
-      this.scheduleService.deleteSchedule(item.id).subscribe({
-        next: () => {
-          this.showAlert('Đã xóa ca làm việc thành công!', 'success');
-          this.loadSchedules();
-        },
-        error: err => {
-          this.showAlert(err.error?.message || 'Không thể xóa ca làm việc này.', 'danger');
-        }
-      });
+  deleteEntry(item: RosterEntry): void {
+    if (!confirm(`Bạn có chắc muốn xóa ca làm việc ngày ${item.workDate} của ${this.personLabel().toLowerCase()} ${item.personName}?`)) {
+      return;
     }
+    const request$ = this.isTech()
+      ? this.scheduleService.deleteStaffShift(item.id)
+      : this.scheduleService.deleteSchedule(item.id);
+    request$.subscribe({
+      next: () => {
+        this.showAlert('Đã xóa ca làm việc thành công!', 'success');
+        if (this.showModal()) this.closeModal();
+        this.reloadAfterChange();
+      },
+      error: err => {
+        this.showAlert(err.error?.message || 'Không thể xóa ca làm việc này.', 'danger');
+      }
+    });
   }
 
   getShiftBadgeClass(shift: string): string {

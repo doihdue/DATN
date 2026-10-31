@@ -7,6 +7,7 @@ import { ScheduleService } from '../../services/schedule.service';
 import { AuthService } from '../../services/auth.service';
 import { CheckInRequest, QueueTicket, PatientLookup } from '../../models/queue.model';
 import { ExaminationRoom } from '../../models/schedule.model';
+import { toIsoDate } from '../../utils/date.utils';
 
 @Component({
   selector: 'app-check-in',
@@ -239,30 +240,25 @@ import { ExaminationRoom } from '../../models/schedule.model';
                   </div>
                 </div>
 
-                <!-- Room Selection with live load indicators -->
+                <!-- Room Selection (Clean Standard Select Field) -->
                 <div class="form-group">
                   <label class="form-label required">Phòng khám tiếp nhận</label>
-                  <div class="room-cards-grid">
-                    @for (r of rooms(); track r.id) {
-                      <div
-                        class="room-select-card"
-                        [class.selected]="form.examinationRoomId === r.id"
-                        (click)="selectRoom(r.id)"
-                      >
-                        <div class="room-card-top">
-                          <span class="room-number-tag">{{ r.roomNumber }}</span>
-                          <span class="room-floor-tag">Tầng {{ r.floor }}</span>
-                        </div>
-                        <div class="room-name-text">{{ r.roomName }}</div>
-                        <div class="room-status-indicator">
-                          <span class="waiting-indicator">
-                            <i class="bi bi-people"></i>
-                            Đang chờ: <strong>{{ getRoomWaitingCount(r.id) }}</strong> ca
-                          </span>
-                        </div>
-                      </div>
+                  <select
+                    [(ngModel)]="form.examinationRoomId"
+                    name="examinationRoomId"
+                    class="form-control"
+                    required
+                  >
+                    @for (floor of availableFloors(); track floor) {
+                      <optgroup [label]="'🏢 Tầng ' + floor">
+                        @for (r of getRoomsByFloor(floor); track r.id) {
+                          <option [ngValue]="r.id">
+                            {{ r.roomNumber }} - {{ r.roomName }} (Tầng {{ r.floor }} • Đang chờ: {{ getRoomWaitingCount(r.id) }} ca)
+                          </option>
+                        }
+                      </optgroup>
                     }
-                  </div>
+                  </select>
                 </div>
 
                 <!-- Emergency Priority Checkbox -->
@@ -835,75 +831,6 @@ import { ExaminationRoom } from '../../models/schedule.model';
       border-radius: var(--radius-xs);
     }
 
-    /* Room Cards Grid */
-    .room-cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 0.75rem;
-      margin-top: 0.4rem;
-    }
-
-    .room-select-card {
-      padding: 0.75rem 0.85rem;
-      background: #ffffff;
-      border: 1.5px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .room-select-card:hover {
-      border-color: var(--primary-400);
-      background-color: var(--primary-50);
-    }
-
-    .room-select-card.selected {
-      border-color: var(--primary-600);
-      background-color: #f0f9ff;
-      box-shadow: 0 0 0 1px var(--primary-600);
-    }
-
-    .room-card-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.35rem;
-    }
-
-    .room-number-tag {
-      font-size: 0.85rem;
-      font-weight: 800;
-      color: var(--primary-700);
-      background: #e0f2fe;
-      padding: 0.1rem 0.45rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .room-floor-tag {
-      font-size: 0.725rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .room-name-text {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: var(--text-main);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-bottom: 0.35rem;
-    }
-
-    .room-status-indicator {
-      font-size: 0.775rem;
-      color: var(--text-secondary);
-    }
-
-    .waiting-indicator strong {
-      color: var(--primary-700);
-    }
-
     /* Emergency Toggle */
     .emergency-toggle-card {
       background: #fff1f2;
@@ -1240,7 +1167,7 @@ export class CheckInComponent implements OnInit, OnDestroy {
   private searchDebounceTimer: any = null;
   private pollingTimer: any = null;
 
-  readonly todayString = new Date().toISOString().split('T')[0];
+  readonly todayString = toIsoDate(new Date());
 
   form: CheckInRequest = {
     patientName: '',
@@ -1260,6 +1187,27 @@ export class CheckInComponent implements OnInit, OnDestroy {
 
   // Map room id to waiting count for room card indicator
   roomWaitingCounts = signal<Record<number, number>>({});
+
+  readonly selectedFloorFilter = signal<number | null>(null);
+
+  readonly availableFloors = computed(() => {
+    const list = this.rooms().map(r => r.floor);
+    return Array.from(new Set(list)).sort((a, b) => a - b);
+  });
+
+  readonly filteredRooms = computed(() => {
+    const f = this.selectedFloorFilter();
+    if (f === null) return this.rooms();
+    return this.rooms().filter(r => r.floor === f);
+  });
+
+  getRoomsByFloor(floor: number): ExaminationRoom[] {
+    return this.rooms().filter(r => r.floor === floor);
+  }
+
+  getSelectedRoom(): ExaminationRoom | undefined {
+    return this.rooms().find(r => r.id === this.form.examinationRoomId);
+  }
 
   ngOnInit(): void {
     this.loadRooms();

@@ -1,8 +1,9 @@
 package com.demo.be.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -15,11 +16,20 @@ import java.util.List;
 @Builder
 public class CreateMedicalRecordRequest {
 
+    // Mã hồ sơ bệnh án (nếu đang cập nhật hồ sơ đã lưu tạm ở Pha 1)
+    private Long recordId;
+
     // Liên kết ca khám
     private Long queueTicketId;
 
-    @NotNull(message = "Bệnh nhân không được để trống")
+    // Khách vãng lai chưa có hồ sơ bệnh nhân: để trống, hệ thống tạo hồ sơ từ thông tin trên vé khám
     private Long patientId;
+
+    @JsonIgnore
+    @AssertTrue(message = "Thiếu thông tin bệnh nhân: cần mã bệnh nhân hoặc vé khám")
+    public boolean isPatientOrTicketProvided() {
+        return patientId != null || queueTicketId != null;
+    }
 
     private Long doctorId;
 
@@ -44,8 +54,7 @@ public class CreateMedicalRecordRequest {
 
     private String preliminaryDiagnosis; // Chẩn đoán sơ bộ
 
-    @NotBlank(message = "Chẩn đoán xác định không được để trống")
-    private String finalDiagnosis; // Chẩn đoán xác định
+    private String finalDiagnosis; // Chẩn đoán xác định (điền khi hoàn tất ca khám)
 
     private String icd10Code; // Mã ICD-10
 

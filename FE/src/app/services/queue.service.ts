@@ -44,6 +44,11 @@ export class QueueService {
     return this.http.get<ApiResponse<RoomQueueOverview>>(`${this.baseUrl}/room/${roomId}`);
   }
 
+  // Hàng đợi phòng mà bác sĩ đang đăng nhập có ca trực hôm nay
+  getMyRoomQueue(): Observable<ApiResponse<RoomQueueOverview>> {
+    return this.http.get<ApiResponse<RoomQueueOverview>>(`${this.baseUrl}/my-room`);
+  }
+
   callNext(roomId: number): Observable<ApiResponse<QueueTicket>> {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/room/${roomId}/call-next`, {});
   }
@@ -52,16 +57,17 @@ export class QueueService {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/start`, {});
   }
 
-  completeExamination(ticketId: number): Observable<ApiResponse<QueueTicket>> {
-    return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/complete`, {});
-  }
-
   skipTicket(ticketId: number): Observable<ApiResponse<QueueTicket>> {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/skip`, {});
   }
 
   recallTicket(ticketId: number): Observable<ApiResponse<QueueTicket>> {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/recall`, {});
+  }
+
+  // Lễ tân đưa số nhỡ lượt (người bệnh đã quay lại) trở lại hàng đợi
+  requeueTicket(ticketId: number): Observable<ApiResponse<QueueTicket>> {
+    return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/ticket/${ticketId}/requeue`, {});
   }
 
   setEmergency(ticketId: number): Observable<ApiResponse<QueueTicket>> {

@@ -1,7 +1,11 @@
 package com.demo.be.repository;
 
 import com.demo.be.model.ExaminationRoom;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,5 +18,16 @@ public interface ExaminationRoomRepository extends JpaRepository<ExaminationRoom
 
     boolean existsByRoomNumber(String roomNumber);
 
-    List<ExaminationRoom> findAllByOrderByRoomNumberAsc();
+    // Phòng khám của bác sĩ (dữ liệu cũ chưa có loại phòng cũng là phòng khám)
+    @Query("SELECT r FROM ExaminationRoom r WHERE r.roomType IS NULL OR r.roomType = 'KHAM' ORDER BY r.roomNumber")
+    List<ExaminationRoom> findExamRooms();
+
+    // Phòng cận lâm sàng để xếp ca KTV
+    @Query("SELECT r FROM ExaminationRoom r WHERE r.roomType IN ('XET_NGHIEM', 'CHAN_DOAN_HINH_ANH') ORDER BY r.roomType DESC, r.roomNumber")
+    List<ExaminationRoom> findLabRooms();
+
+    // Khoá dòng phòng khám khi cấp số để 2 quầy cấp cùng lúc không sinh trùng số thứ tự
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ExaminationRoom r WHERE r.id = :id")
+    Optional<ExaminationRoom> findByIdForUpdate(@Param("id") Long id);
 }

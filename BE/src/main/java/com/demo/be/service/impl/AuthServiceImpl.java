@@ -160,13 +160,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserSummaryResponse getCurrentUser(UserPrincipal currentUser) {
         if (currentUser == null) {
             throw new BadRequestException("Chưa đăng nhập");
         }
 
-        User user = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", currentUser.getId()));
+        User user = userRepository.findByUsername(currentUser.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", currentUser.getUsername()));
 
         return mapToUserSummary(user);
     }
@@ -272,6 +273,14 @@ public class AuthServiceImpl implements AuthService {
         String fullName = user.getPerson() != null ? user.getPerson().getFullName() : user.getUsername();
         String avatarUrl = user.getPerson() != null ? user.getPerson().getAvatarUrl() : null;
         Long personId = user.getPerson() != null ? user.getPerson().getId() : null;
+        String position = null;
+        String department = null;
+        if (user.getPerson() instanceof Employee employee) {
+            position = employee.getPosition();
+        }
+        if (user.getPerson() instanceof LabTechnician technician) {
+            department = technician.getDepartment();
+        }
 
         return UserSummaryResponse.builder()
                 .id(user.getId())
@@ -282,6 +291,8 @@ public class AuthServiceImpl implements AuthService {
                 .avatarUrl(avatarUrl)
                 .status(user.getStatus())
                 .personId(personId)
+                .position(position)
+                .department(department)
                 .roles(roles)
                 .build();
     }

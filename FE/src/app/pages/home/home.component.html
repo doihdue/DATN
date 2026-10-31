@@ -1,0 +1,1010 @@
+<div class="home-container">
+  <!-- ======================================================================= -->
+  <!-- 1. BỆNH NHÂN (PATIENT) - Cổng Chăm Sóc Sức Khỏe & Hành Trình Khám Bệnh   -->
+  <!-- Phong cách: Epic MyChart & Doctolib - Thân thiện, Trực quan, Thời gian thực -->
+  <!-- ======================================================================= -->
+  @if (authService.hasRole('PATIENT')) {
+    <div class="patient-portal animate-fade-in">
+      <!-- Patient Welcome Banner -->
+      <section class="patient-welcome-card">
+        <div class="welcome-left">
+          <div class="portal-badge">
+            <span class="live-dot pulse"></span>
+            <span>Cổng Bệnh Nhân Điện Tử • MedQueue Patient Portal</span>
+          </div>
+          <h1 class="welcome-heading">
+            Xin chào, <span class="highlight-name">{{ authService.currentUser()?.fullName }}</span>!
+          </h1>
+          <p class="welcome-sub">
+            Theo dõi hành trình khám bệnh trực tuyến, nhận cảnh báo số thứ tự thời gian thực và quản lý hồ sơ y tế cá nhân dễ dàng.
+          </p>
+          <div class="patient-meta-chips">
+            <span class="meta-chip">
+              <i class="bi bi-person-badge"></i>
+              Mã BN: #{{ authService.currentUser()?.personId || authService.currentUser()?.id || 'BN-2026' }}
+            </span>
+            <span class="meta-chip">
+              <i class="bi bi-calendar-check"></i>
+              Hôm nay: {{ todayFormatted }}
+            </span>
+            @if (authService.currentUser()?.phoneNumber) {
+              <span class="meta-chip">
+                <i class="bi bi-telephone"></i>
+                {{ authService.currentUser()?.phoneNumber }}
+              </span>
+            }
+          </div>
+        </div>
+
+        <div class="welcome-right-actions">
+          <button (click)="refreshData()" class="btn btn-outline btn-refresh" [disabled]="isLoading()" title="Làm mới dữ liệu">
+            <i class="bi bi-arrow-clockwise" [class.spin]="isLoading()"></i>
+            <span>Cập nhật số liệu</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Patient Active Ticket Journey Card (Hành trình khám hôm nay) -->
+      <section class="patient-journey-section">
+        @if (myActiveTicket(); as ticket) {
+          <!-- Case A: Có phiếu khám đang hiệu lực hôm nay -->
+          <div class="active-ticket-card" [ngClass]="getTicketCardClass(ticket.status)">
+            <div class="ticket-top-bar">
+              <div class="ticket-status-pill" [ngClass]="getTicketStatusClass(ticket.status)">
+                <i class="bi" [ngClass]="getTicketStatusIcon(ticket.status)"></i>
+                <span>{{ getTicketStatusText(ticket.status) }}</span>
+              </div>
+              <div class="ticket-timestamp">
+                <i class="bi bi-clock"></i> Tiếp nhận lúc: <strong>{{ ticket.checkInTime || 'Hôm nay' }}</strong>
+              </div>
+            </div>
+
+            <div class="ticket-main-grid">
+              <!-- Left: Big Ticket Number Badge -->
+              <div class="ticket-number-box">
+                <span class="ticket-caption">SỐ THỨ TỰ CỦA BẠN</span>
+                <span class="ticket-number-display num">{{ ticket.ticketNumber }}</span>
+                <span class="ticket-room-label">{{ ticket.roomName }} • {{ ticket.roomNumber }}</span>
+              </div>
+
+              <!-- Center: Real-time Queue Position Tracker -->
+              <div class="ticket-position-box">
+                <div class="position-stats">
+                  <div class="pos-item">
+                    <span class="pos-label">Vị trí trong hàng:</span>
+                    <span class="pos-value num">#{{ ticket.positionInQueue || 1 }}</span>
+                  </div>
+                  <div class="pos-item">
+                    <span class="pos-label">Số người chờ trước:</span>
+                    <span class="pos-value text-amber num">{{ ticket.waitingAheadCount ?? 0 }} người</span>
+                  </div>
+                  <div class="pos-item">
+                    <span class="pos-label">Thời gian chờ dự kiến:</span>
+                    <span class="pos-value text-cyan num">~{{ ticket.estimatedWaitingMinutes ?? 10 }} phút</span>
+                  </div>
+                </div>
+
+                <!-- Guidance alert depending on status -->
+                <div class="ticket-alert" [ngClass]="ticket.status === 'CALLED' ? 'alert-calling' : 'alert-waiting'">
+                  @if (ticket.status === 'CALLED') {
+                    <i class="bi bi-megaphone-fill alert-icon"></i>
+                    <div>
+                      <strong>MỜI BẠN VÀO PHÒNG KHÁM NGAY!</strong>
+                      <p>Bác sĩ đang gọi số của bạn tại <strong>{{ ticket.roomName }} ({{ ticket.roomNumber }}, {{ ticket.floor ? 'Tầng ' + ticket.floor : 'Tầng 1' }})</strong>. Vui lòng vào phòng khám.</p>
+                    </div>
+                  } @else if (ticket.status === 'IN_PROGRESS') {
+                    <i class="bi bi-heart-pulse-fill alert-icon"></i>
+                    <div>
+                      <strong>BẠN ĐANG TRONG CA KHÁM</strong>
+                      <p>Bác sĩ <strong>{{ ticket.doctorName || 'chuyên khoa' }}</strong> đang thực hiện thăm khám lâm sàng.</p>
+                    </div>
+                  } @else if (ticket.status === 'WAITING_FOR_RESULTS') {
+                    <i class="bi bi-hourglass-split alert-icon"></i>
+                    <div>
+                      <strong>ĐANG CHỜ KẾT QUẢ XÉT NGHIỆM</strong>
+                      <p>Hệ thống phòng lab đang xử lý mẫu cận lâm sàng của bạn. Kết quả sẽ tự động gửi về bác sĩ khi hoàn tất.</p>
+                    </div>
+                  } @else {
+                    <i class="bi bi-info-circle-fill alert-icon"></i>
+                    <div>
+                      <strong>Đang chờ tại sảnh phòng khám</strong>
+                      <p>Bác sĩ phụ trách: <strong>{{ ticket.doctorName || 'Bác sĩ trực khoa' }}</strong>. Hệ thống sẽ phát chuông thông báo khi đến lượt bạn.</p>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Right: Quick Ticket Actions -->
+              <div class="ticket-actions-box">
+                <a routerLink="/my-tickets" class="btn btn-primary btn-sm">
+                  <i class="bi bi-card-checklist"></i> Xem Chi Tiết Vé
+                </a>
+                <a routerLink="/queue" class="btn btn-outline btn-sm">
+                  <i class="bi bi-tv"></i> Màn Hình TV Sảnh
+                </a>
+              </div>
+            </div>
+
+            <!-- 5-Step Visual Clinical Stepper -->
+            <div class="stepper-track">
+              <div class="step-item done">
+                <div class="step-dot"><i class="bi bi-check2"></i></div>
+                <span class="step-text">1. Cấp số tiếp đón</span>
+              </div>
+              <div class="step-divider" [class.active]="ticket.status !== 'WAITING'"></div>
+
+              <div class="step-item" [ngClass]="{'current': ticket.status === 'WAITING' || ticket.status === 'CALLED', 'done': isStepPassed(ticket.status, 2)}">
+                <div class="step-dot">
+                  @if (isStepPassed(ticket.status, 2)) {
+                    <i class="bi bi-check2"></i>
+                  } @else {
+                    2
+                  }
+                </div>
+                <span class="step-text">2. Chờ tại phòng khám</span>
+              </div>
+              <div class="step-divider" [class.active]="isStepPassed(ticket.status, 2)"></div>
+
+              <div class="step-item" [ngClass]="{'current': ticket.status === 'IN_PROGRESS', 'done': isStepPassed(ticket.status, 3)}">
+                <div class="step-dot">
+                  @if (isStepPassed(ticket.status, 3)) {
+                    <i class="bi bi-check2"></i>
+                  } @else {
+                    3
+                  }
+                </div>
+                <span class="step-text">3. Bác sĩ thăm khám</span>
+              </div>
+              <div class="step-divider" [class.active]="isStepPassed(ticket.status, 3)"></div>
+
+              <div class="step-item" [ngClass]="{'current': ticket.status === 'WAITING_FOR_RESULTS' || ticket.status === 'RESULTS_READY', 'done': isStepPassed(ticket.status, 4)}">
+                <div class="step-dot">
+                  @if (isStepPassed(ticket.status, 4)) {
+                    <i class="bi bi-check2"></i>
+                  } @else {
+                    4
+                  }
+                </div>
+                <span class="step-text">4. Xét nghiệm (nếu có)</span>
+              </div>
+              <div class="step-divider" [class.active]="ticket.status === 'COMPLETED'"></div>
+
+              <div class="step-item" [ngClass]="{'done': ticket.status === 'COMPLETED'}">
+                <div class="step-dot">
+                  @if (ticket.status === 'COMPLETED') {
+                    <i class="bi bi-check2"></i>
+                  } @else {
+                    5
+                  }
+                </div>
+                <span class="step-text">5. Nhận đơn thuốc</span>
+              </div>
+            </div>
+          </div>
+        } @else {
+          <!-- Case B: Chưa có phiếu khám hôm nay -->
+          <div class="no-ticket-card">
+            <div class="no-ticket-visual">
+              <div class="icon-bubble">
+                <i class="bi bi-ticket-perforated-fill"></i>
+              </div>
+            </div>
+            <div class="no-ticket-content">
+              <div class="no-ticket-tag">Dịch Vụ Lấy Số Nhanh</div>
+              <h2 class="no-ticket-title">Bạn chưa lấy số khám trong ngày hôm nay</h2>
+              <p class="no-ticket-desc">
+                Đăng ký cấp số thứ tự khám trực tuyến để không phải xếp hàng chen chúc tại bệnh viện. Hệ thống sẽ tính toán thời gian chờ dự kiến và tự động định tuyến vào phòng khám phù hợp.
+              </p>
+              <div class="no-ticket-actions">
+                <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="btn btn-primary btn-cta">
+                  <i class="bi bi-ticket-fill"></i> Lấy Số Khám Trực Tuyến Ngay
+                </a>
+                <a routerLink="/queue/tracking" [queryParams]="{ mode: 'lookup' }" class="btn btn-outline btn-cta">
+                  <i class="bi bi-search"></i> Tra Cứu Phiếu Khám Cũ
+                </a>
+              </div>
+            </div>
+          </div>
+        }
+      </section>
+
+      <!-- Patient Smart Healthcare Service Grid (Chuẩn phong cách MyChart) -->
+      <section class="patient-services-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-grid-fill"></i> Dịch Vụ &amp; Tiện Ích Y Tế</div>
+          <h2 class="section-title">Tiện Ích Chăm Sóc Sức Khỏe</h2>
+          <p class="section-desc">Truy cập nhanh các công cụ y tế số hóa để tối ưu hóa trải nghiệm thăm khám của bạn</p>
+        </div>
+
+        <div class="services-modern-grid">
+          <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="service-card primary-accent">
+            <div class="service-icon"><i class="bi bi-ticket-perforated-fill"></i></div>
+            <div class="service-content">
+              <h3 class="service-title">Lấy Số Thứ Tự Online</h3>
+              <p class="service-desc">Đăng ký xếp hàng từ xa qua điện thoại, chọn chuyên khoa mong muốn và nhận số tức thì.</p>
+              <span class="service-link-label">Đăng ký lấy số <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/my-tickets" class="service-card teal-accent">
+            <div class="service-icon"><i class="bi bi-clipboard2-pulse-fill"></i></div>
+            <div class="service-content">
+              <h3 class="service-title">Hồ Sơ &amp; Phiếu Khám Của Tôi</h3>
+              <p class="service-desc">Xem chi tiết đơn thuốc, kết quả khám bệnh, lịch sử các lần khám và chỉ định của bác sĩ.</p>
+              <span class="service-link-label">Xem hồ sơ <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/queue" class="service-card indigo-accent">
+            <div class="service-icon"><i class="bi bi-tv-fill"></i></div>
+            <div class="service-content">
+              <h3 class="service-title">Màn Hình TV Gọi Số Sảnh</h3>
+              <p class="service-desc">Mở bảng hiển thị gọi số sảnh chờ toàn viện với chế độ phát âm thanh chuông gọi chuẩn.</p>
+              <span class="service-link-label">Mở màn hình TV <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/queue/tracking" [queryParams]="{ mode: 'lookup' }" class="service-card amber-accent">
+            <div class="service-icon"><i class="bi bi-search-heart-fill"></i></div>
+            <div class="service-content">
+              <h3 class="service-title">Tra Cứu Tiến Độ Phiếu Khám</h3>
+              <p class="service-desc">Nhập mã số vé hoặc số điện thoại để kiểm tra số người đang chờ và phòng khám tiếp nhận.</p>
+              <span class="service-link-label">Tra cứu ngay <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- Live Clinic Room Monitor for Patients -->
+      <section class="live-rooms-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-broadcast"></i> Theo Dõi Thời Gian Thực</div>
+          <h2 class="section-title">Bảng Tiến Độ Gọi Số Tại Các Phòng Khám</h2>
+          <p class="section-desc">Cập nhật liên tục tiến trình khám chữa bệnh tại các phòng khám chuyên khoa toàn viện</p>
+        </div>
+
+        <div class="clinic-rooms-grid">
+          @for (room of displayBoard(); track room.roomId) {
+            <div class="clinic-room-card">
+              <div class="room-top">
+                <div class="room-id-badge">{{ room.roomNumber }}</div>
+                <div class="room-wait-chip" [ngClass]="getRoomLoadClass(room.waitingCount)">
+                  <i class="bi bi-people-fill"></i> {{ room.waitingCount }} người chờ
+                </div>
+              </div>
+
+              <h3 class="room-specialty-title">{{ room.roomName }}</h3>
+              <div class="room-doc-meta">
+                <i class="bi bi-person-fill-check"></i> {{ room.doctorName || 'Bác sĩ phụ trách ca' }}
+                <span class="meta-sep">•</span>
+                <span>{{ room.specialtyName || 'Đa Khoa' }}</span>
+              </div>
+
+              <div class="calling-highlight-box">
+                <div class="calling-tag">SỐ ĐANG GỌI</div>
+                <div class="calling-number num">{{ room.currentCalledTicketNumber || room.currentExaminingTicketNumber || '---' }}</div>
+                @if (room.currentCalledPatientName) {
+                  <div class="calling-patient-name">{{ maskPatientName(room.currentCalledPatientName) }}</div>
+                }
+              </div>
+
+              @if (room.upcomingTicketNumbers && room.upcomingTicketNumbers.length > 0) {
+                <div class="upcoming-row">
+                  <span class="upcoming-label">Chuẩn bị:</span>
+                  <div class="upcoming-chips">
+                    @for (num of room.upcomingTicketNumbers.slice(0, 3); track num) {
+                      <span class="num-chip num">{{ num }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Patient Health Advisory Notice -->
+      <section class="patient-advisory-card">
+        <div class="advisory-icon"><i class="bi bi-shield-check"></i></div>
+        <div class="advisory-content">
+          <h4>Lưu Ý Cho Người Bệnh Khi Đến Thăm Khám</h4>
+          <ul>
+            <li>Vui lòng có mặt tại khu vực ghế chờ trước cửa phòng khám khi còn từ <strong>1 - 2 lượt</strong> nữa tới số của bạn.</li>
+            <li>Mang theo bản gốc <strong>Căn Cước Công Dân (CCCD)</strong> hoặc thẻ <strong>BHYT</strong> để đối chiếu thông tin y tế.</li>
+            <li>Nếu có chỉ định xét nghiệm máu hoặc nội soi tiêu hóa, quý khách vui lòng <strong>nhịn ăn sáng</strong> theo hướng dẫn.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- ======================================================================= -->
+  <!-- 2. BÁC SĨ (DOCTOR) - Bàn Điều Hành Lâm Sàng & Quản Lý Ca Khám           -->
+  <!-- Phong cách: Epic Hyperspace & Cerner Millennium - Khoa học, Tập trung cao độ -->
+  <!-- ======================================================================= -->
+  @else if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
+    <div class="doctor-cockpit animate-fade-in">
+      <!-- Doctor Shift Cockpit Header -->
+      <section class="doctor-header-card">
+        <div class="doc-header-left">
+          <div class="doc-avatar-wrap">
+            <div class="doc-avatar">
+              <i class="bi bi-heart-pulse-fill"></i>
+            </div>
+            <span class="status-indicator-badge online" title="Đang trong ca trực"></span>
+          </div>
+
+          <div class="doc-info-block">
+            <div class="doc-badge-row">
+              <span class="badge-role doctor">Bác Sĩ Điều Trị</span>
+              <span class="badge-shift"><i class="bi bi-clock-history"></i> Ca Trực Hôm Nay: {{ currentShiftLabel }}</span>
+            </div>
+            <h1 class="doc-title">
+              Bác Sĩ <span class="doc-name">{{ authService.currentUser()?.fullName }}</span>
+            </h1>
+            <p class="doc-sub">
+              Khoa Khám Bệnh &amp; Điều Trị Ngoại Trú • Chúc Bác sĩ một ngày làm việc hiệu quả và tận tâm!
+            </p>
+          </div>
+        </div>
+
+        <div class="doc-header-actions">
+          <a routerLink="/doctor/examination" class="btn btn-primary btn-launch">
+            <i class="bi bi-clipboard2-pulse-fill"></i> Vào Bàn Khám Bệnh
+          </a>
+          <a routerLink="/doctor/calling" class="btn btn-outline btn-launch">
+            <i class="bi bi-megaphone-fill"></i> Mở Bàn Gọi Số
+          </a>
+        </div>
+      </section>
+
+      <!-- Key Clinical Shift Metrics Bar -->
+      <section class="doc-metrics-grid">
+        <div class="metric-card waiting">
+          <div class="metric-icon"><i class="bi bi-hourglass-split"></i></div>
+          <div class="metric-body">
+            <span class="metric-number num">{{ doctorStats.waitingCount }}</span>
+            <span class="metric-title">Bệnh nhân đang chờ</span>
+            <span class="metric-hint">Đang đợi gọi vào phòng</span>
+          </div>
+        </div>
+
+        <div class="metric-card examining">
+          <div class="metric-icon"><i class="bi bi-person-fill-check"></i></div>
+          <div class="metric-body">
+            <span class="metric-number num">{{ doctorStats.examiningCount }}</span>
+            <span class="metric-title">Đang trong phòng khám</span>
+            <span class="metric-hint">Đang thăm khám lâm sàng</span>
+          </div>
+        </div>
+
+        <div class="metric-card completed">
+          <div class="metric-icon"><i class="bi bi-check-circle-fill"></i></div>
+          <div class="metric-body">
+            <span class="metric-number num">{{ doctorStats.completedCount }}</span>
+            <span class="metric-title">Đã khám hoàn tất</span>
+            <span class="metric-hint">Hôm nay tại phòng</span>
+          </div>
+        </div>
+
+        <div class="metric-card emergency">
+          <div class="metric-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+          <div class="metric-body">
+            <span class="metric-number num">{{ doctorStats.emergencyCount }}</span>
+            <span class="metric-title">Ca cấp cứu / Ưu tiên</span>
+            <span class="metric-hint">Cần xử lý ưu tiên hàng đầu</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Doctor Live Call & Examination Console -->
+      <section class="doc-console-section">
+        <div class="doc-console-card">
+          <div class="console-header">
+            <div class="console-title-wrap">
+              <span class="console-pill"><i class="bi bi-broadcast"></i> Điều Khiển Hàng Đợi Nhanh</span>
+              <h2 class="console-heading">Bàn Gọi Bệnh Nhân Trực Tiếp</h2>
+            </div>
+
+            <!-- Bác sĩ chỉ gọi số tại phòng có ca trực hôm nay của mình -->
+            <div class="room-selector-wrap">
+              <span class="selector-label">Phòng khám:</span>
+              <span class="room-select">
+                @if (doctorRoomOverview(); as ov) {
+                  {{ ov.roomNumber }} - {{ ov.roomName }}
+                } @else {
+                  Chưa có ca trực hôm nay
+                }
+              </span>
+            </div>
+          </div>
+
+          <div class="console-body">
+            <!-- Currently Called / Examining Patient Banner -->
+            <div class="current-call-box">
+              <div class="call-badge">
+                <span class="live-dot pulse"></span>
+                <span>LƯỢT HIỆN TẠI</span>
+              </div>
+
+              @if (doctorCurrentTicket()) {
+                <div class="current-patient-info">
+                  <div class="patient-ticket-big num">{{ doctorCurrentTicket()?.ticketNumber }}</div>
+                  <div class="patient-details">
+                    <h3 class="patient-name">{{ doctorCurrentTicket()?.patientName }}</h3>
+                    <p class="patient-meta">
+                      <span>Tuổi: {{ getPatientAge(doctorCurrentTicket()?.patientDob, doctorCurrentTicket()?.patientYearOfBirth) }}</span>
+                      <span class="sep">•</span>
+                      <span>Giới tính: {{ doctorCurrentTicket()?.patientGender || '---' }}</span>
+                      <span class="sep">•</span>
+                      <span>SĐT: {{ doctorCurrentTicket()?.patientPhone || '---' }}</span>
+                    </p>
+                    @if (doctorCurrentTicket()?.notes) {
+                      <div class="patient-complaint">
+                        <i class="bi bi-chat-left-dots-fill"></i> Triệu chứng ban đầu: <strong>{{ doctorCurrentTicket()?.notes }}</strong>
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <div class="current-actions-row">
+                  <a [routerLink]="['/doctor/examination', doctorCurrentTicket()?.id]" class="btn btn-primary btn-action-lg">
+                    <i class="bi bi-clipboard2-pulse"></i> Khám &amp; Kê Đơn Ca Này
+                  </a>
+                  <button (click)="callNextPatient()" class="btn btn-outline btn-action-lg" [disabled]="isCallingNext()">
+                    <i class="bi bi-arrow-right-circle"></i> Gọi Ca Tiếp Theo
+                  </button>
+                </div>
+              } @else {
+                <div class="empty-call-state">
+                  <i class="bi bi-door-open-fill empty-icon"></i>
+                  <h4>Chưa có bệnh nhân nào trong phòng khám</h4>
+                  <p>Bấm nút bên dưới để phát âm thanh chuông gọi bệnh nhân kế tiếp vào phòng.</p>
+                  <button (click)="callNextPatient()" class="btn btn-primary btn-call-large" [disabled]="isCallingNext()">
+                    <i class="bi bi-megaphone-fill"></i> Gọi Bệnh Nhân Kế Tiếp
+                  </button>
+                </div>
+              }
+            </div>
+
+            <!-- Upcoming Queue in Doctor's Room -->
+            <div class="upcoming-queue-box">
+              <div class="upcoming-header">
+                <h4 class="upcoming-title">
+                  <i class="bi bi-list-ol"></i> Bệnh Nhân Đang Chờ Tại Phòng ({{ doctorWaitingList().length }})
+                </h4>
+                <a routerLink="/doctor/calling" class="link-more">Xem đầy đủ <i class="bi bi-arrow-right"></i></a>
+              </div>
+
+              <div class="waiting-list-scroll">
+                @if (doctorWaitingList().length > 0) {
+                  @for (t of doctorWaitingList().slice(0, 5); track t.id; let idx = $index) {
+                    <div class="waiting-item" [class.emergency-item]="t.isEmergency">
+                      <span class="waiting-order num">#{{ idx + 1 }}</span>
+                      <span class="waiting-ticket num">{{ t.ticketNumber }}</span>
+                      <div class="waiting-patient">
+                        <span class="waiting-name">{{ t.patientName }}</span>
+                        <span class="waiting-notes">{{ t.notes || 'Khám tổng quát' }}</span>
+                      </div>
+                      @if (t.isEmergency) {
+                        <span class="badge-emergency"><i class="bi bi-exclamation-triangle"></i> Cấp cứu</span>
+                      }
+                      <a [routerLink]="['/doctor/examination', t.id]" class="btn-quick-examine" title="Vào khám ngay">
+                        <i class="bi bi-arrow-right-short"></i>
+                      </a>
+                    </div>
+                  }
+                } @else {
+                  <div class="empty-waiting-msg">
+                    <i class="bi bi-check2-circle text-teal"></i> Hàng đợi phòng khám hiện đang trống.
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Physician Clinical Shortcuts Grid -->
+      <section class="doc-tools-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-tools"></i> Công Cụ Lâm Sàng</div>
+          <h2 class="section-title">Hệ Thống Tiện Ích Bác Sĩ</h2>
+          <p class="section-desc">Bộ công cụ hỗ trợ khám chữa bệnh, kê đơn thuốc và chỉ định cận lâm sàng</p>
+        </div>
+
+        <div class="doc-tools-grid">
+          <a routerLink="/doctor/examination" class="doc-tool-card">
+            <div class="tool-icon blue-bg"><i class="bi bi-clipboard2-pulse-fill"></i></div>
+            <div class="tool-info">
+              <h3 class="tool-title">Bàn Khám Bệnh &amp; Kê Đơn</h3>
+              <p class="tool-desc">Khám bệnh, ghi chỉ số sinh tồn, chẩn đoán mã ICD-10 và lập đơn thuốc điện tử.</p>
+              <span class="tool-link">Mở bàn khám <i class="bi bi-chevron-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/doctor/calling" class="doc-tool-card">
+            <div class="tool-icon teal-bg"><i class="bi bi-megaphone-fill"></i></div>
+            <div class="tool-info">
+              <h3 class="tool-title">Điều Phối Gọi Số Tự Động</h3>
+              <p class="tool-desc">Hệ thống phát thanh giọng nói gọi số phòng khám, gọi lại lượt nhỡ và phân luồng.</p>
+              <span class="tool-link">Vào bàn gọi <i class="bi bi-chevron-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/lab/services" class="doc-tool-card">
+            <div class="tool-icon indigo-bg"><i class="bi bi-virus"></i></div>
+            <div class="tool-info">
+              <h3 class="tool-title">Danh Mục Xét Nghiệm &amp; Cận Lâm Sàng</h3>
+              <p class="tool-desc">Tra cứu dịch vụ xét nghiệm sinh hóa, huyết học, chẩn đoán hình ảnh và chỉ số tham chiếu chuẩn.</p>
+              <span class="tool-link">Xem danh mục <i class="bi bi-chevron-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/doctor/medicines" class="doc-tool-card">
+            <div class="tool-icon emerald-bg"><i class="bi bi-capsule-pill"></i></div>
+            <div class="tool-info">
+              <h3 class="tool-title">Tra Cứu Dược Phẩm &amp; Thuốc</h3>
+              <p class="tool-desc">Tra cứu 500+ loại thuốc bệnh viện, kiểm tra tương tác thuốc và liều dùng tiêu chuẩn.</p>
+              <span class="tool-link">Tra cứu thuốc <i class="bi bi-chevron-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/doctor/history" class="doc-tool-card">
+            <div class="tool-icon purple-bg"><i class="bi bi-clock-history"></i></div>
+            <div class="tool-info">
+              <h3 class="tool-title">Lịch Sử Ca Khám Bệnh</h3>
+              <p class="tool-desc">Xem lại hồ sơ bệnh án các ca bệnh đã khám trong tuần, xuất PDF phiếu khám và đơn thuốc.</p>
+              <span class="tool-link">Xem lịch sử <i class="bi bi-chevron-right"></i></span>
+            </div>
+          </a>
+
+          <a routerLink="/doctor/schedule" class="doc-tool-card">
+            <div class="tool-icon amber-bg"><i class="bi bi-calendar3"></i></div>
+            <div class="tool-info">
+              <h3 class="tool-title">Lịch Trực Tuần Của Tôi</h3>
+              <p class="tool-desc">Xem phân công ca làm việc, phòng khám được giao và định mức tiếp nhận theo ngày.</p>
+              <span class="tool-link">Xem lịch trực <i class="bi bi-chevron-right"></i></span>
+            </div>
+          </a>
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- ======================================================================= -->
+  <!-- 3. LỄ TÂN / TIẾP ĐÓN (STAFF) - Trung Tâm Tiếp Đón & Điều Phối Tuyến Đầu -->
+  <!-- Phong cách: Epic Cadence & Doctolib Pro - Nhanh gọn, Kiểm soát toàn viện -->
+  <!-- ======================================================================= -->
+  @else if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
+    <div class="staff-command animate-fade-in">
+      <!-- Staff Hero Action Bar -->
+      <section class="staff-hero-bar">
+        <div class="staff-welcome-col">
+          <div class="portal-badge staff">
+            <span class="live-dot pulse"></span>
+            <span>Bộ Phận Tiếp Đón &amp; Phân Luồng Tuyến Đầu</span>
+          </div>
+          <h1 class="staff-heading">
+            Bàn Tiếp Đón - <span class="highlight-name">{{ authService.currentUser()?.fullName }}</span>
+          </h1>
+          <p class="staff-sub">
+            Cấp số thứ tự khám bệnh, tra cứu thông tin bệnh nhân và giám sát mức tải của các phòng khám theo thời gian thực.
+          </p>
+        </div>
+
+        <div class="staff-primary-cta">
+          <a routerLink="/staff/check-in" class="btn btn-primary btn-intake-hero">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>Tiếp Đón &amp; Cấp Số Mới</span>
+          </a>
+          <a routerLink="/staff/queue" class="btn btn-outline btn-intake-secondary">
+            <i class="bi bi-sliders2-vertical"></i> Điều Phối Hàng Đợi
+          </a>
+          <a routerLink="/queue" class="btn btn-ghost btn-intake-secondary">
+            <i class="bi bi-tv"></i> Màn Hình TV Sảnh
+          </a>
+        </div>
+      </section>
+
+      <!-- Hospital Intake Real-Time Metrics -->
+      <section class="staff-metrics-grid">
+        <div class="stat-box primary">
+          <div class="stat-icon-wrap"><i class="bi bi-ticket-perforated-fill"></i></div>
+          <div class="stat-data">
+            <span class="stat-number num">{{ intakeStats.totalTickets }}</span>
+            <span class="stat-title">Tổng số vé cấp hôm nay</span>
+            <span class="stat-trend"><i class="bi bi-check2"></i> Đang hoạt động bình thường</span>
+          </div>
+        </div>
+
+        <div class="stat-box amber">
+          <div class="stat-icon-wrap"><i class="bi bi-people-fill"></i></div>
+          <div class="stat-data">
+            <span class="stat-number num">{{ intakeStats.waitingCount }}</span>
+            <span class="stat-title">Bệnh nhân đang chờ tại sảnh</span>
+            <span class="stat-trend"><i class="bi bi-clock"></i> Thời gian chờ TB: ~12 phút</span>
+          </div>
+        </div>
+
+        <div class="stat-box green">
+          <div class="stat-icon-wrap"><i class="bi bi-patch-check-fill"></i></div>
+          <div class="stat-data">
+            <span class="stat-number num">{{ intakeStats.completedCount }}</span>
+            <span class="stat-title">Đã khám hoàn tất</span>
+            <span class="stat-trend"><i class="bi bi-arrow-up-right"></i> Tiến độ ổn định</span>
+          </div>
+        </div>
+
+        <div class="stat-box cyan">
+          <div class="stat-icon-wrap"><i class="bi bi-door-open-fill"></i></div>
+          <div class="stat-data">
+            <span class="stat-number num">{{ displayBoard().length || 4 }}</span>
+            <span class="stat-title">Phòng khám đang mở cửa</span>
+            <span class="stat-trend"><i class="bi bi-hospital"></i> Sẵn sàng tiếp nhận</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hospital Room Load & Capacity Matrix (Ma trận tải phòng khám giúp điều phối) -->
+      <section class="room-load-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-speedometer"></i> Giám Sát Tải Phòng Khám</div>
+          <h2 class="section-title">Tình Trạng Hàng Đợi Các Phòng Khám</h2>
+          <p class="section-desc">Theo dõi số lượng người đang chờ để lễ tân phân luồng bệnh nhân vào phòng có thời gian chờ ngắn nhất</p>
+        </div>
+
+        <div class="room-capacity-grid">
+          @for (room of displayBoard(); track room.roomId) {
+            <div class="capacity-card" [ngClass]="getRoomLoadClass(room.waitingCount)">
+              <div class="card-top-row">
+                <span class="room-badge">{{ room.roomNumber }}</span>
+                <span class="load-pill" [ngClass]="getRoomLoadClass(room.waitingCount)">
+                  {{ getRoomLoadLabel(room.waitingCount) }}
+                </span>
+              </div>
+
+              <h3 class="room-label">{{ room.roomName }}</h3>
+              <p class="doc-label"><i class="bi bi-person-fill"></i> {{ room.doctorName || 'Bác sĩ trực phòng' }}</p>
+
+              <div class="load-bar-wrap">
+                <div class="load-bar">
+                  <div class="load-fill" [style.width.%]="getLoadPercentage(room.waitingCount)"></div>
+                </div>
+                <div class="load-stats-row">
+                  <span class="wait-count"><strong>{{ room.waitingCount }}</strong> người đang chờ</span>
+                  <span class="wait-time">~{{ room.waitingCount * 10 }} phút</span>
+                </div>
+              </div>
+
+              <div class="current-call-mini">
+                <span class="call-caption">Số đang gọi:</span>
+                <span class="call-value num">{{ room.currentCalledTicketNumber || room.currentExaminingTicketNumber || 'Chưa gọi' }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Recent Intake Activity Feed -->
+      <section class="recent-intake-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-clock-history"></i> Nhật Ký Cấp Số</div>
+          <h2 class="section-title">Lượt Tiếp Đón Gần Nhất Hôm Nay</h2>
+          <p class="section-desc">Danh sách các bệnh nhân vừa được in phiếu tiếp đón tại bàn lễ tân</p>
+        </div>
+
+        <div class="intake-table-card">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Số Phiếu</th>
+                <th>Họ Và Tên</th>
+                <th>Số Điện Thoại</th>
+                <th>Phòng Chỉ Định</th>
+                <th>Giờ Tiếp Nhận</th>
+                <th>Mức Độ</th>
+                <th>Trạng Thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (recentTickets().length > 0) {
+                @for (t of recentTickets().slice(0, 8); track t.id) {
+                  <tr>
+                    <td><strong class="num ticket-code">{{ t.ticketNumber }}</strong></td>
+                    <td class="font-medium">{{ t.patientName }}</td>
+                    <td class="text-muted num">{{ t.patientPhone }}</td>
+                    <td>{{ t.roomName }} ({{ t.roomNumber }})</td>
+                    <td class="text-muted num">{{ t.checkInTime || 'Hôm nay' }}</td>
+                    <td>
+                      @if (t.isEmergency) {
+                        <span class="badge-priority emergency"><i class="bi bi-exclamation-triangle-fill"></i> Cấp cứu</span>
+                      } @else {
+                        <span class="badge-priority normal">Thường</span>
+                      }
+                    </td>
+                    <td>
+                      <span class="status-badge" [ngClass]="t.status.toLowerCase()">
+                        {{ getTicketStatusText(t.status) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              } @else {
+                <tr>
+                  <td colspan="7" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox"></i> Chưa có lượt cấp số nào trong phiên làm việc hôm nay.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- ======================================================================= -->
+  <!-- 4. ADMIN - Trung Tâm Quản Trị & Giám Sát Hoạt Động Toàn Viện           -->
+  <!-- ======================================================================= -->
+  @else if (authService.hasRole('ADMIN')) {
+    <div class="admin-portal animate-fade-in">
+      <section class="admin-welcome-card">
+        <div class="admin-welcome-content">
+          <div class="portal-badge admin">
+            <span class="live-dot pulse"></span>
+            <span>Hệ Thống Quản Trị Toàn Viện • Hospital Administration</span>
+          </div>
+          <h1 class="admin-heading">
+            Trung Tâm Điều Hành <span class="highlight-name">MedQueue Admin</span>
+          </h1>
+          <p class="admin-sub">
+            Giám sát toàn diện chỉ số lưu lượng bệnh nhân, điều phối nguồn lực y tế, cấu hình chuyên khoa và danh mục dược phẩm.
+          </p>
+          <div class="admin-quick-actions">
+            <a routerLink="/dashboard" class="btn btn-primary btn-admin-hero">
+              <i class="bi bi-speedometer2"></i> Xem Dashboard Thống Kê
+            </a>
+            <a routerLink="/admin/specialties" class="btn btn-outline btn-admin-hero">
+              <i class="bi bi-diagram-3-fill"></i> Quản Lý Chuyên Khoa
+            </a>
+            <a routerLink="/admin/doctors" class="btn btn-outline btn-admin-hero">
+              <i class="bi bi-person-badge"></i> Quản Lý Bác Sĩ
+            </a>
+            <a routerLink="/admin/staff" class="btn btn-outline btn-admin-hero">
+              <i class="bi bi-person-workspace"></i> Quản Lý Lễ Tân
+            </a>
+            <a routerLink="/admin/medicines" class="btn btn-outline btn-admin-hero">
+              <i class="bi bi-capsule"></i> Quản Lý Dược Phẩm
+            </a>
+            <a routerLink="/admin/schedules" class="btn btn-ghost btn-admin-hero">
+              <i class="bi bi-calendar3"></i> Lịch Trực Phòng
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Admin Management Tiles -->
+      <section class="admin-tiles-grid">
+        <a routerLink="/dashboard" class="admin-tile blue-accent">
+          <div class="tile-icon"><i class="bi bi-graph-up-arrow"></i></div>
+          <h3 class="tile-title">Báo Cáo &amp; Phân Tích</h3>
+          <p class="tile-desc">Biểu đồ lượt khám theo giờ, tỷ lệ hoàn thành ca bệnh và thời gian chờ trung bình tại các khoa.</p>
+          <span class="tile-cta">Mở báo cáo <i class="bi bi-arrow-right"></i></span>
+        </a>
+
+        <a routerLink="/admin/specialties" class="admin-tile indigo-accent">
+          <div class="tile-icon"><i class="bi bi-diagram-3"></i></div>
+          <h3 class="tile-title">Danh Mục Chuyên Khoa</h3>
+          <p class="tile-desc">Cấu hình phòng khám chuyên khoa, mô tả dịch vụ, phân bổ bác sĩ phụ trách và gán vị trí sảnh.</p>
+          <span class="tile-cta">Quản lý chuyên khoa <i class="bi bi-arrow-right"></i></span>
+        </a>
+
+        <a routerLink="/admin/doctors" class="admin-tile indigo-accent">
+          <div class="tile-icon"><i class="bi bi-person-badge"></i></div>
+          <h3 class="tile-title">Đội Ngũ Bác Sĩ</h3>
+          <p class="tile-desc">Thêm bác sĩ mới, cấp tài khoản đăng nhập, phân bổ chuyên khoa và khóa/mở khóa tài khoản.</p>
+          <span class="tile-cta">Quản lý bác sĩ <i class="bi bi-arrow-right"></i></span>
+        </a>
+
+        <a routerLink="/admin/staff" class="admin-tile teal-accent">
+          <div class="tile-icon"><i class="bi bi-person-workspace"></i></div>
+          <h3 class="tile-title">Nhân Viên Lễ Tân</h3>
+          <p class="tile-desc">Cấp tài khoản cho nhân viên tiếp đón &amp; điều phối hàng đợi, khóa/mở khóa và đặt lại mật khẩu.</p>
+          <span class="tile-cta">Quản lý lễ tân <i class="bi bi-arrow-right"></i></span>
+        </a>
+
+        <a routerLink="/admin/medicines" class="admin-tile emerald-accent">
+          <div class="tile-icon"><i class="bi bi-capsule-pill"></i></div>
+          <h3 class="tile-title">Dược Phẩm &amp; Thuốc</h3>
+          <p class="tile-desc">Quản lý kho dược phẩm, hoạt chất, biệt dược, hướng dẫn sử dụng và kiểm soát tồn kho.</p>
+          <span class="tile-cta">Quản lý kho thuốc <i class="bi bi-arrow-right"></i></span>
+        </a>
+
+        <a routerLink="/admin/schedules" class="admin-tile amber-accent">
+          <div class="tile-icon"><i class="bi bi-calendar-range-fill"></i></div>
+          <h3 class="tile-title">Phân Công Ca Trực</h3>
+          <p class="tile-desc">Xếp lịch làm việc cho bác sĩ theo tuần, chống xung đột lịch trực và cấu hình hạn mức tiếp nhận.</p>
+          <span class="tile-cta">Cấu hình ca trực <i class="bi bi-arrow-right"></i></span>
+        </a>
+      </section>
+
+      <!-- Hospital Live Board for Admin Monitoring -->
+      <section class="admin-board-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-broadcast"></i> Toàn Viện Thời Gian Thực</div>
+          <h2 class="section-title">Tiến Độ Khám Tại Các Phòng</h2>
+        </div>
+
+        <div class="clinic-rooms-grid">
+          @for (room of displayBoard(); track room.roomId) {
+            <div class="clinic-room-card">
+              <div class="room-top">
+                <div class="room-id-badge">{{ room.roomNumber }}</div>
+                <div class="room-wait-chip" [ngClass]="getRoomLoadClass(room.waitingCount)">
+                  {{ room.waitingCount }} người chờ
+                </div>
+              </div>
+              <h3 class="room-specialty-title">{{ room.roomName }}</h3>
+              <div class="room-doc-meta">{{ room.doctorName || 'Bác sĩ trực' }}</div>
+              <div class="calling-highlight-box">
+                <div class="calling-tag">SỐ ĐANG TIẾP NHẬN</div>
+                <div class="calling-number num">{{ room.currentCalledTicketNumber || room.currentExaminingTicketNumber || '---' }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- ======================================================================= -->
+  <!-- 5. KHÁCH VÃNG LAI / CHƯA ĐĂNG NHẬP (GUEST & PUBLIC)                    -->
+  <!-- Phong cách: Mayo Clinic & Cleveland Clinic - Sang trọng, Uy tín, Tiện lợi -->
+  <!-- ======================================================================= -->
+  @else {
+    <div class="public-portal animate-fade-in">
+      <!-- High-End Clinical Hero Banner -->
+      <section class="public-hero-card">
+        <div class="hero-ambient-glow"></div>
+        <div class="hero-content">
+          <div class="hero-brand-pill">
+            <span class="live-dot pulse"></span>
+            <span>Cổng Tiếp Đón &amp; Quản Lý Hàng Đợi Y Tế Thông Minh</span>
+          </div>
+
+          <h1 class="hero-main-title">
+            Hệ Thống Đặt Hẹn &amp;<br />
+            <span class="gradient-text">Điều Phối Hàng Đợi Khám Bệnh</span>
+          </h1>
+
+          <p class="hero-main-desc">
+            Số hóa toàn diện quy trình tiếp đón: Đăng ký lấy số thứ tự trực tuyến từ xa, giám sát tiến trình gọi số tại các phòng khám thời gian thực và hỗ trợ phân luồng chuyên khoa thông minh.
+          </p>
+
+          <div class="hero-action-buttons">
+            <a routerLink="/register" class="btn btn-primary btn-hero">
+              <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Khám Bệnh
+            </a>
+            <a routerLink="/queue/tracking" [queryParams]="{ mode: 'checkin' }" class="btn btn-outline btn-hero">
+              <i class="bi bi-ticket-perforated-fill"></i> Lấy Số Khám Trực Tuyến
+            </a>
+            <a routerLink="/queue/tracking" [queryParams]="{ mode: 'lookup' }" class="btn btn-outline btn-hero">
+              <i class="bi bi-search"></i> Tra Cứu Phiếu Khám
+            </a>
+            <a routerLink="/queue" class="btn btn-ghost btn-hero">
+              <i class="bi bi-tv-fill"></i> Màn Hình TV Sảnh
+            </a>
+          </div>
+        </div>
+
+        <!-- 3-Pillar Clinical Value Cards -->
+        <div class="value-pillars-grid">
+          <div class="pillar-card">
+            <div class="pillar-icon icon-blue"><i class="bi bi-clock-history"></i></div>
+            <div class="pillar-body">
+              <span class="pillar-stat">10 – 15 Phút</span>
+              <span class="pillar-label">Thời gian chờ dự kiến trung bình tại phòng</span>
+            </div>
+          </div>
+
+          <div class="pillar-card">
+            <div class="pillar-icon icon-teal"><i class="bi bi-qr-code-scan"></i></div>
+            <div class="pillar-body">
+              <span class="pillar-stat">Cấp Số 1 Chạm</span>
+              <span class="pillar-label">Tự động qua Kiosk online &amp; Đặt hẹn trước</span>
+            </div>
+          </div>
+
+          <div class="pillar-card">
+            <div class="pillar-icon icon-indigo"><i class="bi bi-robot"></i></div>
+            <div class="pillar-body">
+              <span class="pillar-stat">Phân Tuyến AI</span>
+              <span class="pillar-label">Gợi ý phòng khám chính xác theo triệu chứng</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live Clinical Queue Monitor -->
+      <section class="live-rooms-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-broadcast"></i> Theo Dõi Trực Tuyến</div>
+          <h2 class="section-title">Bảng Theo Dõi Số Khám Tại Các Phòng</h2>
+          <p class="section-desc">Tiến độ gọi số và trạng thái khám bệnh hiện thời tại sảnh tiếp đón</p>
+        </div>
+
+        <div class="clinic-rooms-grid">
+          @for (room of displayBoard(); track room.roomId) {
+            <div class="clinic-room-card">
+              <div class="room-top">
+                <div class="room-id-badge">{{ room.roomNumber }}</div>
+                <div class="room-wait-chip" [ngClass]="getRoomLoadClass(room.waitingCount)">
+                  <i class="bi bi-people-fill"></i> {{ room.waitingCount }} người chờ
+                </div>
+              </div>
+
+              <h3 class="room-specialty-title">{{ room.roomName }}</h3>
+              <div class="room-doc-meta">
+                <i class="bi bi-person-fill-check"></i> {{ room.doctorName || 'Bác sĩ phụ trách' }}
+                <span class="meta-sep">•</span>
+                <span>{{ room.specialtyName || 'Khoa Khám Bệnh' }}</span>
+              </div>
+
+              <div class="calling-highlight-box">
+                <div class="calling-tag">SỐ ĐANG GỌI</div>
+                <div class="calling-number num">{{ room.currentCalledTicketNumber || room.currentExaminingTicketNumber || '---' }}</div>
+              </div>
+
+              @if (room.upcomingTicketNumbers && room.upcomingTicketNumbers.length > 0) {
+                <div class="upcoming-row">
+                  <span class="upcoming-label">Chuẩn bị:</span>
+                  <div class="upcoming-chips">
+                    @for (num of room.upcomingTicketNumbers.slice(0, 3); track num) {
+                      <span class="num-chip num">{{ num }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- 4-Step Patient Journey Guide -->
+      <section class="public-steps-section">
+        <div class="section-title-wrap">
+          <div class="sub-badge"><i class="bi bi-signpost-split-fill"></i> Hướng Dẫn Quy Trình</div>
+          <h2 class="section-title">Quy Trình Khám Chữa Bệnh Thông Minh</h2>
+          <p class="section-desc">Chỉ 4 bước đơn giản để hoàn tất lượt khám nhanh chóng và không mất thời gian chờ đợi</p>
+        </div>
+
+        <div class="steps-cards-grid">
+          <div class="step-card">
+            <div class="step-num-badge">01</div>
+            <h3 class="step-card-title">Đăng Ký &amp; Lấy Số</h3>
+            <p class="step-card-desc">Lấy số trực tuyến trên điện thoại hoặc nhận phiếu tại Kiosk tiếp đón tự động.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num-badge">02</div>
+            <h3 class="step-card-title">Theo Dõi Hàng Đợi</h3>
+            <p class="step-card-desc">Quan sát bảng TV sảnh chờ hoặc kiểm tra vị trí số thứ tự trên điện thoại cá nhân.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num-badge">03</div>
+            <h3 class="step-card-title">Bác Sĩ Thăm Khám</h3>
+            <p class="step-card-desc">Vào phòng khám chuyên khoa, nhận tư vấn, chẩn đoán và chỉ định cận lâm sàng nếu cần.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num-badge">04</div>
+            <h3 class="step-card-title">Nhận Đơn Thuốc</h3>
+            <p class="step-card-desc">Xem đơn thuốc điện tử trên hệ thống và nhận thuốc tại quầy dược bệnh viện.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+</div>

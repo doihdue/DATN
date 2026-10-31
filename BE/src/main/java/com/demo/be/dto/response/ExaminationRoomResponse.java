@@ -13,4 +13,5 @@ public class ExaminationRoomResponse {
     private String roomNumber;
     private String roomName;
     private Integer floor;
+    private String roomType;
 }

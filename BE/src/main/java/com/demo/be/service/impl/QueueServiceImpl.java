@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,6 +33,9 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 @Slf4j
 public class QueueServiceImpl implements QueueService {
+
+    // Các trạng thái vé vẫn đang chiếm chỗ trong hàng đợi (SKIPPED vẫn có thể được gọi lại)
+    private static final Set<String> ACTIVE_TICKET_STATUSES = Set.of("WAITING", "CALLED", "IN_PROGRESS", "SKIPPED");
 
     private final QueueTicketRepository queueTicketRepository;
     private final ExaminationRoomRepository examinationRoomRepository;
@@ -51,20 +56,20 @@ public class QueueServiceImpl implements QueueService {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
-        ExaminationRoom room = examinationRoomRepository.findById(request.getExaminationRoomId())
+        // Khoá phòng trong suốt giao dịch: các lượt cấp số cho cùng phòng được xử lý tuần tự
+        ExaminationRoom room = examinationRoomRepository.findByIdForUpdate(request.getExaminationRoomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", request.getExaminationRoomId()));
+
+        WorkSchedule onDutySchedule = findOnDutySchedule(room.getId(), today, now)
+                .orElseThrow(() -> new BadRequestException("Phòng " + room.getRoomNumber()
+                        + " không còn ca trực nào trong hôm nay, vui lòng chọn phòng khác"));
 
         Doctor doctor = null;
         if (request.getDoctorId() != null) {
             doctor = doctorRepository.findById(request.getDoctorId()).orElse(null);
         }
-
-        // Nếu chưa chọn bác sĩ, tìm bác sĩ đang có lịch làm việc tại phòng khám hôm nay
         if (doctor == null) {
-            List<WorkSchedule> todaySchedules = workScheduleRepository.findByExaminationRoomIdAndWorkDate(room.getId(), today);
-            if (!todaySchedules.isEmpty()) {
-                doctor = todaySchedules.get(0).getDoctor();
-            }
+            doctor = onDutySchedule.getDoctor();
         }
 
         LocalDate dob = request.getPatientDob();
@@ -84,12 +89,14 @@ public class QueueServiceImpl implements QueueService {
             patient = patientRepository.findById(request.getPatientId()).orElse(null);
         }
 
-        // Tìm theo Số điện thoại nếu không truyền ID cụ thể
+        // Tìm theo Số điện thoại + Họ tên nếu không truyền ID cụ thể.
+        // Không khớp chỉ theo SĐT vì người nhà (bố mẹ - con) thường dùng chung 1 số điện thoại.
         if (patient == null && request.getPatientPhone() != null && !request.getPatientPhone().trim().isEmpty()) {
-            List<Patient> byPhone = patientRepository.findByPhoneNumber(request.getPatientPhone().trim());
-            if (!byPhone.isEmpty()) {
-                patient = byPhone.get(0);
-            }
+            String requestedName = request.getPatientName().trim();
+            patient = patientRepository.findByPhoneNumber(request.getPatientPhone().trim()).stream()
+                    .filter(p -> p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(requestedName))
+                    .findFirst()
+                    .orElse(null);
         }
 
         if (patient == null) {
@@ -130,11 +137,19 @@ public class QueueServiceImpl implements QueueService {
             }
         }
 
-        // Sinh số thứ tự vé khám theo định dạng [Mã phòng]-[Số thứ tự trong ngày]
-        // Ví dụ: P.101 -> P101-001, P101-002
-        long todayCount = queueTicketRepository.countTodayTicketsByRoom(today, room.getId());
-        String roomCode = room.getRoomNumber().replace(".", "").replace(" ", "").toUpperCase();
-        String ticketNumber = String.format("%s-%03d", roomCode, todayCount + 1);
+        // Mỗi bệnh nhân chỉ giữ 1 số còn hiệu lực trong ngày
+        Optional<QueueTicket> activeTicket = queueTicketRepository.findPatientActiveTickets(
+                today, patient.getId(), ACTIVE_TICKET_STATUSES).stream().findFirst();
+        if (activeTicket.isPresent()) {
+            QueueTicket existing = activeTicket.get();
+            String existingRoom = existing.getExaminationRoom() != null ? existing.getExaminationRoom().getRoomNumber() : "?";
+            throw new BadRequestException("Bệnh nhân " + patient.getFullName() + " đã có số " + existing.getTicketNumber()
+                    + " tại phòng " + existingRoom + " (" + existing.getStatus() + ") hôm nay. "
+                    + "Hãy huỷ hoặc chuyển phòng cho số cũ thay vì cấp số mới.");
+        }
+
+        // Sinh số thứ tự vé khám theo định dạng [Mã phòng]-[Số thứ tự trong ngày], ví dụ: P.101 -> P101-001
+        String ticketNumber = nextTicketNumber(room, today);
 
         // Tính điểm ưu tiên (Priority Score Algorithm)
         int priorityScore = 0;
@@ -158,7 +173,7 @@ public class QueueServiceImpl implements QueueService {
         }
 
         // Tính thời gian chờ ước tính: số người đang chờ * thời gian khám trung bình (15 phút)
-        long waitingAhead = queueTicketRepository.findByTicketDateAndExaminationRoomIdAndStatusOrderByPriorityScoreDescCheckInTimeAsc(
+        long waitingAhead = queueTicketRepository.findRoomQueueByStatus(
                 today, room.getId(), "WAITING"
         ).size();
         int avgConsultTime = (doctor != null && doctor.getAverageConsultationTime() != null)
@@ -201,10 +216,12 @@ public class QueueServiceImpl implements QueueService {
         LocalDate today = LocalDate.now();
         ExaminationRoom room = examinationRoomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", roomId));
+        assertCurrentDoctorOnDutyInRoom(roomId);
+        assertNoTicketBeingCalled(roomId, today);
 
         // Lấy danh sách bệnh nhân đang chờ sắp xếp theo điểm ưu tiên DESC, giờ check-in ASC
         List<QueueTicket> waitingList = queueTicketRepository
-                .findByTicketDateAndExaminationRoomIdAndStatusOrderByPriorityScoreDescCheckInTimeAsc(today, roomId, "WAITING");
+                .findRoomQueueByStatus(today, roomId, "WAITING");
 
         if (waitingList.isEmpty()) {
             throw new BadRequestException("Không còn bệnh nhân nào đang chờ tại phòng " + room.getRoomNumber());
@@ -227,6 +244,7 @@ public class QueueServiceImpl implements QueueService {
     public QueueTicketResponse startExamination(Long ticketId) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+        assertCurrentDoctorOnDutyInRoom(ticket.getExaminationRoom().getId());
 
         ticket.setStatus("IN_PROGRESS");
         ticket.setStartTime(LocalTime.now());
@@ -239,24 +257,14 @@ public class QueueServiceImpl implements QueueService {
 
     @Override
     @Transactional
-    public QueueTicketResponse completeExamination(Long ticketId) {
-        QueueTicket ticket = queueTicketRepository.findById(ticketId)
-                .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
-
-        ticket.setStatus("COMPLETED");
-        ticket.setEndTime(LocalTime.now());
-        QueueTicket saved = queueTicketRepository.save(ticket);
-        log.info("-> Hoàn thành khám vé {}", saved.getTicketNumber());
-
-        broadcastQueueEvent("TICKET_COMPLETED", saved, "Số " + saved.getTicketNumber() + " đã hoàn thành khám");
-        return mapToResponse(saved);
-    }
-
-    @Override
-    @Transactional
     public QueueTicketResponse skipTicket(Long ticketId) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+        assertCurrentDoctorOnDutyInRoom(ticket.getExaminationRoom().getId());
+
+        if (!"CALLED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Chỉ có thể đánh dấu vắng mặt cho số đang được gọi");
+        }
 
         ticket.setStatus("SKIPPED");
         QueueTicket saved = queueTicketRepository.save(ticket);
@@ -271,6 +279,13 @@ public class QueueServiceImpl implements QueueService {
     public QueueTicketResponse recallTicket(Long ticketId) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+        Long roomId = ticket.getExaminationRoom().getId();
+        assertCurrentDoctorOnDutyInRoom(roomId);
+
+        if (!"SKIPPED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Chỉ có thể gọi lại số đang nằm trong danh sách nhỡ lượt");
+        }
+        assertNoTicketBeingCalled(roomId, ticket.getTicketDate());
 
         ticket.setStatus("CALLED");
         ticket.setCallTime(LocalTime.now());
@@ -278,6 +293,40 @@ public class QueueServiceImpl implements QueueService {
         log.info("-> Gọi lại vé đã nhỡ {}", saved.getTicketNumber());
 
         broadcastQueueEvent("TICKET_RECALLED", saved, "Gọi lại số nhỡ " + saved.getTicketNumber());
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public QueueTicketResponse requeueTicket(Long ticketId) {
+        QueueTicket ticket = queueTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+
+        if (!"SKIPPED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Chỉ có thể đưa lại hàng đợi cho số đang nhỡ lượt (trạng thái hiện tại: " + ticket.getStatus() + ")");
+        }
+
+        // Người bệnh vắng mặt đã quay lại: xếp lên đầu nhóm thường (vẫn đứng sau các ca cấp cứu)
+        if (!Boolean.TRUE.equals(ticket.getIsEmergency())) {
+            int topNormalScore = queueTicketRepository
+                    .findRoomQueueByStatus(
+                            ticket.getTicketDate(), ticket.getExaminationRoom().getId(), "WAITING").stream()
+                    .filter(t -> !Boolean.TRUE.equals(t.getIsEmergency()))
+                    .mapToInt(t -> t.getPriorityScore() != null ? t.getPriorityScore() : 0)
+                    .max()
+                    .orElse(0);
+            int currentScore = ticket.getPriorityScore() != null ? ticket.getPriorityScore() : 0;
+            ticket.setPriorityScore(Math.max(currentScore, topNormalScore + 1));
+        }
+
+        ticket.setStatus("WAITING");
+        String requeueNote = "[Đã quay lại, đưa lại hàng đợi]";
+        ticket.setNotes(ticket.getNotes() != null ? ticket.getNotes() + " " + requeueNote : requeueNote);
+
+        QueueTicket saved = queueTicketRepository.save(ticket);
+        log.info("-> Đưa vé nhỡ lượt {} trở lại hàng đợi (điểm ưu tiên mới: {})", saved.getTicketNumber(), saved.getPriorityScore());
+
+        broadcastQueueEvent("TICKET_REQUEUED", saved, "Số " + saved.getTicketNumber() + " đã được đưa lại hàng đợi");
         return mapToResponse(saved);
     }
 
@@ -316,8 +365,10 @@ public class QueueServiceImpl implements QueueService {
 
         // Tìm bác sĩ đang trực tại phòng đích hôm nay
         LocalDate today = LocalDate.now();
-        List<WorkSchedule> schedules = workScheduleRepository.findByExaminationRoomIdAndWorkDate(newRoom.getId(), today);
-        Doctor newDoctor = schedules.isEmpty() ? null : schedules.get(0).getDoctor();
+        WorkSchedule newSchedule = findOnDutySchedule(newRoom.getId(), today, LocalTime.now())
+                .orElseThrow(() -> new BadRequestException("Phòng " + newRoom.getRoomNumber()
+                        + " không còn ca trực nào trong hôm nay, không thể chuyển bệnh nhân sang"));
+        Doctor newDoctor = newSchedule.getDoctor();
 
         String oldRoomNum = oldRoom != null ? oldRoom.getRoomNumber() : "Chưa rõ";
         String noteTransfer = String.format("[Chuyển từ %s -> %s: %s]", oldRoomNum, newRoom.getRoomNumber(),
@@ -401,17 +452,14 @@ public class QueueServiceImpl implements QueueService {
 
         // Tự động liên kết hoặc tạo hồ sơ bệnh nhân nếu vé chưa có patient
         if (ticket.getPatient() == null && ticket.getPatientName() != null && !ticket.getPatientName().trim().isEmpty()) {
+            // Tìm theo SĐT rồi khớp tên (giống lúc check-in), không tải toàn bộ bệnh nhân
+            String ticketName = ticket.getPatientName().trim();
             Patient matchedPatient = null;
-            List<Patient> allPatients = patientRepository.findAll();
-            for (Patient p : allPatients) {
-                if (p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(ticket.getPatientName().trim())) {
-                    matchedPatient = p;
-                    break;
-                }
-                if (ticket.getPatientPhone() != null && ticket.getPatientPhone().trim().equals(p.getPhoneNumber())) {
-                    matchedPatient = p;
-                    break;
-                }
+            if (ticket.getPatientPhone() != null && !ticket.getPatientPhone().trim().isEmpty()) {
+                matchedPatient = patientRepository.findByPhoneNumber(ticket.getPatientPhone().trim()).stream()
+                        .filter(p -> p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(ticketName))
+                        .findFirst()
+                        .orElse(null);
             }
             if (matchedPatient == null) {
                 LocalDate dob = ticket.getPatientDob();
@@ -442,15 +490,18 @@ public class QueueServiceImpl implements QueueService {
                 .orElseThrow(() -> new ResourceNotFoundException("Phòng khám", "id", roomId));
 
         // Tìm bác sĩ đang trực tại phòng
-        Doctor doctor = null;
-        List<WorkSchedule> schedules = workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, today);
-        if (!schedules.isEmpty()) {
-            doctor = schedules.get(0).getDoctor();
-        }
+        Doctor doctor = findOnDutySchedule(roomId, today, LocalTime.now()).map(WorkSchedule::getDoctor).orElse(null);
 
-        // Lấy danh sách vé trong ngày của phòng
+        return buildRoomOverview(room, doctor);
+    }
+
+    /**
+     * Dựng tổng quan hàng đợi của một phòng: lấy toàn bộ vé hôm nay của phòng bằng 1 truy vấn
+     * rồi chia theo trạng thái trong bộ nhớ.
+     */
+    private RoomQueueOverviewResponse buildRoomOverview(ExaminationRoom room, Doctor doctor) {
         List<QueueTicket> allTickets = queueTicketRepository
-                .findByTicketDateAndExaminationRoomIdOrderByPriorityScoreDescCheckInTimeAsc(today, roomId);
+                .findRoomQueue(LocalDate.now(), room.getId());
 
         QueueTicket examining = allTickets.stream()
                 .filter(t -> "IN_PROGRESS".equals(t.getStatus()))
@@ -462,6 +513,16 @@ public class QueueServiceImpl implements QueueService {
 
         List<QueueTicketResponse> waiting = allTickets.stream()
                 .filter(t -> "WAITING".equals(t.getStatus()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        List<QueueTicketResponse> resultsReady = allTickets.stream()
+                .filter(t -> "RESULTS_READY".equals(t.getStatus()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        List<QueueTicketResponse> waitingForResults = allTickets.stream()
+                .filter(t -> "WAITING_FOR_RESULTS".equals(t.getStatus()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
@@ -477,7 +538,7 @@ public class QueueServiceImpl implements QueueService {
 
         int avgTime = (doctor != null && doctor.getAverageConsultationTime() != null)
                 ? doctor.getAverageConsultationTime() : 15;
-        int estimatedWait = waiting.size() * avgTime;
+        int estimatedWait = (waiting.size() + resultsReady.size()) * avgTime;
 
         return RoomQueueOverviewResponse.builder()
                 .examinationRoomId(room.getId())
@@ -490,9 +551,11 @@ public class QueueServiceImpl implements QueueService {
                 .currentExaminingTicket(examining != null ? mapToResponse(examining) : null)
                 .currentCalledTicket(called != null ? mapToResponse(called) : null)
                 .waitingTickets(waiting)
+                .resultsReadyTickets(resultsReady)
+                .waitingForResultsTickets(waitingForResults)
                 .skippedTickets(skipped)
                 .completedTickets(completed)
-                .totalWaitingCount(waiting.size())
+                .totalWaitingCount(waiting.size() + resultsReady.size())
                 .totalExaminedCount(completed.size())
                 .estimatedWaitMinutes(estimatedWait)
                 .build();
@@ -500,14 +563,40 @@ public class QueueServiceImpl implements QueueService {
 
     @Override
     @Transactional(readOnly = true)
+    public RoomQueueOverviewResponse getMyRoomQueueOverview() {
+        Doctor doctor = getCurrentDoctor();
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        List<WorkSchedule> todaySchedules = workScheduleRepository
+                .findDoctorSchedules(doctor.getId(), today, today).stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .filter(ws -> ws.getExaminationRoom() != null)
+                .collect(Collectors.toList());
+        if (todaySchedules.isEmpty()) {
+            throw new BadRequestException("Hôm nay bạn không có ca trực nào tại phòng khám");
+        }
+
+        // Ca đang diễn ra / sắp tới gần nhất; nếu các ca đã hết giờ thì lấy ca cuối để bác sĩ khám nốt bệnh nhân còn lại
+        WorkSchedule schedule = todaySchedules.stream()
+                .filter(ws -> ws.getEndTime() == null || ws.getEndTime().isAfter(now))
+                .findFirst()
+                .orElse(todaySchedules.get(todaySchedules.size() - 1));
+
+        // Đã biết phòng và bác sĩ từ ca trực, không cần tra lại phòng / ca trực của phòng
+        return buildRoomOverview(schedule.getExaminationRoom(), doctor);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ClinicDisplayBoardResponse> getClinicDisplayBoard() {
         LocalDate today = LocalDate.now();
-        List<ExaminationRoom> rooms = examinationRoomRepository.findAllByOrderByRoomNumberAsc();
+        List<ExaminationRoom> rooms = examinationRoomRepository.findExamRooms();
         List<ClinicDisplayBoardResponse> displayList = new ArrayList<>();
 
         for (ExaminationRoom room : rooms) {
             List<QueueTicket> tickets = queueTicketRepository
-                    .findByTicketDateAndExaminationRoomIdOrderByPriorityScoreDescCheckInTimeAsc(today, room.getId());
+                    .findRoomQueue(today, room.getId());
 
             QueueTicket examining = tickets.stream()
                     .filter(t -> "IN_PROGRESS".equals(t.getStatus()))
@@ -526,10 +615,7 @@ public class QueueServiceImpl implements QueueService {
             long waitingCount = tickets.stream().filter(t -> "WAITING".equals(t.getStatus())).count();
 
             Doctor doc = null;
-            List<WorkSchedule> schedules = workScheduleRepository.findByExaminationRoomIdAndWorkDate(room.getId(), today);
-            if (!schedules.isEmpty()) {
-                doc = schedules.get(0).getDoctor();
-            }
+            doc = findOnDutySchedule(room.getId(), today, LocalTime.now()).map(WorkSchedule::getDoctor).orElse(null);
 
             displayList.add(ClinicDisplayBoardResponse.builder()
                     .roomId(room.getId())
@@ -631,6 +717,68 @@ public class QueueServiceImpl implements QueueService {
                 .orElse(tickets.get(0));
 
         return getMyTicketStatus(target.getTicketNumber());
+    }
+
+    /**
+     * Ca trực của phòng tại thời điểm {@code time}: ưu tiên ca đang diễn ra,
+     * nếu chưa tới ca nào thì lấy ca sắp tới gần nhất. Bỏ qua ca đã huỷ hoặc đã kết thúc.
+     */
+    private Optional<WorkSchedule> findOnDutySchedule(Long roomId, LocalDate date, LocalTime time) {
+        return workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, date).stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .filter(ws -> ws.getEndTime() == null || ws.getEndTime().isAfter(time))
+                .min(Comparator.comparing(WorkSchedule::getStartTime, Comparator.nullsFirst(Comparator.naturalOrder())));
+    }
+
+    private Doctor getCurrentDoctor() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new BadRequestException("Không xác định được tài khoản bác sĩ đang đăng nhập");
+        }
+        User user = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", auth.getName()));
+        if (!(user.getPerson() instanceof Doctor doctor)) {
+            throw new BadRequestException("Tài khoản hiện tại không gắn với hồ sơ bác sĩ");
+        }
+        return doctor;
+    }
+
+    /**
+     * Chỉ bác sĩ có ca trực hôm nay tại phòng mới được gọi số / khám cho phòng đó,
+     * tránh việc bác sĩ khác (hoặc chọn nhầm phòng) gọi bệnh nhân của phòng khác.
+     */
+    private void assertCurrentDoctorOnDutyInRoom(Long roomId) {
+        Doctor doctor = getCurrentDoctor();
+        boolean onDuty = workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, LocalDate.now()).stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .anyMatch(ws -> ws.getDoctor() != null && doctor.getId().equals(ws.getDoctor().getId()));
+        if (!onDuty) {
+            throw new BadRequestException("Bạn không có ca trực hôm nay tại phòng khám này");
+        }
+    }
+
+    // Mỗi phòng chỉ mời một bệnh nhân tại một thời điểm, tránh TV gọi chồng số
+    private void assertNoTicketBeingCalled(Long roomId, LocalDate date) {
+        queueTicketRepository.findRoomQueueByStatus(date, roomId, "CALLED")
+                .stream().findFirst()
+                .ifPresent(called -> {
+                    throw new BadRequestException("Số " + called.getTicketNumber()
+                            + " đang được mời vào phòng, vui lòng cho vào khám hoặc đánh dấu vắng mặt trước");
+                });
+    }
+
+    // Số thứ tự tiếp theo = số lớn nhất đã cấp trong ngày của phòng + 1.
+    // Không dùng "đếm số vé + 1" vì vé đã chuyển sang phòng khác vẫn giữ số cũ, đếm lại sẽ sinh trùng.
+    private String nextTicketNumber(ExaminationRoom room, LocalDate date) {
+        String roomCode = room.getRoomNumber().replace(".", "").replace(" ", "").toUpperCase();
+        String prefix = roomCode + "-";
+        int maxSequence = queueTicketRepository.findTicketNumbersByDateAndPrefix(date, prefix).stream()
+                .map(number -> number.substring(prefix.length()))
+                .filter(suffix -> suffix.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(0);
+        return String.format("%s%03d", prefix, maxSequence + 1);
     }
 
     private void broadcastQueueEvent(String eventType, QueueTicket ticket, String message) {

@@ -22,7 +22,7 @@ import { RouterLink } from '@angular/router';
           </div>
           <h1 class="page-title">{{ isDoctor() ? 'Bàn Gọi Khám Phòng Khám' : 'Điều Phối Hàng Đợi Các Phòng Khám' }}</h1>
           <p class="page-subtitle">
-            {{ isDoctor() ? 'Gọi số khám, mời bệnh nhân vào phòng và bắt đầu ca khám bệnh' : 'Giám sát hàng đợi các phòng khám, điều chuyển phòng khi quá tải, gọi số và xử lý ưu tiên' }}
+            {{ isDoctor() ? 'Gọi số khám, mời bệnh nhân vào phòng và bắt đầu ca khám bệnh' : 'Giám sát hàng đợi các phòng khám, điều chuyển phòng khi quá tải, xử lý ưu tiên và người bệnh nhỡ lượt' }}
           </p>
         </div>
         @if (!isDoctor()) {
@@ -37,24 +37,51 @@ import { RouterLink } from '@angular/router';
         }
       </div>
 
-      <!-- Room Selector Strip with Load Count -->
-      <div class="room-selector-bar">
-        <span class="selector-label"><i class="bi bi-hospital"></i> Phòng Khám:</span>
-        <div class="room-pills">
-          @for (room of rooms(); track room.id) {
-            <button
-              class="room-pill-btn"
-              [class.active]="selectedRoomId() === room.id"
-              (click)="selectRoom(room.id)"
+      <!-- Clean Simple Room Filter Bar -->
+      <div class="room-filter-bar">
+        <div class="room-filter-left">
+          <label for="roomSelectControl" class="room-filter-label">
+            <i class="bi bi-hospital text-primary"></i> Phòng khám:
+          </label>
+          @if (isDoctor()) {
+            <!-- Bác sĩ chỉ được gọi số tại phòng mình có ca trực hôm nay -->
+            <span class="room-filter-select">
+              @if (overview(); as ov) {
+                {{ ov.roomNumber }} - {{ ov.roomName }}
+              } @else {
+                Chưa có phòng trực
+              }
+            </span>
+          } @else {
+            <select
+              id="roomSelectControl"
+              class="room-filter-select"
+              [ngModel]="selectedRoomId()"
+              (ngModelChange)="selectRoom($event)"
             >
-              <span class="pill-number">{{ room.roomNumber }}</span>
-              <span class="pill-name">{{ room.roomName }}</span>
-              <span class="pill-load" [class.high-load]="getRoomWaitingCount(room.id) >= 5">
-                {{ getRoomWaitingCount(room.id) }} chờ
-              </span>
-            </button>
+              @for (floor of availableFloors(); track floor) {
+                <optgroup [label]="'🏢 Tầng ' + floor">
+                  @for (room of getRoomsByFloor(floor); track room.id) {
+                    <option [ngValue]="room.id">
+                      {{ room.roomNumber }} - {{ room.roomName }}
+                    </option>
+                  }
+                </optgroup>
+              }
+            </select>
           }
         </div>
+
+        @if (isDoctor() ? overview() : selectedRoom()) {
+          <div class="room-filter-right">
+            <span class="room-stat-badge">
+              <i class="bi bi-people-fill text-primary"></i> Đang chờ: <strong>{{ currentRoomWaitingCount() }}</strong> ca
+            </span>
+            <button type="button" class="btn-refresh-simple" (click)="fetchOverview(true)" title="Làm mới">
+              <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i>
+            </button>
+          </div>
+        }
       </div>
 
       <!-- Alerts (Top-Right Floating Toast) -->
@@ -80,6 +107,11 @@ import { RouterLink } from '@angular/router';
           <div class="spinner"></div>
           <p>Đang tải dữ liệu hàng đợi phòng khám...</p>
         </div>
+      } @else if (myRoomError()) {
+        <div class="loading-state">
+          <i class="bi bi-calendar-x text-muted" style="font-size: 2rem;"></i>
+          <p>{{ myRoomError() }}</p>
+        </div>
       } @else if (overview()) {
         <!-- Main Console Layout -->
         <div class="console-grid">
@@ -98,7 +130,8 @@ import { RouterLink } from '@angular/router';
               </div>
             </div>
 
-            <!-- Central Call Control -->
+            <!-- Central Call Control: chỉ bác sĩ trực phòng mới gọi số vào phòng khám -->
+            @if (isDoctor()) {
             <div class="call-action-box">
               <button
                 class="btn-call-next"
@@ -120,6 +153,14 @@ import { RouterLink } from '@angular/router';
                 </div>
               </button>
             </div>
+            } @else {
+              <div class="call-action-box">
+                <p class="text-muted small mb-0">
+                  <i class="bi bi-info-circle"></i> Bác sĩ trực phòng sẽ gọi số mời bệnh nhân vào khám.
+                  Quầy điều phối theo dõi hàng đợi, chuyển phòng, ưu tiên và xử lý người bệnh nhỡ lượt.
+                </p>
+              </div>
+            }
 
             <!-- Current States Panels -->
             <div class="status-panels-row">
@@ -144,14 +185,16 @@ import { RouterLink } from '@angular/router';
                           <span> • Năm sinh: {{ overview()!.currentCalledTicket!.patientYearOfBirth }}</span>
                         }
                       </div>
-                      <div class="panel-actions">
-                        <button class="btn btn-success btn-sm" (click)="startExam(overview()!.currentCalledTicket!.id)">
-                          <i class="bi bi-play-circle-fill"></i> Vào Khám
-                        </button>
-                        <button class="btn btn-outline-danger btn-sm" (click)="skipTicket(overview()!.currentCalledTicket!.id)">
-                          <i class="bi bi-skip-forward-fill"></i> Bỏ Qua (Vắng mặt)
-                        </button>
-                      </div>
+                      @if (isDoctor()) {
+                        <div class="panel-actions">
+                          <button class="btn btn-success btn-sm" (click)="startExam(overview()!.currentCalledTicket!.id)">
+                            <i class="bi bi-play-circle-fill"></i> Vào Khám
+                          </button>
+                          <button class="btn btn-outline-danger btn-sm" (click)="skipTicket(overview()!.currentCalledTicket!.id)">
+                            <i class="bi bi-skip-forward-fill"></i> Bỏ Qua (Vắng mặt)
+                          </button>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <div class="panel-empty">
@@ -178,19 +221,16 @@ import { RouterLink } from '@angular/router';
                       <div class="patient-info-sub">
                         <span>Bắt đầu lúc: {{ overview()!.currentExaminingTicket!.startTime }}</span>
                       </div>
-                      <div class="panel-actions">
-                        @if (isDoctor()) {
+                      @if (isDoctor()) {
+                        <div class="panel-actions">
                           <a [routerLink]="['/doctor/examination', overview()!.currentExaminingTicket!.id]" 
                              [state]="{ ticket: overview()!.currentExaminingTicket }"
                              (click)="onOpenExamination(overview()!.currentExaminingTicket!)" 
                              class="btn btn-primary btn-sm">
                             <i class="bi bi-file-earmark-medical-fill"></i> Bàn Khám &amp; Kê Đơn
                           </a>
-                        }
-                        <button class="btn btn-outline btn-sm" (click)="completeExam(overview()!.currentExaminingTicket!.id)">
-                          <i class="bi bi-check-circle-fill text-success"></i> Xong Nhanh
-                        </button>
-                      </div>
+                        </div>
+                      }
                     </div>
                   } @else {
                     <div class="panel-empty">
@@ -209,26 +249,52 @@ import { RouterLink } from '@angular/router';
             <div class="queue-tabs">
               <button
                 class="tab-btn"
+                [class.active]="activeTab === 'RESULTS_READY'"
+                (click)="activeTab = 'RESULTS_READY'"
+                title="Bệnh nhân đã có kết quả cận lâm sàng / xét nghiệm"
+              >
+                <i class="bi bi-file-earmark-check-fill text-success"></i>
+                <span class="tab-text">Có KQ CLS</span>
+                <span class="tab-count count-results-ready num">{{ overview()?.resultsReadyTickets?.length || 0 }}</span>
+              </button>
+              <button
+                class="tab-btn"
                 [class.active]="activeTab === 'WAITING'"
                 (click)="activeTab = 'WAITING'"
+                title="Bệnh nhân chờ khám lần đầu"
               >
-                <i class="bi bi-hourglass-split"></i> Đang Chờ
-                <span class="tab-count num">{{ overview()?.waitingTickets?.length || 0 }}</span>
+                <i class="bi bi-hourglass-split text-primary"></i>
+                <span class="tab-text">Chờ khám</span>
+                <span class="tab-count count-waiting num">{{ overview()?.waitingTickets?.length || 0 }}</span>
+              </button>
+              <button
+                class="tab-btn"
+                [class.active]="activeTab === 'WAITING_FOR_RESULTS'"
+                (click)="activeTab = 'WAITING_FOR_RESULTS'"
+                title="Bệnh nhân đang làm xét nghiệm cận lâm sàng"
+              >
+                <i class="bi bi-clock-history text-warning"></i>
+                <span class="tab-text">Đang làm XN</span>
+                <span class="tab-count count-waiting-lab num">{{ overview()?.waitingForResultsTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'SKIPPED'"
                 (click)="activeTab = 'SKIPPED'"
+                title="Bệnh nhân bị nhỡ lượt gọi"
               >
-                <i class="bi bi-arrow-repeat"></i> Bị Nhỡ Lượt
+                <i class="bi bi-arrow-repeat text-danger"></i>
+                <span class="tab-text">Nhỡ lượt</span>
                 <span class="tab-count count-skipped num">{{ overview()?.skippedTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'COMPLETED'"
                 (click)="activeTab = 'COMPLETED'"
+                title="Bệnh nhân đã hoàn tất khám"
               >
-                <i class="bi bi-check2-all"></i> Đã Khám
+                <i class="bi bi-check2-all text-secondary"></i>
+                <span class="tab-text">Đã khám</span>
                 <span class="tab-count count-completed num">{{ overview()?.completedTickets?.length || 0 }}</span>
               </button>
             </div>
@@ -248,6 +314,52 @@ import { RouterLink } from '@angular/router';
                 }
               </div>
             </div>
+
+            <!-- Tab Content 0: RESULTS_READY (Ưu tiên số 1) -->
+            @if (activeTab === 'RESULTS_READY') {
+              <div class="tab-content-list">
+                @if (filteredResultsReadyTickets().length === 0) {
+                  <div class="empty-list-state">
+                    <i class="bi bi-file-earmark-medical text-muted"></i>
+                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện chưa có bệnh nhân nào có kết quả cận lâm sàng' }}</p>
+                  </div>
+                } @else {
+                  @for (t of filteredResultsReadyTickets(); track t.id; let idx = $index) {
+                    <div class="ticket-row-card results-ready-row">
+                      <div class="row-order">
+                        <span class="order-idx num">#{{ idx + 1 }}</span>
+                        <span class="row-ticket-num num text-success">{{ t.ticketNumber }}</span>
+                      </div>
+                      <div class="row-patient-details">
+                        <div class="row-patient-name">
+                          <strong>{{ t.patientName }}</strong>
+                          <span class="badge badge-results-ready"><i class="bi bi-check2-circle"></i> ĐÃ CÓ KẾT QUẢ CLS</span>
+                          @if (t.isEmergency) {
+                            <span class="badge badge-emergency"><i class="bi bi-exclamation-octagon-fill"></i> CẤP CỨU</span>
+                          }
+                        </div>
+                        <div class="row-patient-meta">
+                          <span>SĐT: {{ t.patientPhone }}</span>
+                          @if (t.patientDob) {
+                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                          }
+                          <span class="text-success font-semibold">• Sẵn sàng đọc kết quả &amp; kê đơn</span>
+                        </div>
+                      </div>
+                      <div class="row-actions">
+                        @if (isDoctor()) {
+                          <button class="btn btn-sm btn-success" (click)="startExam(t.id)" title="Mời bệnh nhân vào phòng khám tiếp">
+                            <i class="bi bi-play-circle-fill"></i> Vào Khám (Đọc KQ)
+                          </button>
+                        } @else {
+                          <span class="text-xs text-muted">Chờ bác sĩ mời vào đọc kết quả</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
 
             <!-- Tab Content 1: WAITING -->
             @if (activeTab === 'WAITING') {
@@ -312,6 +424,43 @@ import { RouterLink } from '@angular/router';
               </div>
             }
 
+            <!-- Tab Content: WAITING_FOR_RESULTS (Đang làm xét nghiệm) -->
+            @if (activeTab === 'WAITING_FOR_RESULTS') {
+              <div class="tab-content-list">
+                @if (filteredWaitingForResultsTickets().length === 0) {
+                  <div class="empty-list-state">
+                    <i class="bi bi-hourglass-bottom text-muted"></i>
+                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện không có bệnh nhân nào đang làm xét nghiệm' }}</p>
+                  </div>
+                } @else {
+                  @for (t of filteredWaitingForResultsTickets(); track t.id; let idx = $index) {
+                    <div class="ticket-row-card waiting-lab-row">
+                      <div class="row-order">
+                        <span class="order-idx num">#{{ idx + 1 }}</span>
+                        <span class="row-ticket-num num text-warning">{{ t.ticketNumber }}</span>
+                      </div>
+                      <div class="row-patient-details">
+                        <div class="row-patient-name">
+                          <strong>{{ t.patientName }}</strong>
+                          <span class="badge badge-waiting-lab"><i class="bi bi-clock-history"></i> ĐANG CHỜ PHÒNG LAB</span>
+                        </div>
+                        <div class="row-patient-meta">
+                          <span>SĐT: {{ t.patientPhone }}</span>
+                          @if (t.patientDob) {
+                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                          }
+                          <span class="text-warning">• Bệnh nhân đang di chuyển sang phòng xét nghiệm</span>
+                        </div>
+                      </div>
+                      <div class="row-actions">
+                        <span class="text-xs text-muted">Đang xử lý kết quả</span>
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            }
+
             <!-- Tab Content 2: SKIPPED -->
             @if (activeTab === 'SKIPPED') {
               <div class="tab-content-list">
@@ -342,9 +491,15 @@ import { RouterLink } from '@angular/router';
                         }
                       </div>
                       <div class="row-actions">
-                        <button class="btn btn-sm btn-outline" (click)="recallTicket(t.id)" title="Gọi lại số này">
-                          <i class="bi bi-arrow-counterclockwise"></i> Gọi lại
-                        </button>
+                        @if (isDoctor()) {
+                          <button class="btn btn-sm btn-outline" (click)="recallTicket(t.id)" title="Gọi lại số này">
+                            <i class="bi bi-arrow-counterclockwise"></i> Gọi lại
+                          </button>
+                        } @else {
+                          <button class="btn btn-sm btn-outline" (click)="requeueTicket(t.id)" title="Người bệnh đã quay lại: xếp lên đầu hàng chờ để bác sĩ gọi lượt tiếp theo">
+                            <i class="bi bi-arrow-counterclockwise"></i> Đưa lại hàng đợi
+                          </button>
+                        }
                         <button class="btn btn-sm btn-outline-primary" (click)="openTransferModal(t)" title="Chuyển sang phòng khác">
                           <i class="bi bi-arrow-left-right"></i> Chuyển phòng
                         </button>
@@ -627,86 +782,119 @@ import { RouterLink } from '@angular/router';
       align-items: center;
     }
 
-    /* Room Selector Bar */
-    .room-selector-bar {
+    /* Clean Simple Room Filter Bar */
+    .room-filter-bar {
       background-color: #ffffff;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-color);
-      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 0.6rem 1rem;
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 1rem;
       margin-bottom: 1.25rem;
-      box-shadow: var(--shadow-xs);
-      flex-wrap: wrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
-    .selector-label {
-      font-size: 0.875rem;
+    .room-filter-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+    }
+
+    .room-filter-label {
+      font-size: 0.9rem;
       font-weight: 700;
-      color: var(--text-secondary);
+      color: #334155;
       display: flex;
       align-items: center;
       gap: 0.4rem;
       white-space: nowrap;
+      margin: 0;
     }
 
-    .room-pills {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .room-pill-btn {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.45rem 0.95rem;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-color);
-      background-color: var(--bg-main);
-      color: var(--text-secondary);
-      cursor: pointer;
-      font-size: 0.85rem;
+    .room-filter-select {
+      max-width: 420px;
+      width: 100%;
+      height: 38px;
+      padding: 0 0.85rem;
+      font-size: 0.9rem;
       font-weight: 600;
+      color: #0f172a;
+      background-color: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
       transition: all 0.15s ease;
     }
 
-    .room-pill-btn:hover {
-      border-color: var(--primary-300);
-      background-color: var(--primary-50);
-      color: var(--primary-700);
+    .room-filter-select:hover {
+      background-color: #ffffff;
+      border-color: #94a3b8;
     }
 
-    .room-pill-btn.active {
-      background-color: var(--primary-600);
-      border-color: var(--primary-600);
-      color: #ffffff;
-      box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+    .room-filter-select:focus {
+      background-color: #ffffff;
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
     }
 
-    .pill-number {
-      font-weight: 800;
-      letter-spacing: 0.02em;
+    .room-filter-right {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
     }
 
-    .pill-load {
-      font-size: 0.725rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-      background: rgba(0, 0, 0, 0.06);
+    .room-stat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      background: #f1f5f9;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #334155;
+      font-weight: 500;
+      white-space: nowrap;
     }
 
-    .room-pill-btn.active .pill-load {
-      background: rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-    }
-
-    .pill-load.high-load {
-      background: #fee2e2;
-      color: #b91c1c;
+    .room-stat-badge strong {
+      color: #0284c7;
       font-weight: 700;
     }
+
+    .btn-refresh-simple {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 0.9rem;
+    }
+
+    .btn-refresh-simple:hover {
+      background: #f0f9ff;
+      border-color: #0284c7;
+      color: #0284c7;
+    }
+
+    .spin-active {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
 
     /* Console Grid */
     .console-grid {
@@ -954,39 +1142,96 @@ import { RouterLink } from '@angular/router';
 
     .queue-tabs {
       display: flex;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border-color);
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0.35rem;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .queue-tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .tab-btn {
-      flex: 1;
-      padding: 0.75rem 0.5rem;
-      background: none;
+      flex: 1 0 auto;
+      white-space: nowrap;
+      padding: 0.45rem 0.65rem;
+      background: transparent;
       border: none;
-      border-bottom: 2px solid transparent;
-      font-size: 0.825rem;
-      font-weight: 700;
-      color: var(--text-secondary);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 0.35rem;
-      transition: all 0.15s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+
+    .tab-btn:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.7);
+      color: #1e293b;
     }
 
     .tab-btn.active {
-      color: var(--primary-700);
-      border-bottom-color: var(--primary-700);
       background: #ffffff;
+      color: #0f172a;
+      font-weight: 700;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .tab-text {
+      white-space: nowrap;
     }
 
     .tab-count {
-      font-size: 0.725rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 0.35rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1;
       background: #e2e8f0;
-      color: #334155;
+      color: #475569;
+    }
+
+    .tab-count.count-results-ready {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .tab-btn.active .tab-count.count-results-ready {
+      background: #16a34a;
+      color: #ffffff;
+    }
+
+    .tab-count.count-waiting {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+
+    .tab-btn.active .tab-count.count-waiting {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
+    .tab-count.count-waiting-lab {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .tab-btn.active .tab-count.count-waiting-lab {
+      background: #f59e0b;
+      color: #ffffff;
     }
 
     .tab-count.count-skipped {
@@ -994,9 +1239,14 @@ import { RouterLink } from '@angular/router';
       color: #b91c1c;
     }
 
+    .tab-btn.active .tab-count.count-skipped {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
     .tab-count.count-completed {
-      background: #dcfce7;
-      color: #15803d;
+      background: #f1f5f9;
+      color: #64748b;
     }
 
     .list-search-bar {
@@ -1106,6 +1356,52 @@ import { RouterLink } from '@angular/router';
       font-weight: 800;
       padding: 0.1rem 0.4rem;
       border-radius: var(--radius-xs);
+    }
+
+    .badge-results-ready {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid #86efac;
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    }
+
+    .badge-waiting-lab {
+      background: #fef3c7;
+      color: #b45309;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid #fde68a;
+    }
+
+    .results-ready-row {
+      border-left: 4px solid #16a34a !important;
+      background: #f0fdf4 !important;
+    }
+
+    .waiting-lab-row {
+      border-left: 4px solid #f59e0b !important;
+      background: #fffbeb !important;
+    }
+
+    .count-results-ready {
+      background: #16a34a !important;
+      color: #ffffff !important;
+    }
+
+    .count-waiting-lab {
+      background: #f59e0b !important;
+      color: #ffffff !important;
     }
 
     .badge-priority {
@@ -1350,11 +1646,50 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   readonly isStaff = computed(() => this.authService.hasRole('STAFF'));
 
   readonly rooms = signal<ExaminationRoom[]>([]);
-  readonly selectedRoomId = signal<number>(1);
+  readonly selectedRoomId = signal<number>(0);
+  readonly selectedFloor = signal<number | null>(null);
+
+  readonly selectedRoom = computed(() => {
+    return this.rooms().find(r => r.id === this.selectedRoomId()) || null;
+  });
+
+  readonly availableFloors = computed(() => {
+    const list = this.rooms().map(r => r.floor);
+    return Array.from(new Set(list)).sort((a, b) => a - b);
+  });
+
+  getRoomsByFloor(floor: number): ExaminationRoom[] {
+    return this.rooms().filter(r => r.floor === floor);
+  }
+
+  prevRoom(): void {
+    const all = this.rooms();
+    if (all.length === 0) return;
+    const currIdx = all.findIndex(r => r.id === this.selectedRoomId());
+    if (currIdx > 0) {
+      this.selectRoom(all[currIdx - 1].id);
+    } else {
+      this.selectRoom(all[all.length - 1].id);
+    }
+  }
+
+  nextRoom(): void {
+    const all = this.rooms();
+    if (all.length === 0) return;
+    const currIdx = all.findIndex(r => r.id === this.selectedRoomId());
+    if (currIdx < all.length - 1) {
+      this.selectRoom(all[currIdx + 1].id);
+    } else {
+      this.selectRoom(all[0].id);
+    }
+  }
+
   readonly overview = signal<RoomQueueOverview | null>(null);
 
   readonly loading = signal(true);
   readonly calling = signal(false);
+  // Thông báo khi bác sĩ không có ca trực hôm nay (không có phòng để gọi số)
+  readonly myRoomError = signal<string | null>(null);
 
   // Transfer Modal State
   readonly showTransferModal = signal(false);
@@ -1377,7 +1712,7 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   readonly alertMessage = signal<string | null>(null);
   readonly alertType = signal<'success' | 'danger'>('success');
 
-  activeTab: 'WAITING' | 'SKIPPED' | 'COMPLETED' = 'WAITING';
+  activeTab: 'WAITING' | 'RESULTS_READY' | 'WAITING_FOR_RESULTS' | 'SKIPPED' | 'COMPLETED' = 'WAITING';
   listSearchQuery: string = '';
 
   private pollingTimer: any = null;
@@ -1400,6 +1735,12 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   }
 
   loadRooms(): void {
+    // Bác sĩ chỉ cần hàng đợi phòng mình trực; danh sách phòng chỉ tải khi cần chuyển phòng
+    if (this.isDoctor()) {
+      this.loadMyRoom(true);
+      return;
+    }
+
     this.scheduleService.getAllRooms().subscribe({
       next: res => {
         if (res.success && res.data && res.data.length > 0) {
@@ -1412,7 +1753,30 @@ export class QueueControlComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Bác sĩ luôn làm việc tại phòng mình có ca trực hôm nay, không được chọn phòng khác
+  private loadMyRoom(showLoading: boolean): void {
+    if (showLoading) this.loading.set(true);
+    this.queueService.getMyRoomQueue().subscribe({
+      next: res => {
+        if (res.success && res.data) {
+          this.selectedRoomId.set(res.data.examinationRoomId);
+          this.overview.set(res.data);
+          this.myRoomError.set(null);
+        }
+        if (showLoading) this.loading.set(false);
+      },
+      error: err => {
+        this.selectedRoomId.set(0);
+        this.overview.set(null);
+        this.myRoomError.set(err.error?.message || 'Hôm nay bạn không có ca trực tại phòng khám nào');
+        if (showLoading) this.loading.set(false);
+      }
+    });
+  }
+
   loadDisplayBoardCounts(): void {
+    // Số người chờ của các phòng khác chỉ phục vụ quầy điều phối
+    if (this.isDoctor()) return;
     this.queueService.getDisplayBoard().subscribe({
       next: res => {
         if (res.success && res.data) {
@@ -1430,12 +1794,24 @@ export class QueueControlComponent implements OnInit, OnDestroy {
     return this.roomWaitingCounts()[roomId] || 0;
   }
 
+  // Bác sĩ đếm ngay trên hàng đợi phòng mình, không cần bảng tổng hợp các phòng
+  currentRoomWaitingCount(): number {
+    if (this.isDoctor()) {
+      return this.overview()?.waitingTickets?.length || 0;
+    }
+    return this.getRoomWaitingCount(this.selectedRoomId());
+  }
+
   selectRoom(roomId: number): void {
     this.selectedRoomId.set(roomId);
     this.fetchOverview(true);
   }
 
   fetchOverview(showLoading = true): void {
+    if (this.isDoctor()) {
+      this.loadMyRoom(showLoading);
+      return;
+    }
     if (showLoading) this.loading.set(true);
     this.queueService.getRoomQueue(this.selectedRoomId()).subscribe({
       next: res => {
@@ -1483,18 +1859,7 @@ export class QueueControlComponent implements OnInit, OnDestroy {
   onOpenExamination(ticket: QueueTicket): void {
     try {
       sessionStorage.setItem('currentExaminingTicket', JSON.stringify(ticket));
-    } catch {}
-  }
-
-  completeExam(ticketId: number): void {
-    this.queueService.completeExamination(ticketId).subscribe({
-      next: () => {
-        this.showAlert('Đã hoàn thành lượt khám bệnh!', 'success');
-        this.fetchOverview(false);
-        this.loadDisplayBoardCounts();
-      },
-      error: err => this.showAlert(err.error?.message || 'Lỗi khi hoàn thành khám', 'danger')
-    });
+    } catch { }
   }
 
   skipTicket(ticketId: number): void {
@@ -1516,6 +1881,17 @@ export class QueueControlComponent implements OnInit, OnDestroy {
         this.loadDisplayBoardCounts();
       },
       error: err => this.showAlert(err.error?.message || 'Lỗi khi gọi lại số', 'danger')
+    });
+  }
+
+  requeueTicket(ticketId: number): void {
+    this.queueService.requeueTicket(ticketId).subscribe({
+      next: res => {
+        this.showAlert(`Đã đưa số ${res.data?.ticketNumber} trở lại hàng đợi, bác sĩ sẽ gọi ở lượt tiếp theo`, 'success');
+        this.fetchOverview(false);
+        this.loadDisplayBoardCounts();
+      },
+      error: err => this.showAlert(err.error?.message || 'Lỗi khi đưa lại hàng đợi', 'danger')
     });
   }
 
@@ -1553,6 +1929,19 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   // --- Chuyển phòng khám (Transfer Ticket) ---
   openTransferModal(ticket: QueueTicket): void {
+    // Bác sĩ không tải danh sách phòng khi mở màn, chỉ tải lần đầu cần chuyển phòng
+    if (this.rooms().length === 0) {
+      this.scheduleService.getAllRooms().subscribe({
+        next: res => {
+          if (res.success && res.data && res.data.length > 0) {
+            this.rooms.set(res.data);
+            this.openTransferModal(ticket);
+          }
+        },
+        error: err => this.showAlert(err.error?.message || 'Không tải được danh sách phòng khám', 'danger')
+      });
+      return;
+    }
     this.activeTransferTicket.set(ticket);
     const availableRooms = this.rooms().filter(r => r.id !== ticket.examinationRoomId);
     this.targetRoomId = availableRooms.length > 0 ? availableRooms[0].id : 0;
@@ -1631,6 +2020,28 @@ export class QueueControlComponent implements OnInit, OnDestroy {
 
   filteredSkippedTickets(): QueueTicket[] {
     const tickets = this.overview()?.skippedTickets || [];
+    const q = this.listSearchQuery.trim().toLowerCase();
+    if (!q) return tickets;
+    return tickets.filter(t =>
+      t.ticketNumber.toLowerCase().includes(q) ||
+      t.patientName.toLowerCase().includes(q) ||
+      (t.patientPhone && t.patientPhone.includes(q))
+    );
+  }
+
+  filteredResultsReadyTickets(): QueueTicket[] {
+    const tickets = this.overview()?.resultsReadyTickets || [];
+    const q = this.listSearchQuery.trim().toLowerCase();
+    if (!q) return tickets;
+    return tickets.filter(t =>
+      t.ticketNumber.toLowerCase().includes(q) ||
+      t.patientName.toLowerCase().includes(q) ||
+      (t.patientPhone && t.patientPhone.includes(q))
+    );
+  }
+
+  filteredWaitingForResultsTickets(): QueueTicket[] {
+    const tickets = this.overview()?.waitingForResultsTickets || [];
     const q = this.listSearchQuery.trim().toLowerCase();
     if (!q) return tickets;
     return tickets.filter(t =>

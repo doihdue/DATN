@@ -81,4 +81,8 @@ public class MedicalRecord {
 
     @OneToOne(mappedBy = "medicalRecord", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Prescription prescription;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "medicalRecord", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private java.util.List<LabOrder> labOrders = new java.util.ArrayList<>();
 }

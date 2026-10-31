@@ -1,6 +1,8 @@
 package com.demo.be.service;
 
+import com.demo.be.dto.request.BatchWorkScheduleRequest;
 import com.demo.be.dto.request.WorkScheduleRequest;
+import com.demo.be.dto.response.BatchWorkScheduleResponse;
 import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
 
@@ -17,9 +19,20 @@ public interface WorkScheduleService {
             Long roomId
     );
 
-    WorkScheduleResponse getScheduleById(Long id);
+    // Lịch trực của bác sĩ đang đăng nhập
+    List<WorkScheduleResponse> getMySchedules(LocalDate startDate, LocalDate endDate);
+
+    // Các ca còn nhận đặt lịch online (còn chỗ, chưa huỷ, chưa kết thúc)
+    List<WorkScheduleResponse> getBookableSchedules(
+            LocalDate startDate,
+            LocalDate endDate,
+            Long doctorId,
+            Long specialtyId
+    );
 
     WorkScheduleResponse createSchedule(WorkScheduleRequest request);
+
+    BatchWorkScheduleResponse createBatchSchedules(BatchWorkScheduleRequest request);
 
     WorkScheduleResponse updateSchedule(Long id, WorkScheduleRequest request);
 

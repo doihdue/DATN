@@ -39,6 +39,9 @@ import { AuthService } from '../../services/auth.service';
               <button type="button" class="chip-item" (click)="fillAccount('staff_mai', 'Staff@123456')">
                 <i class="bi bi-person-badge-fill text-amber"></i> Lễ tân
               </button>
+              <button type="button" class="chip-item" (click)="fillAccount('ktv_lan', '123456')">
+                <i class="bi bi-eyedropper text-teal"></i> Kỹ thuật viên
+              </button>
               <button type="button" class="chip-item" (click)="fillAccount('admin', 'Admin@123456')">
                 <i class="bi bi-shield-lock-fill text-purple"></i> Admin
               </button>
@@ -350,6 +353,9 @@ export class LoginComponent {
           } else if (isAdmin) {
             // Chỉ Admin vào thẳng Dashboard
             this.router.navigateByUrl('/dashboard');
+          } else if (this.authService.isLabTech()) {
+            // Kỹ thuật viên xét nghiệm vào thẳng phòng Lab
+            this.router.navigateByUrl('/lab');
           } else {
             // Bác sĩ, Lễ tân và Bệnh nhân đều vào Trang chủ '/'
             this.router.navigateByUrl('/');

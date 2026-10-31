@@ -21,6 +21,17 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Mã lịch hẹn để bệnh nhân xuất trình tại quầy, ví dụ: LH260815-0012
+    @Column(name = "appointment_code", unique = true, length = 30)
+    private String appointmentCode;
+
+    // Số thứ tự đặt trước trong ca làm việc (1..maxPatients)
+    @Column(name = "booking_number")
+    private Integer bookingNumber;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
     @Column(name = "appointment_date", nullable = false)
     private LocalDate appointmentDate;
 

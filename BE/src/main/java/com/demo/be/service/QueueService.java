@@ -13,11 +13,12 @@ public interface QueueService {
 
     QueueTicketResponse startExamination(Long ticketId);
 
-    QueueTicketResponse completeExamination(Long ticketId);
 
     QueueTicketResponse skipTicket(Long ticketId);
 
     QueueTicketResponse recallTicket(Long ticketId);
+
+    QueueTicketResponse requeueTicket(Long ticketId);
 
     QueueTicketResponse setEmergency(Long ticketId);
 
@@ -30,6 +31,8 @@ public interface QueueService {
     List<PatientLookupResponse> searchPatients(String keyword);
 
     RoomQueueOverviewResponse getRoomQueueOverview(Long roomId);
+
+    RoomQueueOverviewResponse getMyRoomQueueOverview();
 
     List<ClinicDisplayBoardResponse> getClinicDisplayBoard();
 

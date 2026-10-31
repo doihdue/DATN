@@ -11,7 +11,7 @@ export interface QueueTicket {
   isEmergency: boolean;
   hasAppointment: boolean;
   priorityScore: number;
-  status: 'WAITING' | 'CALLED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED';
+  status: 'WAITING' | 'CALLED' | 'IN_PROGRESS' | 'WAITING_FOR_RESULTS' | 'RESULTS_READY' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED';
   checkInTime: string;
   callTime?: string;
   startTime?: string;
@@ -54,6 +54,8 @@ export interface RoomQueueOverview {
   currentExaminingTicket?: QueueTicket;
   currentCalledTicket?: QueueTicket;
   waitingTickets: QueueTicket[];
+  resultsReadyTickets?: QueueTicket[];
+  waitingForResultsTickets?: QueueTicket[];
   skippedTickets: QueueTicket[];
   completedTickets: QueueTicket[];
 

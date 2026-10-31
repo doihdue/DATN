@@ -8,6 +8,7 @@ import { MedicalRecordService } from '../../services/medical-record.service';
 import { CheckInRequest, MyTicketStatus } from '../../models/queue.model';
 import { ExaminationRoom } from '../../models/schedule.model';
 import { AuthService } from '../../services/auth.service';
+import { toIsoDate } from '../../utils/date.utils';
 
 @Component({
   selector: 'app-queue-tracking',
@@ -1304,7 +1305,7 @@ export class QueueTrackingComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly rooms = signal<ExaminationRoom[]>([]);
 
-  readonly todayString = new Date().toISOString().split('T')[0];
+  readonly todayString = toIsoDate(new Date());
 
   checkInForm: CheckInRequest = {
     patientName: '',

@@ -11,7 +11,16 @@ import { DoctorExaminationComponent } from './pages/doctor-examination/doctor-ex
 import { MedicinesComponent } from './pages/medicines/medicines.component';
 import { CheckInComponent } from './pages/check-in/check-in.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
-import { roleGuard, patientOrGuestGuard } from './guards/auth.guard';
+import { BookAppointmentComponent } from './pages/book-appointment/book-appointment.component';
+import { MyAppointmentsComponent } from './pages/my-appointments/my-appointments.component';
+import { AppointmentManagementComponent } from './pages/appointment-management/appointment-management.component';
+import { DoctorsComponent } from './pages/doctors/doctors.component';
+import { StaffComponent } from './pages/staff/staff.component';
+import { LabTechniciansComponent } from './pages/lab-technicians/lab-technicians.component';
+import { LabManagementComponent } from './pages/lab-management/lab-management.component';
+import { LabServicesComponent } from './pages/lab-services/lab-services.component';
+import { DoctorHistoryComponent } from './pages/doctor-history/doctor-history.component';
+import { roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   // Trang chủ - ai cũng vào được
@@ -37,16 +46,69 @@ export const routes: Routes = [
     canActivate: [roleGuard(['ADMIN'])]
   },
   {
+    path: 'admin/doctors',
+    component: DoctorsComponent,
+    title: 'Quản lý Bác sĩ - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/staff',
+    component: StaffComponent,
+    title: 'Quản lý Lễ tân - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/lab-technicians',
+    component: LabTechniciansComponent,
+    title: 'Quản lý Kỹ thuật viên - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/lab-techs',
+    redirectTo: 'admin/lab-technicians'
+  },
+  {
+    path: 'admin/personnel',
+    redirectTo: 'admin/doctors',
+    pathMatch: 'full'
+  },
+  {
     path: 'admin/medicines',
+    redirectTo: 'admin/medicines/list',
+    pathMatch: 'full'
+  },
+  {
+    path: 'admin/medicines/list',
     component: MedicinesComponent,
-    title: 'Quản lý Dược phẩm & Thuốc - MedQueue',
+    title: 'Kho Thuốc & Biệt Dược - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/medicines/categories',
+    component: MedicinesComponent,
+    title: 'Nhóm & Danh Mục Thuốc - MedQueue',
     canActivate: [roleGuard(['ADMIN'])]
   },
   {
     path: 'admin/schedules',
+    redirectTo: 'admin/schedules/doctors',
+    pathMatch: 'full'
+  },
+  {
+    path: 'admin/schedules/doctors',
     component: SchedulesComponent,
-    title: 'Quản lý Lịch làm việc - MedQueue',
+    title: 'Lịch trực Bác sĩ - MedQueue',
     canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/schedules/technicians',
+    component: SchedulesComponent,
+    title: 'Lịch trực Kỹ thuật viên - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
+  },
+  {
+    path: 'admin/schedules/techs',
+    redirectTo: 'admin/schedules/technicians'
   },
 
   // ========================
@@ -71,6 +133,18 @@ export const routes: Routes = [
     canActivate: [roleGuard(['DOCTOR'])]
   },
   {
+    path: 'doctor/history',
+    component: DoctorHistoryComponent,
+    title: 'Lịch Sử Ca Khám Bệnh - MedQueue',
+    canActivate: [roleGuard(['DOCTOR'])]
+  },
+  {
+    path: 'doctor/medicines',
+    component: MedicinesComponent,
+    title: 'Tra Cứu Danh Mục Thuốc - MedQueue',
+    canActivate: [roleGuard(['DOCTOR'])]
+  },
+  {
     path: 'doctor/schedule',
     component: SchedulesComponent,
     title: 'Lịch trực Bác sĩ - MedQueue',
@@ -78,18 +152,46 @@ export const routes: Routes = [
   },
 
   // ========================
-  // STAFF - Lễ tân tiếp đón (CHỈ STAFF, Admin không được dùng bàn này)
+  // STAFF - Lễ tân tiếp đón (CHỈ LỄ TÂN, KTV Xét nghiệm vào /lab)
   // ========================
   {
     path: 'staff/check-in',
     component: CheckInComponent,
     title: 'Tiếp đón & Cấp số - MedQueue',
-    canActivate: [roleGuard(['STAFF'])]
+    canActivate: [receptionistGuard]
   },
   {
     path: 'staff/queue',
     component: QueueControlComponent,
     title: 'Bàn Điều phối Hàng đợi - MedQueue',
+    canActivate: [receptionistGuard]
+  },
+
+  // ========================
+  // LAB - Phòng Xét Nghiệm & Cận Lâm Sàng
+  // ========================
+  {
+    path: 'lab',
+    component: LabManagementComponent,
+    title: 'Phòng Xét Nghiệm & Cận Lâm Sàng - MedQueue',
+    canActivate: [labTechGuard]
+  },
+  {
+    path: 'lab/my-shifts',
+    component: SchedulesComponent,
+    title: 'Ca trực của tôi - MedQueue',
+    canActivate: [labTechGuard]
+  },
+  {
+    path: 'lab/services',
+    component: LabServicesComponent,
+    title: 'Danh Mục Xét Nghiệm & Chỉ Số Chuẩn - MedQueue',
+    canActivate: [roleGuard(['ADMIN', 'DOCTOR', 'STAFF', 'LAB_TECH'])]
+  },
+  {
+    path: 'staff/appointments',
+    component: AppointmentManagementComponent,
+    title: 'Quản lý lịch hẹn - MedQueue',
     canActivate: [roleGuard(['STAFF'])]
   },
 
@@ -105,6 +207,19 @@ export const routes: Routes = [
     component: QueueTrackingComponent,
     title: 'Tra cứu phiếu khám - MedQueue',
     canActivate: [patientOrGuestGuard]
+  },
+  // Đặt lịch khám online: khách xem được ca trống, đặt lịch cần đăng nhập bệnh nhân
+  {
+    path: 'booking',
+    component: BookAppointmentComponent,
+    title: 'Đặt lịch khám - MedQueue',
+    canActivate: [patientOrGuestGuard]
+  },
+  {
+    path: 'my-appointments',
+    component: MyAppointmentsComponent,
+    title: 'Lịch hẹn của tôi - MedQueue',
+    canActivate: [roleGuard(['PATIENT'])]
   },
   {
     path: 'my-tickets',
