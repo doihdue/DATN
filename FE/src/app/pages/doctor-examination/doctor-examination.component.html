@@ -83,7 +83,7 @@
               <span class="emergency-badge"><i class="bi bi-lightning-fill"></i> ƯU TIÊN CẤP CỨU</span>
             }
             <button type="button" class="btn btn-sm btn-outline-primary btn-switch-patient" (click)="showQueueDrawer.set(true)" title="Chọn bệnh nhân khác trong phòng">
-              <i class="bi bi-arrow-left-right"></i> Đổi bệnh nhân ({{ roomTickets().length }} trong hàng đợi)
+              <i class="bi bi-arrow-left-right"></i> Đổi bệnh nhân ({{ myPatients().length }} đang phụ trách · {{ waitingPatients().length }} chờ)
             </button>
           </div>
           <div class="patient-details-row">
@@ -122,7 +122,7 @@
             <i class="bi bi-megaphone"></i> Bàn Gọi Số Khám
           </a>
           <button type="button" class="btn btn-outline-primary btn-sm" (click)="showQueueDrawer.set(true)">
-            <i class="bi bi-people"></i> Hàng Đợi ({{ roomTickets().length }})
+            <i class="bi bi-people"></i> Hàng Đợi ({{ myPatients().length }} đang phụ trách · {{ waitingPatients().length }} chờ)
           </button>
         </div>
       </div>
@@ -1160,20 +1160,22 @@
 
   <!-- MODAL: In Phiếu Chỉ Định Cận Lâm Sàng & Xét Nghiệm (Pha 1) -->
   @if (showLabPrintModal()) {
-    <div class="modal-backdrop-print">
-      <div class="modal-print-container">
-        <!-- Floating Actions Bar -->
-        <div class="print-actions-floating-bar no-print">
-          <div class="actions-left">
-            <span class="badge badge-warning text-dark"><i class="bi bi-send-check-fill"></i> Đã Gửi Chỉ Định Xét Nghiệm</span>
-            <span class="text-white-50 small ms-2">Bệnh nhân chuyển sang trạng thái Chờ Kết Quả</span>
+    <div class="modal-backdrop">
+      <div class="print-modal-container">
+        <div class="modal-actions-bar no-print">
+          <div class="modal-left">
+            <span class="badge-success-glow"><i class="bi bi-send-check-fill"></i> Đã gửi {{ selectedLabServices().length }} chỉ định cận lâm sàng</span>
+            <div class="lab-next-steps">
+              In phiếu đưa bệnh nhân sang phòng ghi ở cột <strong>Nơi thực hiện</strong>. Ca khám tạm dừng;
+              khi có đủ kết quả, bệnh nhân hiện ở tab <strong>Có KQ CLS</strong> trên màn gọi số để bạn mời vào đọc kết quả và kê đơn.
+            </div>
           </div>
-          <div class="actions-right">
-            <button type="button" class="btn btn-primary btn-print-action" (click)="printLabOrderDocument()">
-              <i class="bi bi-printer-fill"></i> In Phiếu Chỉ Định (A4)
+          <div class="modal-right">
+            <button type="button" class="btn btn-primary btn-print" (click)="printLabOrderDocument()">
+              <i class="bi bi-printer-fill"></i> In phiếu chỉ định
             </button>
-            <button type="button" class="btn btn-outline-light btn-return-queue" (click)="closeLabPrintModalAndClear()">
-              <i class="bi bi-arrow-right-circle"></i> Đóng &amp; Đón Ca Khám Tiếp Theo
+            <button type="button" class="btn btn-outline btn-return-queue" (click)="closeLabPrintModalAndClear()">
+              <i class="bi bi-arrow-right"></i> Gọi bệnh nhân tiếp theo
             </button>
           </div>
         </div>
@@ -1184,12 +1186,12 @@
             <div class="doc-clinic-col">
               <div class="clinic-brand-title">HỆ THỐNG PHÒNG KHÁM ĐA KHOA QUỐC TẾ MEDQUEUE</div>
               <div class="clinic-sub">Địa chỉ: Km10, Đường Nguyễn Trãi, Q. Hà Đông, Hà Nội</div>
-              <div class="clinic-sub">Hotline: <strong>1900 6868</strong> • Khoa Xét Nghiệm &amp; CĐHA (Tầng 1)</div>
+              <div class="clinic-sub">Hotline: <strong>1900 6868</strong> • Website: <strong>medqueue.vn</strong></div>
             </div>
             <div class="doc-meta-col">
               <div class="meta-item"><span class="meta-label">Mã phiếu chỉ định:</span> <strong class="meta-val text-primary">#LAB-{{ lastSentLabRecord()?.id || currentTicket()?.id }}</strong></div>
               <div class="meta-item"><span class="meta-label">Số thứ tự khám:</span> <strong class="meta-val text-danger">#{{ currentTicket()?.ticketNumber || 'N/A' }}</strong></div>
-              <div class="meta-item"><span class="meta-label">Thời gian chỉ định:</span> <span class="meta-val">{{ 'now' | date:'dd/MM/yyyy HH:mm' }}</span></div>
+              <div class="meta-item"><span class="meta-label">Thời gian chỉ định:</span> <span class="meta-val">{{ labSentAt() | date:'dd/MM/yyyy HH:mm' }}</span></div>
             </div>
           </div>
 
@@ -1197,7 +1199,7 @@
 
           <div class="doc-title-block">
             <h1 class="doc-main-title text-primary">PHIẾU CHỈ ĐỊNH CẬN LÂM SÀNG &amp; XÉT NGHIỆM</h1>
-            <p class="doc-sub-title">(Người bệnh mang phiếu này tới Phòng Xét Nghiệm &amp; Thăm Dò Chức Năng)</p>
+            <p class="doc-sub-title">(Người bệnh mang phiếu này tới phòng ghi ở cột "Nơi thực hiện")</p>
           </div>
 
           <!-- Thông tin bệnh nhân -->
@@ -1239,9 +1241,9 @@
                 <tr>
                   <th style="width: 6%; text-align: center;">STT</th>
                   <th style="width: 14%;">Mã DV</th>
-                  <th style="width: 45%;">Tên dịch vụ kỹ thuật xét nghiệm / CĐHA</th>
-                  <th style="width: 15%; text-align: center;">Đơn vị</th>
-                  <th style="width: 20%; text-align: right;">Đơn giá</th>
+                  <th style="width: 40%;">Tên dịch vụ kỹ thuật xét nghiệm / CĐHA</th>
+                  <th style="width: 24%;">Nơi thực hiện</th>
+                  <th style="width: 16%; text-align: right;">Đơn giá</th>
                 </tr>
               </thead>
               <tbody>
@@ -1255,14 +1257,14 @@
                         <span class="text-muted small"> ({{ s.category }})</span>
                       }
                     </td>
-                    <td style="text-align: center;">{{ s.unit || 'Lần' }}</td>
+                    <td><strong>{{ labRoomOf(s) }}</strong></td>
                     <td style="text-align: right; font-weight: 600;">{{ s.price | number:'1.0-0' }} đ</td>
                   </tr>
                 }
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="4" style="text-align: right; font-weight: bold; padding: 8px;">TỔNG CHI PHÍ XÉT NGHIỆM:</td>
+                  <td colspan="4" style="text-align: right; font-weight: bold; padding: 8px;">TỔNG CHI PHÍ CẬN LÂM SÀNG:</td>
                   <td style="text-align: right; font-weight: bold; color: #1e40af; font-size: 1.05rem; padding: 8px;">
                     {{ totalLabFee() | number:'1.0-0' }} VNĐ
                   </td>
@@ -1275,7 +1277,7 @@
           <div class="doc-revisit-alert" style="background: #eff6ff; border-color: #bfdbfe;">
             <div class="revisit-main" style="display: flex; flex-direction: column; gap: 4px;">
               <strong class="text-primary"><i class="bi bi-info-circle-fill"></i> HƯỚNG DẪN THỰC HIỆN XÉT NGHIỆM:</strong>
-              <span class="small">1. Người bệnh cầm phiếu này sang <strong>Phòng Xét Nghiệm &amp; Chẩn Đoán Hình Ảnh (Tầng 1 - P.Lab)</strong>.</span>
+              <span class="small">1. Người bệnh cầm phiếu này sang các phòng ghi ở cột <strong>Nơi thực hiện</strong>.</span>
               <span class="small">2. Lấy mẫu hoặc chụp chiếu theo hướng dẫn của Kỹ thuật viên. Kết quả sẽ tự động đồng bộ về máy Bác sĩ khi hoàn tất.</span>
               <span class="small">3. Sau khi làm xong xét nghiệm, người bệnh <strong>quay trở lại Phòng khám ban đầu</strong> để được Bác sĩ ưu tiên mời vào đọc kết quả và kê đơn thuốc.</span>
             </div>
@@ -1291,7 +1293,7 @@
             </div>
 
             <div class="signature-col doctor-sig-box">
-              <div class="sig-date">Hà Nội, {{ 'now' | date:'dd/MM/yyyy HH:mm' }}</div>
+              <div class="sig-date">Hà Nội, {{ labSentAt() | date:'dd/MM/yyyy HH:mm' }}</div>
               <div class="sig-role">BÁC SĨ CHỈ ĐỊNH</div>
               <div class="sig-sub">(Ký và ghi rõ họ tên)</div>
               <div class="sig-space"></div>
@@ -1317,22 +1319,20 @@
         </div>
         <div class="drawer-body">
           <p class="drawer-subtitle">
-            Bấm chọn bệnh nhân để chuyển sang ca khám của người đó ngay lập tức:
+            Đổi qua lại giữa các bệnh nhân bạn đang phụ trách. Bệnh nhân còn chờ ngoài sảnh phải được gọi số ở màn Gọi khám bệnh.
           </p>
-          @if (roomTickets().length === 0) {
+          @if (myPatients().length === 0) {
             <div class="queue-empty-box">
               <i class="bi bi-inbox"></i>
-              <p>Hiện không có bệnh nhân nào trong hàng đợi của phòng khám.</p>
+              <p>Bạn chưa phụ trách bệnh nhân nào. Hãy gọi số ở màn Gọi khám bệnh.</p>
             </div>
           } @else {
             <div class="queue-ticket-cards">
-              @for (ticket of roomTickets(); track ticket.id) {
+              @for (ticket of myPatients(); track ticket.id) {
                 <div class="queue-patient-card" [class.selected]="currentTicket()?.id === ticket.id" (click)="selectTicketToExamine(ticket)">
                   <div class="card-top-line">
                     <span class="ticket-num-badge">#{{ ticket.ticketNumber }}</span>
-                    <span class="ticket-state-tag" [ngClass]="ticket.status === 'IN_PROGRESS' ? 'state-examining' : (ticket.status === 'CALLED' ? 'state-called' : 'state-waiting')">
-                      {{ ticket.status === 'IN_PROGRESS' ? 'Đang khám' : (ticket.status === 'CALLED' ? 'Đang gọi' : 'Đang chờ') }}
-                    </span>
+                    <span class="ticket-state-tag" [ngClass]="ticketStateClass(ticket.status)">{{ ticketStateLabel(ticket.status) }}</span>
                   </div>
                   <div class="patient-full-name">{{ ticket.patientName }}</div>
                   <div class="patient-sub-meta">
@@ -1348,7 +1348,8 @@
                       <span class="badge-current"><i class="bi bi-check-circle-fill"></i> Đang mở khám</span>
                     } @else {
                       <button type="button" class="btn btn-sm btn-outline-primary w-100">
-                        <i class="bi bi-box-arrow-in-right"></i> Chọn khám ca này
+                        <i class="bi bi-box-arrow-in-right"></i>
+                        {{ ticket.status === 'RESULTS_READY' || ticket.status === 'WAITING_FOR_RESULTS' ? 'Mở xem kết quả xét nghiệm' : 'Mở khám bệnh nhân này' }}
                       </button>
                     }
                   </div>
@@ -1356,6 +1357,29 @@
               }
             </div>
           }
+
+          <!-- Hàng chờ ngoài sảnh: chỉ để bác sĩ nắm số lượng, không chọn khám trực tiếp -->
+          <div class="waiting-section">
+            <div class="waiting-section-title">
+              <span><i class="bi bi-hourglass-split"></i> Đang chờ ngoài sảnh ({{ waitingPatients().length }})</span>
+              <a routerLink="/doctor/calling" class="waiting-call-link">Gọi số <i class="bi bi-arrow-right"></i></a>
+            </div>
+            @if (waitingPatients().length === 0) {
+              <p class="waiting-empty">Không còn bệnh nhân chờ.</p>
+            } @else {
+              <ul class="waiting-list">
+                @for (ticket of waitingPatients(); track ticket.id) {
+                  <li>
+                    <span class="waiting-num">#{{ ticket.ticketNumber }}</span>
+                    <span class="waiting-name">{{ ticket.patientName }}</span>
+                    @if (ticket.isEmergency) {
+                      <span class="waiting-flag">Cấp cứu</span>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
         </div>
       </div>
     </div>

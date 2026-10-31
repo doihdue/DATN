@@ -51,13 +51,14 @@ export class ClinicalLabService {
     return this.http.get<ApiResponse<LabOrder[]>>(`${this.baseUrl}/lab-orders/ticket/${ticketId}`);
   }
 
-  // 5. Lấy danh sách chỉ định cho phòng Lab / KTV (có thể lọc theo status)
-  getOrders(status?: string): Observable<ApiResponse<LabOrder[]>> {
-    let params = new HttpParams();
-    if (status && status.trim()) {
-      params = params.set('status', status.trim());
-    }
-    return this.http.get<ApiResponse<LabOrder[]>>(`${this.baseUrl}/lab-orders`, { params });
+  // 5. Danh sách làm việc của phòng Lab: chỉ định trong ngày + chỉ định còn dang dở
+  getWorklist(date: string): Observable<ApiResponse<LabOrder[]>> {
+    return this.http.get<ApiResponse<LabOrder[]>>(`${this.baseUrl}/lab-orders`, { params: { date } });
+  }
+
+  // 5.1 KTV tiếp nhận mẫu bệnh phẩm (PENDING -> PROCESSING)
+  startProcessing(id: number): Observable<ApiResponse<LabOrder>> {
+    return this.http.put<ApiResponse<LabOrder>>(`${this.baseUrl}/lab-orders/${id}/start`, null);
   }
 
   // 6. KTV cập nhật kết quả xét nghiệm & ký duyệt
@@ -65,7 +66,7 @@ export class ClinicalLabService {
     return this.http.put<ApiResponse<LabOrder>>(`${this.baseUrl}/lab-orders/${id}/result`, request);
   }
 
-  // 7. Hủy chỉ định xét nghiệm (khi còn PENDING)
+  // 7. Hủy chỉ định xét nghiệm (khi chưa có kết quả)
   cancelOrder(id: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.baseUrl}/lab-orders/${id}`);
   }

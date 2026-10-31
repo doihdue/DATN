@@ -16,12 +16,19 @@ public interface QueueTicketRepository extends JpaRepository<QueueTicket, Long> 
 
     Optional<QueueTicket> findByTicketNumberAndTicketDate(String ticketNumber, LocalDate ticketDate);
 
-    List<QueueTicket> findByTicketDateAndExaminationRoomIdOrderByPriorityScoreDescCheckInTimeAsc(
-            LocalDate ticketDate, Long roomId
-    );
+    // Hàng đợi của phòng trong ngày, sắp theo điểm ưu tiên rồi giờ check-in
+    @Query("SELECT q FROM QueueTicket q " +
+           "WHERE q.ticketDate = :ticketDate AND q.examinationRoom.id = :roomId " +
+           "ORDER BY q.priorityScore DESC, q.checkInTime ASC")
+    List<QueueTicket> findRoomQueue(@Param("ticketDate") LocalDate ticketDate, @Param("roomId") Long roomId);
 
-    List<QueueTicket> findByTicketDateAndExaminationRoomIdAndStatusOrderByPriorityScoreDescCheckInTimeAsc(
-            LocalDate ticketDate, Long roomId, String status
+    @Query("SELECT q FROM QueueTicket q " +
+           "WHERE q.ticketDate = :ticketDate AND q.examinationRoom.id = :roomId AND q.status = :status " +
+           "ORDER BY q.priorityScore DESC, q.checkInTime ASC")
+    List<QueueTicket> findRoomQueueByStatus(
+            @Param("ticketDate") LocalDate ticketDate,
+            @Param("roomId") Long roomId,
+            @Param("status") String status
     );
 
     List<QueueTicket> findByTicketDateAndStatus(LocalDate ticketDate, String status);
@@ -34,11 +41,6 @@ public interface QueueTicketRepository extends JpaRepository<QueueTicket, Long> 
     @Query("SELECT COUNT(q) FROM QueueTicket q " +
            "WHERE q.ticketDate = :ticketDate")
     long countTodayTicketsTotal(@Param("ticketDate") LocalDate ticketDate);
-
-    // Tìm vé đang được gọi hoặc đang khám của phòng
-    Optional<QueueTicket> findFirstByTicketDateAndExaminationRoomIdAndStatus(
-            LocalDate ticketDate, Long roomId, String status
-    );
 
     // Đếm số người đứng trước vé này trong hàng đợi WAITING
     @Query("SELECT COUNT(q) FROM QueueTicket q " +
@@ -57,8 +59,12 @@ public interface QueueTicketRepository extends JpaRepository<QueueTicket, Long> 
     List<QueueTicket> findTop20ByTicketDateOrderByCheckInTimeDesc(LocalDate ticketDate);
 
     // Vé còn hiệu lực (chưa khám xong / chưa huỷ) của bệnh nhân trong ngày
-    Optional<QueueTicket> findFirstByTicketDateAndPatientIdAndStatusIn(
-            LocalDate ticketDate, Long patientId, Collection<String> statuses
+    @Query("SELECT q FROM QueueTicket q " +
+           "WHERE q.ticketDate = :ticketDate AND q.patient.id = :patientId AND q.status IN :statuses")
+    List<QueueTicket> findPatientActiveTickets(
+            @Param("ticketDate") LocalDate ticketDate,
+            @Param("patientId") Long patientId,
+            @Param("statuses") Collection<String> statuses
     );
 
     // Tất cả số vé đã cấp trong ngày theo mã phòng (kể cả vé đã chuyển sang phòng khác)

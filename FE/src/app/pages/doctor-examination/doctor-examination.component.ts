@@ -5,9 +5,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MedicalRecordService } from '../../services/medical-record.service';
 import { MedicineCategoryService } from '../../services/medicine-category.service';
 import { QueueService } from '../../services/queue.service';
-import { ScheduleService } from '../../services/schedule.service';
 import { AuthService } from '../../services/auth.service';
 import { ClinicalLabService } from '../../services/lab.service';
+import { ScheduleService } from '../../services/schedule.service';
+import { ExaminationRoom } from '../../models/schedule.model';
 import {
   Medicine,
   PrescriptionItemRequest,
@@ -16,8 +17,7 @@ import {
   PatientMedicalHistoryResponse
 } from '../../models/medical-record.model';
 import { MedicineCategory } from '../../models/medicine-category.model';
-import { QueueTicket } from '../../models/queue.model';
-import { ExaminationRoom } from '../../models/schedule.model';
+import { QueueTicket, RoomQueueOverview } from '../../models/queue.model';
 import { toIsoDate } from '../../utils/date.utils';
 import { LabService, LabOrder, SendLabOrdersRequest } from '../../models/lab.model';
 
@@ -43,8 +43,8 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   private readonly medicalService = inject(MedicalRecordService);
   private readonly categoryService = inject(MedicineCategoryService);
   private readonly queueService = inject(QueueService);
-  private readonly scheduleService = inject(ScheduleService);
   private readonly labService = inject(ClinicalLabService);
+  private readonly scheduleService = inject(ScheduleService);
   readonly authService = inject(AuthService);
 
   // Trạng thái phiếu khám & bệnh nhân
@@ -56,9 +56,12 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   alertType = signal<'success' | 'danger'>('success');
 
   // Hàng đợi phòng khám & Đổi bệnh nhân
-  rooms = signal<ExaminationRoom[]>([]);
   activeRoomId = signal<number>(1);
   roomTickets = signal<QueueTicket[]>([]);
+  // Bệnh nhân bác sĩ đang phụ trách (đã gọi vào phòng / đang khám / đang làm hoặc đã có KQ xét nghiệm): đổi qua lại được
+  readonly myPatients = computed(() => this.roomTickets().filter(t => t.status !== 'WAITING'));
+  // Bệnh nhân còn chờ ngoài sảnh: chỉ hiển thị, muốn khám phải gọi số đúng thứ tự ở màn Gọi khám bệnh
+  readonly waitingPatients = computed(() => this.roomTickets().filter(t => t.status === 'WAITING'));
   showQueueDrawer = signal<boolean>(false);
 
   // UC: Xem tiền sử bệnh
@@ -141,6 +144,10 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   labOrders = signal<LabOrder[]>([]);
   showLabPrintModal = signal<boolean>(false);
   lastSentLabRecord = signal<MedicalRecordResponse | null>(null);
+  // Thời điểm gửi chỉ định, in trên phiếu
+  labSentAt = signal<Date | null>(null);
+  // Phòng cận lâm sàng (P.104 xét nghiệm, P.204 / P.205 CĐHA) để ghi nơi thực hiện trên phiếu
+  labRooms = signal<ExaminationRoom[]>([]);
 
   labCategories = computed(() => {
     const list = this.availableLabServices().map(s => s.category).filter((c): c is string => !!c);
@@ -190,22 +197,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Tải danh sách phòng khám
-    this.scheduleService.getAllRooms().subscribe({
-      next: res => {
-        if (res.data && res.data.length > 0) {
-          this.rooms.set(res.data);
-        }
-      }
-    });
-
-    // 0. Đọc từ router state (nếu vừa chuyển từ màn điều phối/gọi số)
+    // 0. Đọc từ router state (nếu vừa chuyển từ màn điều phối/gọi số) để hiển thị ngay;
+    // tiền sử bệnh sẽ được tải 1 lần khi đồng bộ vé ở bước dưới
     const stateTicket = history.state?.ticket;
     if (stateTicket && stateTicket.status !== 'COMPLETED') {
       this.currentTicket.set(stateTicket);
       if (stateTicket.id) this.ticketId.set(stateTicket.id);
       if (stateTicket.examinationRoomId) this.activeRoomId.set(stateTicket.examinationRoomId);
-      if (stateTicket.patientId) this.loadPatientHistory(stateTicket.patientId);
     } else {
       try {
         const saved = sessionStorage.getItem('currentExaminingTicket');
@@ -215,7 +213,6 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             this.currentTicket.set(t);
             if (t.id) this.ticketId.set(t.id);
             if (t.examinationRoomId) this.activeRoomId.set(t.examinationRoomId);
-            if (t.patientId) this.loadPatientHistory(t.patientId);
           } else {
             sessionStorage.removeItem('currentExaminingTicket');
           }
@@ -257,7 +254,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
             this.patientHistory.set(null);
           }
           this.loadExistingRecord(t.id);
-          this.loadRoomTickets(t.examinationRoomId || 1);
+          this.loadRoomTickets();
         } else {
           this.currentTicket.set(null);
           this.ticketId.set(null);
@@ -276,23 +273,54 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadRoomTickets(roomId?: number): void {
-    const rId = roomId || this.activeRoomId();
-    this.queueService.getRoomQueue(rId).subscribe({
+  // Danh sách bệnh nhân trong ngăn "Đổi bệnh nhân": luôn là hàng đợi phòng bác sĩ đang trực
+  loadRoomTickets(): void {
+    this.queueService.getMyRoomQueue().subscribe({
       next: res => {
         if (res.data) {
           const overview = res.data;
-          const list: QueueTicket[] = [];
-          if (overview.currentExaminingTicket) list.push(overview.currentExaminingTicket);
-          if (overview.currentCalledTicket) list.push(overview.currentCalledTicket);
-          if (overview.waitingTickets) list.push(...overview.waitingTickets);
-          this.roomTickets.set(list);
+          this.roomTickets.set(this.buildRoomTickets(overview));
         }
       }
     });
   }
 
+  // Gồm cả bệnh nhân đã gửi chỉ định (đang làm XN / đã có KQ) để bác sĩ mở lại xem kết quả
+  private buildRoomTickets(overview: RoomQueueOverview): QueueTicket[] {
+    return [
+      ...(overview.currentExaminingTicket ? [overview.currentExaminingTicket] : []),
+      ...(overview.currentCalledTicket ? [overview.currentCalledTicket] : []),
+      ...(overview.resultsReadyTickets ?? []),
+      ...(overview.waitingForResultsTickets ?? []),
+      ...(overview.waitingTickets ?? [])
+    ];
+  }
+
+  ticketStateLabel(status: string): string {
+    switch (status) {
+      case 'IN_PROGRESS': return 'Đang khám';
+      case 'CALLED': return 'Đang gọi';
+      case 'RESULTS_READY': return 'Có KQ CLS';
+      case 'WAITING_FOR_RESULTS': return 'Đang làm XN';
+      default: return 'Đang chờ';
+    }
+  }
+
+  ticketStateClass(status: string): string {
+    switch (status) {
+      case 'IN_PROGRESS': return 'state-examining';
+      case 'CALLED': return 'state-called';
+      case 'RESULTS_READY': return 'state-results';
+      case 'WAITING_FOR_RESULTS': return 'state-lab';
+      default: return 'state-waiting';
+    }
+  }
+
   selectTicketToExamine(ticket: QueueTicket): void {
+    if (ticket.status === 'WAITING') {
+      this.showAlert(`Bệnh nhân #${ticket.ticketNumber} chưa được gọi. Hãy gọi số ở màn Gọi khám bệnh để giữ đúng thứ tự hàng đợi.`, 'danger');
+      return;
+    }
     this.currentTicket.set(ticket);
     this.ticketId.set(ticket.id);
     try {
@@ -310,16 +338,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
 
   loadActiveExaminingTicket(): void {
     this.loading.set(true);
-    const roomId = this.activeRoomId();
-    this.queueService.getRoomQueue(roomId).subscribe({
+    // Luôn lấy theo phòng bác sĩ có ca trực hôm nay (không mặc định phòng đầu tiên)
+    this.queueService.getMyRoomQueue().subscribe({
       next: res => {
         if (res.data) {
           const overview = res.data;
-          const list: QueueTicket[] = [];
-          if (overview.currentExaminingTicket) list.push(overview.currentExaminingTicket);
-          if (overview.currentCalledTicket) list.push(overview.currentCalledTicket);
-          if (overview.waitingTickets) list.push(...overview.waitingTickets);
-          this.roomTickets.set(list);
+          this.activeRoomId.set(overview.examinationRoomId);
+          this.roomTickets.set(this.buildRoomTickets(overview));
 
           // Chỉ nhận bệnh nhân đang được gọi hoặc đang trong ca khám tại phòng
           const activeTicket = overview.currentExaminingTicket || overview.currentCalledTicket;
@@ -743,6 +768,9 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
         }
       }
     });
+    this.scheduleService.getLabRooms().subscribe({
+      next: res => this.labRooms.set(res.data || [])
+    });
   }
 
   filterLabServices(): void {
@@ -819,6 +847,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
       next: res => {
         this.submittingLab.set(false);
         this.lastSentLabRecord.set(res.data || null);
+        this.labSentAt.set(new Date());
         try {
           sessionStorage.removeItem('currentExaminingTicket');
         } catch {}
@@ -881,6 +910,13 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     this.currentTicket.set(null);
     this.ticketId.set(null);
     this.router.navigate(['/doctor/calling']);
+  }
+
+  // Nơi bệnh nhân sang làm: nhóm "Chẩn đoán hình ảnh" ở các phòng CĐHA, còn lại ở phòng xét nghiệm (giống quy tắc backend)
+  labRoomOf(service: LabService): string {
+    const department = service.category === 'Chẩn đoán hình ảnh' ? 'CHAN_DOAN_HINH_ANH' : 'XET_NGHIEM';
+    const rooms = this.labRooms().filter(r => r.roomType === department);
+    return rooms.length ? rooms.map(r => `${r.roomNumber} (${r.roomName})`).join(' hoặc ') : '---';
   }
 
   printLabOrderDocument(): void {

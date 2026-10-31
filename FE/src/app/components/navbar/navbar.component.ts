@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -47,18 +48,60 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/admin/specialties" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-diagram-3"></i> Chuyên khoa
               </a>
-              <a routerLink="/admin/doctors" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-person-badge"></i> Bác sĩ
-              </a>
-              <a routerLink="/admin/staff" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-person-workspace"></i> Lễ tân
-              </a>
-              <a routerLink="/admin/medicines" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-capsule"></i> Thuốc
-              </a>
-              <a routerLink="/admin/schedules" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-calendar3"></i> Lịch trực
-              </a>
+
+              <!-- Dropdown Nhóm Nhân Sự (Gộp Bác sĩ, Lễ tân, Kỹ thuật viên) -->
+              <div class="nav-dropdown" [class.dropdown-active]="isPersonnelActive()">
+                <button type="button" class="nav-item nav-dropdown-toggle" [class.active]="isPersonnelActive()" (click)="togglePersonnelNav($event)">
+                  <i class="bi bi-people-fill"></i> Nhân sự <i class="bi bi-chevron-down dropdown-arrow" [class.rotated]="isPersonnelNavOpen"></i>
+                </button>
+                @if (isPersonnelNavOpen) {
+                  <div class="nav-dropdown-menu" (click)="$event.stopPropagation()">
+                    <a routerLink="/admin/doctors" routerLinkActive="active" (click)="isPersonnelNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-person-badge"></i> Bác sĩ
+                    </a>
+                    <a routerLink="/admin/staff" routerLinkActive="active" (click)="isPersonnelNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-person-workspace"></i> Lễ tân
+                    </a>
+                    <a routerLink="/admin/lab-technicians" routerLinkActive="active" (click)="isPersonnelNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-eyedropper"></i> Kỹ thuật viên
+                    </a>
+                  </div>
+                }
+              </div>
+
+              <!-- Dropdown Nhóm Kho Dược & Thuốc -->
+              <div class="nav-dropdown" [class.dropdown-active]="isMedicinesActive()">
+                <button type="button" class="nav-item nav-dropdown-toggle" [class.active]="isMedicinesActive()" (click)="toggleMedicinesNav($event)">
+                  <i class="bi bi-capsule"></i> Thuốc <i class="bi bi-chevron-down dropdown-arrow" [class.rotated]="isMedicinesNavOpen"></i>
+                </button>
+                @if (isMedicinesNavOpen) {
+                  <div class="nav-dropdown-menu" (click)="$event.stopPropagation()">
+                    <a routerLink="/admin/medicines/list" routerLinkActive="active" (click)="isMedicinesNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-capsule-pill"></i> Kho thuốc &amp; Biệt dược
+                    </a>
+                    <a routerLink="/admin/medicines/categories" routerLinkActive="active" (click)="isMedicinesNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-folder2-open"></i> Nhóm &amp; Danh mục thuốc
+                    </a>
+                  </div>
+                }
+              </div>
+
+              <!-- Dropdown Nhóm Lịch Trực (Gộp Bác sĩ, Kỹ thuật viên) -->
+              <div class="nav-dropdown" [class.dropdown-active]="isScheduleActive()">
+                <button type="button" class="nav-item nav-dropdown-toggle" [class.active]="isScheduleActive()" (click)="toggleScheduleNav($event)">
+                  <i class="bi bi-calendar3"></i> Lịch trực <i class="bi bi-chevron-down dropdown-arrow" [class.rotated]="isScheduleNavOpen"></i>
+                </button>
+                @if (isScheduleNavOpen) {
+                  <div class="nav-dropdown-menu" (click)="$event.stopPropagation()">
+                    <a routerLink="/admin/schedules/doctors" routerLinkActive="active" (click)="isScheduleNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-person-badge"></i> Bác sĩ
+                    </a>
+                    <a routerLink="/admin/schedules/technicians" routerLinkActive="active" (click)="isScheduleNavOpen = false" class="dropdown-item">
+                      <i class="bi bi-eyedropper"></i> Kỹ thuật viên
+                    </a>
+                  </div>
+                }
+              </div>
             }
             @if (authService.hasRole('DOCTOR') && !authService.hasRole('ADMIN')) {
               <a routerLink="/doctor/calling" routerLinkActive="active" class="nav-item">
@@ -87,8 +130,8 @@ import { AuthService } from '../../services/auth.service';
               <a routerLink="/lab/services" routerLinkActive="active" class="nav-item">
                 <i class="bi bi-journal-medical"></i> Danh mục &amp; Chỉ số
               </a>
-              <a routerLink="/lab/schedule" routerLinkActive="active" class="nav-item">
-                <i class="bi bi-calendar2-week"></i> Ca trực của tôi
+              <a routerLink="/lab/my-shifts" routerLinkActive="active" class="nav-item">
+                <i class="bi bi-calendar2-week"></i> Ca trực
               </a>
             } @else if (authService.hasRole('STAFF') && !authService.hasRole('ADMIN')) {
               <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
@@ -414,10 +457,145 @@ import { AuthService } from '../../services/auth.service';
         display: none;
       }
     }
+
+    /* Dropdown Quản lý Nhân sự */
+    .nav-dropdown {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .nav-dropdown-toggle {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .dropdown-arrow {
+      font-size: 0.68rem;
+      margin-left: 0.35rem;
+      transition: transform 0.2s ease;
+    }
+
+    .dropdown-arrow.rotated {
+      transform: rotate(180deg);
+    }
+
+    .nav-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 175px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15);
+      padding: 0.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      z-index: 1050;
+      animation: dropdownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes dropdownFade {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #475569;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .dropdown-item:hover {
+      background: #f0f9ff;
+      color: #0284c7;
+    }
+
+    .dropdown-item.active {
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: 700;
+    }
   `]
 })
 export class NavbarComponent {
   readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+
+  isPersonnelNavOpen = false;
+  isMedicinesNavOpen = false;
+  isScheduleNavOpen = false;
+  currentUrl = signal<string>(this.router.url);
+
+  readonly isPersonnelActive = computed(() => {
+    const url = this.currentUrl();
+    return (
+      url.includes('/admin/doctors') ||
+      url.includes('/admin/staff') ||
+      url.includes('/admin/lab-technicians') ||
+      url.includes('/admin/lab-techs') ||
+      url.includes('/admin/personnel')
+    );
+  });
+
+  readonly isMedicinesActive = computed(() => this.currentUrl().includes('/admin/medicines'));
+  readonly isScheduleActive = computed(() => this.currentUrl().includes('/admin/schedules'));
+
+  constructor() {
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => {
+        this.currentUrl.set(e.urlAfterRedirects || e.url);
+        this.isPersonnelNavOpen = false;
+        this.isMedicinesNavOpen = false;
+        this.isScheduleNavOpen = false;
+      });
+  }
+
+  togglePersonnelNav(event: Event): void {
+    event.stopPropagation();
+    this.isPersonnelNavOpen = !this.isPersonnelNavOpen;
+    if (this.isPersonnelNavOpen) {
+      this.isMedicinesNavOpen = false;
+      this.isScheduleNavOpen = false;
+    }
+  }
+
+  toggleMedicinesNav(event: Event): void {
+    event.stopPropagation();
+    this.isMedicinesNavOpen = !this.isMedicinesNavOpen;
+    if (this.isMedicinesNavOpen) {
+      this.isPersonnelNavOpen = false;
+      this.isScheduleNavOpen = false;
+    }
+  }
+
+  toggleScheduleNav(event: Event): void {
+    event.stopPropagation();
+    this.isScheduleNavOpen = !this.isScheduleNavOpen;
+    if (this.isScheduleNavOpen) {
+      this.isPersonnelNavOpen = false;
+      this.isMedicinesNavOpen = false;
+    }
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.isPersonnelNavOpen = false;
+    this.isMedicinesNavOpen = false;
+    this.isScheduleNavOpen = false;
+  }
 
   logout(): void {
     this.authService.logout();

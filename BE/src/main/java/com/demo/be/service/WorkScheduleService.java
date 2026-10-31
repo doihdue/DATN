@@ -19,7 +19,8 @@ public interface WorkScheduleService {
             Long roomId
     );
 
-    WorkScheduleResponse getScheduleById(Long id);
+    // Lịch trực của bác sĩ đang đăng nhập
+    List<WorkScheduleResponse> getMySchedules(LocalDate startDate, LocalDate endDate);
 
     // Các ca còn nhận đặt lịch online (còn chỗ, chưa huỷ, chưa kết thúc)
     List<WorkScheduleResponse> getBookableSchedules(

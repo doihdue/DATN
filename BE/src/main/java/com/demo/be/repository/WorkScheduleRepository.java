@@ -2,6 +2,7 @@ package com.demo.be.repository;
 
 import com.demo.be.model.WorkSchedule;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,14 +19,20 @@ public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, Long
 
     List<WorkSchedule> findByWorkDate(LocalDate workDate);
 
-    List<WorkSchedule> findByWorkDateBetweenOrderByWorkDateAscStartTimeAsc(LocalDate startDate, LocalDate endDate);
-
-    List<WorkSchedule> findByDoctorIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
-            Long doctorId, LocalDate startDate, LocalDate endDate
+    // Lịch của một bác sĩ trong khoảng ngày, sắp theo ngày và giờ bắt đầu
+    @Query("SELECT ws FROM WorkSchedule ws " +
+           "WHERE ws.doctor.id = :doctorId AND ws.workDate BETWEEN :startDate AND :endDate " +
+           "ORDER BY ws.workDate ASC, ws.startTime ASC")
+    List<WorkSchedule> findDoctorSchedules(
+            @Param("doctorId") Long doctorId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
     );
 
     List<WorkSchedule> findByExaminationRoomIdAndWorkDate(Long roomId, LocalDate workDate);
 
+    // Nạp sẵn bác sĩ, chuyên khoa, phòng để hiển thị danh sách không phát sinh thêm truy vấn mỗi dòng
+    @EntityGraph(attributePaths = {"doctor", "doctor.specialty", "examinationRoom"})
     @Query("SELECT ws FROM WorkSchedule ws " +
            "WHERE (:startDate IS NULL OR ws.workDate >= :startDate) " +
            "AND (:endDate IS NULL OR ws.workDate <= :endDate) " +

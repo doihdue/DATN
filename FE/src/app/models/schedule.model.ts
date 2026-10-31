@@ -3,6 +3,59 @@ export interface ExaminationRoom {
   roomNumber: string;
   roomName: string;
   floor: number;
+  roomType?: 'KHAM' | 'XET_NGHIEM' | 'CHAN_DOAN_HINH_ANH';
+}
+
+// Ca trực của KTV tại phòng cận lâm sàng
+export interface StaffShift {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  employeeCode?: string;
+  department: string;
+  roomId: number;
+  roomNumber: string;
+  roomName: string;
+  workDate: string;
+  shiftType: string;
+  startTime: string;
+  endTime: string;
+  notes?: string;
+}
+
+export interface StaffShiftRequest {
+  employeeId: number;
+  roomId: number;
+  workDate: string;
+  shiftType: string;
+  startTime: string;
+  endTime: string;
+  notes?: string;
+}
+
+export interface BatchStaffShiftRequest {
+  employeeId: number;
+  roomId: number;
+  workDates: string[];
+  shiftType?: string;
+  startTime: string;
+  endTime: string;
+  notes?: string;
+}
+
+export interface BatchStaffShiftResponse {
+  totalRequested: number;
+  successCount: number;
+  conflictCount: number;
+  createdShifts: StaffShift[];
+  conflictMessages: string[];
+}
+
+export interface LabTech {
+  id: number;
+  fullName: string;
+  employeeCode?: string;
+  department: string;
 }
 
 export interface WorkSchedule {
@@ -36,20 +89,16 @@ export interface WorkScheduleRequest {
   startTime: string;
   endTime: string;
   maxPatients: number;
-  status?: string;
 }
 
 export interface BatchWorkScheduleRequest {
   doctorId: number;
   examinationRoomId: number;
-  startDate: string;
-  endDate: string;
-  daysOfWeek: number[]; // 1=Thứ 2, ..., 7=Chủ nhật
+  workDates: string[]; // Các ngày chọn trên lịch tháng của bác sĩ
   shiftType?: string;
   startTime: string;
   endTime: string;
   maxPatients: number;
-  status?: string;
 }
 
 export interface BatchWorkScheduleResponse {

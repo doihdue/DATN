@@ -1116,6 +1116,15 @@ $text-muted: #64748b;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 
     .modal-left {
+      // Phiếu chỉ định CLS: giải thích bước tiếp theo cho bác sĩ
+      .lab-next-steps {
+        margin-top: 0.45rem;
+        max-width: 480px;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        color: #475569;
+      }
+
       .badge-success-glow {
         display: inline-flex;
         align-items: center;
@@ -1573,6 +1582,65 @@ $text-muted: #64748b;
       }
     }
 
+    .waiting-section {
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px dashed #cbd5e1;
+
+      .waiting-section-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #475569;
+        margin-bottom: 0.5rem;
+      }
+
+      .waiting-call-link {
+        font-weight: 600;
+        color: #2563eb;
+        text-decoration: none;
+      }
+
+      .waiting-empty {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        margin: 0;
+      }
+
+      .waiting-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+
+        li {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          padding: 0.4rem 0.6rem;
+          border-radius: 6px;
+          background: #f8fafc;
+          font-size: 0.85rem;
+          color: #64748b;
+        }
+
+        .waiting-num { font-weight: 700; color: #475569; }
+        .waiting-name { flex: 1; }
+        .waiting-flag {
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: #b91c1c;
+          background: #fef2f2;
+          border-radius: 4px;
+          padding: 0.05rem 0.4rem;
+        }
+      }
+    }
+
     .queue-ticket-cards {
       display: flex;
       flex-direction: column;
@@ -1625,6 +1693,14 @@ $text-muted: #64748b;
             &.state-waiting {
               background: #f1f5f9;
               color: #475569;
+            }
+            &.state-results {
+              background: #dcfce7;
+              color: #15803d;
+            }
+            &.state-lab {
+              background: #e0f2fe;
+              color: #0369a1;
             }
           }
         }

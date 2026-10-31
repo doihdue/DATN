@@ -1,7 +1,6 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { timeout } from 'rxjs';
 import { ClinicalLabService } from '../../services/lab.service';
 import { AuthService } from '../../services/auth.service';
 import { LabService } from '../../models/lab.model';
@@ -74,12 +73,12 @@ import { ApiResponse } from '../../models/auth.models';
           <input
             type="text"
             class="search-input"
-            [(ngModel)]="searchQuery"
-            (ngModelChange)="onSearchChange()"
+            [ngModel]="searchQuery()"
+            (ngModelChange)="onSearchChange($event)"
             placeholder="Tìm theo mã dịch vụ (XN-HEM...), tên kỹ thuật hoặc chỉ số tham chiếu..."
           />
-          @if (searchQuery) {
-            <button type="button" class="btn-clear" (click)="clearSearch()">
+          @if (searchQuery()) {
+            <button type="button" class="btn-clear" (click)="onSearchChange('')" aria-label="Xoá từ khoá">
               <i class="bi bi-x-circle-fill"></i>
             </button>
           }
@@ -1317,7 +1316,7 @@ export class LabServicesComponent implements OnInit {
   readonly loading = signal(false);
 
   readonly selectedCategory = signal<string>('ALL');
-  searchQuery = '';
+  readonly searchQuery = signal('');
 
   readonly selectedServiceDetail = signal<LabService | null>(null);
 
@@ -1364,7 +1363,7 @@ export class LabServicesComponent implements OnInit {
   readonly filteredServices = computed(() => {
     const list = this.services();
     const cat = this.selectedCategory();
-    const q = this.searchQuery.trim().toLowerCase();
+    const q = this.searchQuery().trim().toLowerCase();
 
     return list.filter(s => {
       const matchCat = cat === 'ALL' || s.category === cat;
@@ -1418,12 +1417,8 @@ export class LabServicesComponent implements OnInit {
     this.currentPage.set(1);
   }
 
-  onSearchChange(): void {
-    this.currentPage.set(1);
-  }
-
-  clearSearch(): void {
-    this.searchQuery = '';
+  onSearchChange(query: string): void {
+    this.searchQuery.set(query);
     this.currentPage.set(1);
   }
 
@@ -1505,77 +1500,42 @@ export class LabServicesComponent implements OnInit {
       return;
     }
 
+    const toNumber = (v: number | null) => v !== null && !isNaN(Number(v)) ? Number(v) : undefined;
+    const payload: Partial<LabService> = {
+      serviceCode: this.formData.serviceCode.trim().toUpperCase(),
+      serviceName: this.formData.serviceName.trim(),
+      category: this.formData.category.trim(),
+      price: Number(this.formData.price) || 0,
+      unit: this.formData.unit.trim(),
+      referenceRange: this.formData.referenceRange.trim(),
+      lowerLimit: toNumber(this.formData.lowerLimit),
+      upperLimit: toNumber(this.formData.upperLimit),
+      description: this.formData.description.trim()
+    };
+
+    const editingId = this.isEditMode() ? this.editingServiceId() : null;
+    const request$ = editingId
+      ? this.labService.updateLabService(editingId, payload)
+      : this.labService.createLabService(payload);
+
     this.submitting.set(true);
-
-    if (this.isEditMode() && this.editingServiceId()) {
-      const id = this.editingServiceId()!;
-      const updatePayload: Partial<LabService> = {
-        serviceCode: this.formData.serviceCode.trim().toUpperCase(),
-        serviceName: this.formData.serviceName.trim(),
-        category: this.formData.category.trim(),
-        price: Number(this.formData.price) || 0,
-        unit: this.formData.unit.trim(),
-        referenceRange: this.formData.referenceRange.trim(),
-        lowerLimit: this.formData.lowerLimit !== null && !isNaN(Number(this.formData.lowerLimit)) ? Number(this.formData.lowerLimit) : undefined,
-        upperLimit: this.formData.upperLimit !== null && !isNaN(Number(this.formData.upperLimit)) ? Number(this.formData.upperLimit) : undefined,
-        description: this.formData.description.trim()
-      };
-
-      // Cập nhật ngay trên signal UI
-      this.services.update(list =>
-        list.map(s => s.id === id ? { ...s, ...updatePayload } as LabService : s)
-      );
-
-      this.labService.updateLabService(id, updatePayload).subscribe({
-        next: (res) => {
-          this.submitting.set(false);
-          this.closeFormModal();
-          this.showToast('Cập nhật kỹ thuật xét nghiệm thành công!', 'success');
-          if (res.data) {
-            this.services.update(list => list.map(s => s.id === id ? res.data : s));
-          }
-        },
-        error: () => {
-          this.submitting.set(false);
-          this.closeFormModal();
-          this.showToast('Đã lưu cục bộ kỹ thuật xét nghiệm!', 'success');
+    request$.subscribe({
+      next: res => {
+        this.submitting.set(false);
+        this.closeFormModal();
+        if (res.data) {
+          const saved = res.data;
+          this.services.update(list => editingId
+            ? list.map(s => s.id === editingId ? saved : s)
+            : [saved, ...list]);
         }
-      });
-    } else {
-      const tempId = Date.now();
-      const newService: LabService = {
-        id: tempId,
-        serviceCode: this.formData.serviceCode.trim().toUpperCase(),
-        serviceName: this.formData.serviceName.trim(),
-        category: this.formData.category.trim(),
-        price: Number(this.formData.price) || 0,
-        unit: this.formData.unit.trim(),
-        referenceRange: this.formData.referenceRange.trim(),
-        lowerLimit: this.formData.lowerLimit !== null && !isNaN(Number(this.formData.lowerLimit)) ? Number(this.formData.lowerLimit) : undefined,
-        upperLimit: this.formData.upperLimit !== null && !isNaN(Number(this.formData.upperLimit)) ? Number(this.formData.upperLimit) : undefined,
-        description: this.formData.description.trim(),
-        isActive: true
-      };
-
-      // Đưa lên đầu danh sách ngay lập tức
-      this.services.update(list => [newService, ...list]);
-
-      this.labService.createLabService(newService).subscribe({
-        next: (res) => {
-          this.submitting.set(false);
-          this.closeFormModal();
-          this.showToast('Thêm mới kỹ thuật xét nghiệm thành công!', 'success');
-          if (res.data) {
-            this.services.update(list => list.map(s => s.id === tempId ? res.data : s));
-          }
-        },
-        error: () => {
-          this.submitting.set(false);
-          this.closeFormModal();
-          this.showToast('Đã thêm kỹ thuật xét nghiệm vào danh mục!', 'success');
-        }
-      });
-    }
+        this.showToast(editingId ? 'Cập nhật kỹ thuật xét nghiệm thành công!' : 'Thêm mới kỹ thuật xét nghiệm thành công!', 'success');
+      },
+      error: err => {
+        this.submitting.set(false);
+        this.showToast(err.error?.message || 'Không thể lưu kỹ thuật xét nghiệm', 'error');
+      }
+    });
   }
 
   openDeleteConfirm(svc: LabService): void {
@@ -1593,28 +1553,19 @@ export class LabServicesComponent implements OnInit {
     if (!target) return;
 
     this.deleting.set(true);
-    const id = target.id;
-
-    // Xóa ngay trên signal UI
-    this.services.update(list => list.filter(s => s.id !== id));
-
-    this.labService.deleteLabService(id).subscribe({
+    this.labService.deleteLabService(target.id).subscribe({
       next: () => {
         this.deleting.set(false);
         this.closeDeleteModal();
-        this.showToast(`Đã xóa dịch vụ ${target.serviceCode} thành công!`, 'success');
+        this.services.update(list => list.filter(s => s.id !== target.id));
+        this.showToast(`Đã ngừng sử dụng dịch vụ ${target.serviceCode}!`, 'success');
       },
-      error: () => {
+      error: err => {
         this.deleting.set(false);
         this.closeDeleteModal();
-        this.showToast(`Đã xóa dịch vụ khỏi danh mục hiển thị!`, 'success');
+        this.showToast(err.error?.message || 'Không thể xoá dịch vụ xét nghiệm', 'error');
       }
     });
-  }
-
-  constructor() {
-    // Khởi tạo dữ liệu mẫu ngay lập tức để trang hiển thị trong 0ms, không bắt người dùng chờ
-    this.services.set(this.fallbackServices);
   }
 
   ngOnInit(): void {
@@ -1622,272 +1573,18 @@ export class LabServicesComponent implements OnInit {
   }
 
   loadServices(): void {
-    if (this.services().length === 0) {
-      this.loading.set(true);
-    }
-    this.labService.getLabServices().pipe(timeout(2500)).subscribe({
+    this.loading.set(true);
+    this.labService.getLabServices().subscribe({
       next: (res: ApiResponse<LabService[]>) => {
         this.loading.set(false);
-        if (res.success && res.data && res.data.length > 0) {
-          this.services.set(res.data);
-        }
+        this.services.set(res.data || []);
       },
-      error: () => {
+      error: err => {
         this.loading.set(false);
+        this.showToast(err.error?.message || 'Không tải được danh mục xét nghiệm', 'error');
       }
     });
   }
-
-  readonly fallbackServices: LabService[] = [
-    {
-      id: 1,
-      serviceCode: 'XN-HEM-01',
-      serviceName: 'Tổng phân tích tế bào máu ngoại vi bằng máy laser (22 thông số)',
-      price: 120000,
-      referenceRange: '4.0 - 10.0 G/L (WBC), 4.2 - 5.4 T/L (RBC)',
-      lowerLimit: 4.0,
-      upperLimit: 10.0,
-      unit: 'G/L',
-      category: 'Huyết học',
-      description: 'Đánh giá số lượng bạch cầu, hồng cầu, tiểu cầu, phát hiện tình trạng nhiễm trùng, thiếu máu.',
-      isActive: true
-    },
-    {
-      id: 2,
-      serviceCode: 'XN-GLU-01',
-      serviceName: 'Định lượng Glucose trong máu (Đường huyết lúc đói)',
-      price: 60000,
-      referenceRange: '3.9 - 6.4 mmol/L',
-      lowerLimit: 3.9,
-      upperLimit: 6.4,
-      unit: 'mmol/L',
-      category: 'Sinh hóa máu',
-      description: 'Sàng lọc, chẩn đoán và theo dõi điều trị đái tháo đường.',
-      isActive: true
-    },
-    {
-      id: 3,
-      serviceCode: 'XN-HBA1C-01',
-      serviceName: 'Đo phần trăm HbA1c trong máu (Sắc ký lỏng cao áp)',
-      price: 150000,
-      referenceRange: '4.0 - 5.6 %',
-      lowerLimit: 4.0,
-      upperLimit: 5.6,
-      unit: '%',
-      category: 'Sinh hóa máu',
-      description: 'Chỉ số vàng theo dõi đường huyết trung bình trong 3 tháng gần nhất.',
-      isActive: true
-    },
-    {
-      id: 4,
-      serviceCode: 'XN-URE-01',
-      serviceName: 'Định lượng Ure máu',
-      price: 60000,
-      referenceRange: '2.5 - 7.5 mmol/L',
-      lowerLimit: 2.5,
-      upperLimit: 7.5,
-      unit: 'mmol/L',
-      category: 'Sinh hóa máu',
-      description: 'Đánh giá chức năng lọc cầu thận và chuyển hóa đạm.',
-      isActive: true
-    },
-    {
-      id: 5,
-      serviceCode: 'XN-CRE-01',
-      serviceName: 'Định lượng Creatinin huyết thanh',
-      price: 65000,
-      referenceRange: '62 - 115 umol/L',
-      lowerLimit: 62.0,
-      upperLimit: 115.0,
-      unit: 'umol/L',
-      category: 'Sinh hóa máu',
-      description: 'Chỉ số vàng đánh giá chức năng thận và mức lọc cầu thận eGFR.',
-      isActive: true
-    },
-    {
-      id: 6,
-      serviceCode: 'XN-AST-01',
-      serviceName: 'Đo hoạt độ AST (GOT) trong máu',
-      price: 55000,
-      referenceRange: '< 37 U/L',
-      lowerLimit: 0.0,
-      upperLimit: 37.0,
-      unit: 'U/L',
-      category: 'Men gan',
-      description: 'Đánh giá tổn thương tế bào gan, hoại tử nhu mô gan hoặc cơ tim.',
-      isActive: true
-    },
-    {
-      id: 7,
-      serviceCode: 'XN-ALT-01',
-      serviceName: 'Đo hoạt độ ALT (GPT) trong máu',
-      price: 55000,
-      referenceRange: '< 40 U/L',
-      lowerLimit: 0.0,
-      upperLimit: 40.0,
-      unit: 'U/L',
-      category: 'Men gan',
-      description: 'Chỉ số đặc hiệu cảnh báo viêm gan cấp, viêm gan virus, tổn thương gan do thuốc.',
-      isActive: true
-    },
-    {
-      id: 8,
-      serviceCode: 'XN-GGT-01',
-      serviceName: 'Đo hoạt độ GGT (Gamma GT) trong máu',
-      price: 65000,
-      referenceRange: '< 55 U/L',
-      lowerLimit: 0.0,
-      upperLimit: 55.0,
-      unit: 'U/L',
-      category: 'Men gan',
-      description: 'Đánh giá tổn thương đường mật, ứ mật và tác hại của rượu bia lên gan.',
-      isActive: true
-    },
-    {
-      id: 9,
-      serviceCode: 'XN-CHOL-01',
-      serviceName: 'Định lượng Cholesterol toàn phần',
-      price: 70000,
-      referenceRange: '3.9 - 5.2 mmol/L',
-      lowerLimit: 3.9,
-      upperLimit: 5.2,
-      unit: 'mmol/L',
-      category: 'Mỡ máu',
-      description: 'Sàng lọc rối loạn lipid máu và nguy cơ mảng xơ vữa động mạch.',
-      isActive: true
-    },
-    {
-      id: 10,
-      serviceCode: 'XN-TRIG-01',
-      serviceName: 'Định lượng Triglycerid huyết thanh',
-      price: 65000,
-      referenceRange: '0.4 - 1.7 mmol/L',
-      lowerLimit: 0.4,
-      upperLimit: 1.7,
-      unit: 'mmol/L',
-      category: 'Mỡ máu',
-      description: 'Đánh giá rối loạn chuyển hóa mỡ máu và nguy cơ viêm tụy cấp khi tăng quá cao.',
-      isActive: true
-    },
-    {
-      id: 11,
-      serviceCode: 'XN-HDL-01',
-      serviceName: 'Định lượng HDL-Cholesterol (Mỡ tốt bảo vệ tim)',
-      price: 70000,
-      referenceRange: '> 1.0 mmol/L',
-      lowerLimit: 1.0,
-      upperLimit: 3.5,
-      unit: 'mmol/L',
-      category: 'Mỡ máu',
-      description: 'Mỡ có lợi giúp vận chuyển cholesterol dư thừa từ mạch máu về gan thoái hóa.',
-      isActive: true
-    },
-    {
-      id: 12,
-      serviceCode: 'XN-LDL-01',
-      serviceName: 'Định lượng LDL-Cholesterol (Mỡ xấu gây xơ vữa)',
-      price: 70000,
-      referenceRange: '< 3.4 mmol/L',
-      lowerLimit: 0.0,
-      upperLimit: 3.4,
-      unit: 'mmol/L',
-      category: 'Mỡ máu',
-      description: 'Yếu tố nguy cơ hàng đầu gây tắc nghẽn động mạch và nhồi máu cơ tim.',
-      isActive: true
-    },
-    {
-      id: 13,
-      serviceCode: 'XN-URIC-01',
-      serviceName: 'Định lượng Acid Uric trong máu',
-      price: 65000,
-      referenceRange: '200 - 420 umol/L',
-      lowerLimit: 200.0,
-      upperLimit: 420.0,
-      unit: 'umol/L',
-      category: 'Sinh hóa máu',
-      description: 'Chẩn đoán cơn gút (gout) cấp tính và theo dõi nồng độ acid uric ở người thừa đạm.',
-      isActive: true
-    },
-    {
-      id: 14,
-      serviceCode: 'XN-URI-01',
-      serviceName: 'Tổng phân tích nước tiểu tự động (10 thông số)',
-      price: 50000,
-      referenceRange: 'Âm tính các thông số bệnh lý',
-      unit: 'Que thử',
-      category: 'Nước tiểu',
-      description: 'Phát hiện hồng cầu, bạch cầu, protein, đường trong nước tiểu, tầm soát bệnh thận - tiết niệu.',
-      isActive: true
-    },
-    {
-      id: 15,
-      serviceCode: 'XN-DENGUE-01',
-      serviceName: 'Test nhanh kháng nguyên & kháng thể Sốt xuất huyết Dengue',
-      price: 180000,
-      referenceRange: 'Âm tính (Negative)',
-      unit: 'Test nhanh',
-      category: 'Miễn dịch',
-      description: 'Phát hiện sớm kháng nguyên NS1 và kháng thể IgM/IgG Dengue từ ngày đầu của sốt.',
-      isActive: true
-    },
-    {
-      id: 16,
-      serviceCode: 'XN-CRP-01',
-      serviceName: 'Định lượng CRP (C-Reactive Protein định lượng cao)',
-      price: 130000,
-      referenceRange: '< 5.0 mg/L',
-      lowerLimit: 0.0,
-      upperLimit: 5.0,
-      unit: 'mg/L',
-      category: 'Miễn dịch',
-      description: 'Chỉ số sinh học đánh giá nhanh phản ứng viêm nhiễm cấp do vi khuẩn.',
-      isActive: true
-    },
-    {
-      id: 17,
-      serviceCode: 'CDHA-XR-01',
-      serviceName: 'Chụp X-Quang ngực thẳng kỹ thuật số (CR/DR)',
-      price: 150000,
-      referenceRange: 'Hình ảnh tim phổi bình thường',
-      unit: 'Phim',
-      category: 'Chẩn đoán hình ảnh',
-      description: 'Kiểm tra tổn thương nhu mô phổi, phế quản, bóng tim và xương lồng ngực.',
-      isActive: true
-    },
-    {
-      id: 18,
-      serviceCode: 'CDHA-US-01',
-      serviceName: 'Siêu âm ổ bụng tổng quát Doppler màu',
-      price: 180000,
-      referenceRange: 'Cấu trúc gan, mật, tụy, lách, thận bình thường',
-      unit: 'Lần',
-      category: 'Chẩn đoán hình ảnh',
-      description: 'Khảo sát hình thái các tạng trong ổ bụng, phát hiện khối u, sỏi, nang, dịch tự do.',
-      isActive: true
-    },
-    {
-      id: 19,
-      serviceCode: 'CDHA-ECG-01',
-      serviceName: 'Ghi điện tim (ECG) 12 chuyển đạo',
-      price: 80000,
-      referenceRange: 'Nhịp xoang đều, tần số 60 - 90 chu kỳ/phút',
-      unit: 'Bản ghi',
-      category: 'Chẩn đoán hình ảnh',
-      description: 'Phát hiện nhanh rối loạn nhịp tim, thiếu máu cục bộ cơ tim và phì đại tâm thất.',
-      isActive: true
-    },
-    {
-      id: 20,
-      serviceCode: 'CDHA-CT-01',
-      serviceName: 'Chụp cắt lớp vi tính (CT Scanner) sọ não',
-      price: 950000,
-      referenceRange: 'Nhu mô não không thấy ổ tổn thương tỷ trọng bất thường',
-      unit: 'Lần',
-      category: 'Chẩn đoán hình ảnh',
-      description: 'Chẩn đoán tai biến mạch máu não, xuất huyết não, chấn thương sọ não cấp.',
-      isActive: true
-    }
-  ];
 
   getCategoryCount(cat: string): number {
     return this.services().filter(s => s.category === cat).length;

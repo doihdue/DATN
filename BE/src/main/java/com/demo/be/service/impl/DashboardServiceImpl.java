@@ -146,7 +146,7 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         // 6. Hiệu suất theo từng phòng khám (Room Stats)
-        List<ExaminationRoom> rooms = examinationRoomRepository.findAll();
+        List<ExaminationRoom> rooms = examinationRoomRepository.findExamRooms();
         List<WorkSchedule> todaySchedules = workScheduleRepository.findByWorkDate(today);
         Map<Long, String> roomDoctorMap = new HashMap<>();
         for (WorkSchedule ws : todaySchedules) {

@@ -59,9 +59,17 @@ public class QueueController {
         return ResponseEntity.ok(ApiResponse.success(overview, "Lấy thông tin hàng đợi phòng khám thành công"));
     }
 
-    // 5. Gọi số tiếp theo
+    // 4b. Hàng đợi phòng mà bác sĩ đang đăng nhập có ca trực hôm nay
+    @GetMapping("/my-room")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<ApiResponse<RoomQueueOverviewResponse>> getMyRoomQueueOverview() {
+        RoomQueueOverviewResponse overview = queueService.getMyRoomQueueOverview();
+        return ResponseEntity.ok(ApiResponse.success(overview, "Lấy hàng đợi phòng trực của bác sĩ thành công"));
+    }
+
+    // 5. Gọi số tiếp theo (chỉ bác sĩ trực phòng)
     @PostMapping("/room/{roomId}/call-next")
-    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<QueueTicketResponse>> callNext(@PathVariable Long roomId) {
         QueueTicketResponse calledTicket = queueService.callNext(roomId);
         return ResponseEntity.ok(ApiResponse.success(calledTicket, "Đã gọi lượt khám: " + calledTicket.getTicketNumber()));
@@ -76,23 +84,15 @@ public class QueueController {
 
     // 6. Bắt đầu vào khám
     @PostMapping("/ticket/{ticketId}/start")
-    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<QueueTicketResponse>> startExamination(@PathVariable Long ticketId) {
         QueueTicketResponse ticket = queueService.startExamination(ticketId);
         return ResponseEntity.ok(ApiResponse.success(ticket, "Đã bắt đầu lượt khám: " + ticket.getTicketNumber()));
     }
 
-    // 7. Hoàn thành khám
-    @PostMapping("/ticket/{ticketId}/complete")
-    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR')")
-    public ResponseEntity<ApiResponse<QueueTicketResponse>> completeExamination(@PathVariable Long ticketId) {
-        QueueTicketResponse ticket = queueService.completeExamination(ticketId);
-        return ResponseEntity.ok(ApiResponse.success(ticket, "Đã hoàn thành lượt khám: " + ticket.getTicketNumber()));
-    }
-
     // 8. Bỏ qua lượt (vắng mặt)
     @PostMapping("/ticket/{ticketId}/skip")
-    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<QueueTicketResponse>> skipTicket(@PathVariable Long ticketId) {
         QueueTicketResponse ticket = queueService.skipTicket(ticketId);
         return ResponseEntity.ok(ApiResponse.success(ticket, "Đã chuyển sang danh sách nhỡ lượt: " + ticket.getTicketNumber()));
@@ -100,10 +100,18 @@ public class QueueController {
 
     // 9. Gọi lại lượt đã nhỡ
     @PostMapping("/ticket/{ticketId}/recall")
-    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<QueueTicketResponse>> recallTicket(@PathVariable Long ticketId) {
         QueueTicketResponse ticket = queueService.recallTicket(ticketId);
         return ResponseEntity.ok(ApiResponse.success(ticket, "Đã gọi lại số: " + ticket.getTicketNumber()));
+    }
+
+    // 9b. Người bệnh vắng mặt đã quay lại: lễ tân đưa lại vào hàng đợi (bác sĩ sẽ gọi ở lượt tiếp theo)
+    @PostMapping("/ticket/{ticketId}/requeue")
+    @PreAuthorize("hasRole('STAFF')")
+    public ResponseEntity<ApiResponse<QueueTicketResponse>> requeueTicket(@PathVariable Long ticketId) {
+        QueueTicketResponse ticket = queueService.requeueTicket(ticketId);
+        return ResponseEntity.ok(ApiResponse.success(ticket, "Đã đưa số " + ticket.getTicketNumber() + " trở lại hàng đợi"));
     }
 
     // 10. Ưu tiên cấp cứu

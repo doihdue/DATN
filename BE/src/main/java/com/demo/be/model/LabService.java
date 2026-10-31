@@ -46,4 +46,10 @@ public class LabService {
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    // Khoa thực hiện: nhóm "Chẩn đoán hình ảnh" do khoa CĐHA làm, các nhóm còn lại do khoa Xét nghiệm làm
+    @Transient
+    public String getDepartment() {
+        return "Chẩn đoán hình ảnh".equalsIgnoreCase(category) ? "CHAN_DOAN_HINH_ANH" : "XET_NGHIEM";
+    }
 }

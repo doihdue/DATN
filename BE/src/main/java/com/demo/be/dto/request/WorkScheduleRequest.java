@@ -34,6 +34,4 @@ public class WorkScheduleRequest {
     @NotNull(message = "Số lượng bệnh nhân tối đa không được để trống")
     @Min(value = 1, message = "Số lượng bệnh nhân tối đa phải lớn hơn 0")
     private Integer maxPatients;
-
-    private String status; // AVAILABLE, FULL, CANCELLED
 }

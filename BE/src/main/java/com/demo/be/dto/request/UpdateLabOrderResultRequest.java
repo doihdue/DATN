@@ -17,10 +17,5 @@ public class UpdateLabOrderResultRequest {
 
     private String notes; // Ghi chú thêm
 
-    private Boolean isAbnormal; // Đánh dấu chỉ số bất thường
-
-    private Long performerId; // Bác sĩ / KTV thực hiện
-
-    @Builder.Default
-    private String status = "COMPLETED"; // PROCESSING, COMPLETED, CANCELLED
+    private Boolean isAbnormal; // Đánh dấu chỉ số bất thường (để trống thì tự so với ngưỡng tham chiếu)
 }

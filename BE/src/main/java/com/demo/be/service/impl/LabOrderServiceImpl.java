@@ -4,6 +4,7 @@ import com.demo.be.dto.request.SendLabOrdersRequest;
 import com.demo.be.dto.request.UpdateLabOrderResultRequest;
 import com.demo.be.dto.response.LabOrderResponse;
 import com.demo.be.dto.response.MedicalRecordResponse;
+import com.demo.be.exception.AppException;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
@@ -11,12 +12,14 @@ import com.demo.be.repository.*;
 import com.demo.be.service.LabOrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +46,9 @@ public class LabOrderServiceImpl implements LabOrderService {
 
         QueueTicket ticket = queueTicketRepository.findById(request.getQueueTicketId())
                 .orElseThrow(() -> new ResourceNotFoundException("Phiếu khám hàng đợi", "id", request.getQueueTicketId()));
+        if ("COMPLETED".equals(ticket.getStatus()) || "CANCELLED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Ca khám của vé " + ticket.getTicketNumber() + " đã kết thúc, không thể gửi thêm chỉ định");
+        }
 
         Doctor doctor = resolveDoctor(request.getDoctorId());
         if (doctor == null && ticket.getDoctor() != null) {
@@ -98,10 +104,23 @@ public class LabOrderServiceImpl implements LabOrderService {
 
         MedicalRecord savedRecord = medicalRecordRepository.save(record);
 
+        // Gửi bổ sung cho lượt khám đã có chỉ định: không chỉ định lại dịch vụ đang làm / đã có kết quả
+        List<LabOrder> recordOrders = savedRecord.getLabOrders();
+        List<String> duplicated = recordOrders.stream()
+                .filter(o -> !"CANCELLED".equals(o.getStatus()))
+                .filter(o -> request.getLabServiceIds().contains(o.getLabService().getId()))
+                .map(o -> o.getLabService().getServiceName())
+                .distinct()
+                .toList();
+        if (!duplicated.isEmpty()) {
+            throw new BadRequestException("Bệnh nhân đã được chỉ định trong lượt khám này: " + String.join(", ", duplicated)
+                    + ". Bỏ chọn các dịch vụ này rồi gửi lại.");
+        }
+
         // Sinh các bản ghi LabOrder ở trạng thái PENDING
         LocalDateTime now = LocalDateTime.now();
         List<LabOrder> newOrders = new ArrayList<>();
-        for (Long serviceId : request.getLabServiceIds()) {
+        for (Long serviceId : request.getLabServiceIds().stream().distinct().toList()) {
             LabService service = labServiceRepository.findById(serviceId)
                     .orElseThrow(() -> new ResourceNotFoundException("Dịch vụ xét nghiệm", "id", serviceId));
 
@@ -117,7 +136,8 @@ public class LabOrderServiceImpl implements LabOrderService {
         }
 
         List<LabOrder> savedOrders = labOrderRepository.saveAll(newOrders);
-        savedRecord.setLabOrders(savedOrders);
+        // Thêm vào danh sách đang được quản lý; gán danh sách mới sẽ lỗi vì labOrders có orphanRemoval
+        recordOrders.addAll(savedOrders);
 
         // Đổi trạng thái vé sang WAITING_FOR_RESULTS
         ticket.setStatus("WAITING_FOR_RESULTS");
@@ -156,84 +176,133 @@ public class LabOrderServiceImpl implements LabOrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<LabOrderResponse> getOrdersByStatus(String status) {
-        return labOrderRepository.findByStatusWithDetails(status).stream()
-                .map(LabOrderResponse::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<LabOrderResponse> getAllOrders() {
-        return labOrderRepository.findAllWithDetails().stream()
+    public List<LabOrderResponse> getWorklist(LocalDate date) {
+        LocalDate day = date != null ? date : LocalDate.now();
+        // Admin xem toàn bộ; KTV chỉ thấy chỉ định thuộc khoa của mình
+        String department = !isAdmin() && getCurrentEmployee() instanceof LabTechnician tech ? tech.getDepartment() : null;
+        return labOrderRepository.findWorklist(day.atStartOfDay(), day.plusDays(1).atStartOfDay()).stream()
+                .filter(o -> department == null || department.equals(o.getLabService().getDepartment()))
                 .map(LabOrderResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public LabOrderResponse updateOrderResult(Long orderId, UpdateLabOrderResultRequest request) {
-        LabOrder order = labOrderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chỉ định xét nghiệm", "id", orderId));
+    public LabOrderResponse startProcessing(Long orderId) {
+        LabOrder order = findOrder(orderId);
+        if (!"PENDING".equals(order.getStatus())) {
+            throw new BadRequestException("Chỉ tiếp nhận được chỉ định đang chờ làm (trạng thái hiện tại: " + order.getStatus() + ")");
+        }
+        order.setStatus("PROCESSING");
+        order.setPerformer(getDepartmentTech(order));
+        LabOrder saved = labOrderRepository.save(order);
+        log.info("-> KTV {} tiếp nhận mẫu cho chỉ định LabOrder ID: {}", saved.getPerformer().getFullName(), orderId);
+        return LabOrderResponse.fromEntity(saved);
+    }
 
-        Doctor performer = resolveDoctor(request.getPerformerId());
+    @Override
+    @Transactional
+    public LabOrderResponse updateOrderResult(Long orderId, UpdateLabOrderResultRequest request) {
+        LabOrder order = findOrder(orderId);
+        if ("CANCELLED".equals(order.getStatus())) {
+            throw new BadRequestException("Chỉ định đã bị huỷ, không thể nhập kết quả");
+        }
+        QueueTicket ticket = order.getMedicalRecord().getQueueTicket();
+        if (ticket != null && "COMPLETED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Ca khám của bệnh nhân đã kết thúc, không thể sửa kết quả xét nghiệm");
+        }
 
         order.setResultValue(request.getResultValue().trim());
-        order.setConclusion(request.getConclusion());
-        order.setNotes(request.getNotes());
+        order.setConclusion(trimToNull(request.getConclusion()));
+        order.setNotes(trimToNull(request.getNotes()));
         order.setPerformedTime(LocalDateTime.now());
-        order.setPerformer(performer);
-
-        String targetStatus = request.getStatus() != null ? request.getStatus().trim().toUpperCase() : "COMPLETED";
-        order.setStatus(targetStatus);
-
-        // Kiểm tra ngưỡng bất thường
-        Boolean isAbnormal = request.getIsAbnormal();
-        if (isAbnormal == null) {
-            isAbnormal = checkAbnormal(order.getResultValue(), order.getLabService());
-        }
-        order.setIsAbnormal(isAbnormal);
+        order.setPerformer(getDepartmentTech(order));
+        order.setStatus("COMPLETED");
+        // KTV không đánh dấu thì tự so với ngưỡng tham chiếu của dịch vụ
+        order.setIsAbnormal(request.getIsAbnormal() != null
+                ? request.getIsAbnormal()
+                : checkAbnormal(order.getResultValue(), order.getLabService()));
 
         LabOrder saved = labOrderRepository.save(order);
         log.info("-> Đã nhập kết quả chỉ định LabOrder ID: {} - Giá trị: {}, Bất thường: {}",
                 saved.getId(), saved.getResultValue(), saved.getIsAbnormal());
 
-        // Kiểm tra nếu tất cả các xét nghiệm của bệnh án này đã hoàn thành -> Chuyển vé sang RESULTS_READY
-        MedicalRecord record = saved.getMedicalRecord();
-        if (record != null && record.getQueueTicket() != null) {
-            QueueTicket ticket = record.getQueueTicket();
-            List<LabOrder> allOrders = labOrderRepository.findByMedicalRecordId(record.getId());
-            boolean allDone = allOrders.stream().allMatch(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()) || "CANCELLED".equalsIgnoreCase(o.getStatus()));
-
-            if (allDone && !"COMPLETED".equalsIgnoreCase(ticket.getStatus())) {
-                ticket.setStatus("RESULTS_READY");
-                queueTicketRepository.save(ticket);
-                log.info("-> Toàn bộ chỉ định CLS của vé số {} đã xong. Trạng thái chuyển sang: RESULTS_READY", ticket.getTicketNumber());
-
-                try {
-                    messagingTemplate.convertAndSend("/topic/queue", "TICKET_RESULTS_READY");
-                } catch (Exception e) {
-                    log.warn("Không thể gửi websocket event: {}", e.getMessage());
-                }
-            }
-        }
-
+        refreshTicketStatus(saved.getMedicalRecord());
         return LabOrderResponse.fromEntity(saved);
     }
 
     @Override
     @Transactional
     public void cancelOrder(Long orderId) {
-        LabOrder order = labOrderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chỉ định xét nghiệm", "id", orderId));
-
-        if ("COMPLETED".equalsIgnoreCase(order.getStatus())) {
+        LabOrder order = findOrder(orderId);
+        if ("COMPLETED".equals(order.getStatus())) {
             throw new BadRequestException("Không thể hủy xét nghiệm đã có kết quả và được ký duyệt");
         }
 
         order.setStatus("CANCELLED");
         labOrderRepository.save(order);
         log.info("-> Đã hủy chỉ định xét nghiệm ID: {}", orderId);
+
+        // Huỷ chỉ định cuối cùng còn dang dở thì bệnh nhân cũng đã đủ kết quả
+        refreshTicketStatus(order.getMedicalRecord());
+    }
+
+    // Tất cả chỉ định của hồ sơ đã xong / huỷ -> vé đang chờ kết quả chuyển sang RESULTS_READY để bác sĩ gọi lại
+    private void refreshTicketStatus(MedicalRecord record) {
+        QueueTicket ticket = record != null ? record.getQueueTicket() : null;
+        if (ticket == null || !"WAITING_FOR_RESULTS".equals(ticket.getStatus())) {
+            return;
+        }
+        boolean allDone = labOrderRepository.findByMedicalRecordId(record.getId()).stream()
+                .allMatch(o -> "COMPLETED".equals(o.getStatus()) || "CANCELLED".equals(o.getStatus()));
+        if (!allDone) {
+            return;
+        }
+        ticket.setStatus("RESULTS_READY");
+        queueTicketRepository.save(ticket);
+        log.info("-> Toàn bộ chỉ định CLS của vé số {} đã xong. Trạng thái chuyển sang: RESULTS_READY", ticket.getTicketNumber());
+        try {
+            messagingTemplate.convertAndSend("/topic/queue", "TICKET_RESULTS_READY");
+        } catch (Exception e) {
+            log.warn("Không thể gửi websocket event: {}", e.getMessage());
+        }
+    }
+
+    private LabOrder findOrder(Long orderId) {
+        return labOrderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chỉ định xét nghiệm", "id", orderId));
+    }
+
+    // KTV / nhân viên đang đăng nhập, dùng làm người tiếp nhận và ký duyệt kết quả
+    private Employee getCurrentEmployee() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User user = auth != null ? userRepository.findByUsername(auth.getName()).orElse(null) : null;
+        if (user == null || !(user.getPerson() instanceof Employee employee)) {
+            throw new BadRequestException("Tài khoản hiện tại không gắn với hồ sơ nhân viên, không thể ký duyệt kết quả");
+        }
+        return employee;
+    }
+
+    // KTV đang đăng nhập, chỉ được làm chỉ định thuộc khoa của mình
+    private LabTechnician getDepartmentTech(LabOrder order) {
+        if (!(getCurrentEmployee() instanceof LabTechnician tech)) {
+            throw new AppException("Chỉ kỹ thuật viên mới được tiếp nhận và ký kết quả xét nghiệm", HttpStatus.FORBIDDEN);
+        }
+        if (!tech.getDepartment().equals(order.getLabService().getDepartment())) {
+            throw new AppException("Chỉ định " + order.getLabService().getServiceCode()
+                    + " không thuộc khoa của bạn", HttpStatus.FORBIDDEN);
+        }
+        return tech;
+    }
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private boolean checkAbnormal(String resultValue, LabService service) {
@@ -270,7 +339,6 @@ public class LabOrderServiceImpl implements LabOrderService {
         } catch (Exception e) {
             log.debug("Không tìm thấy thông tin bác sĩ từ SecurityContext: {}", e.getMessage());
         }
-        List<Doctor> allDoctors = doctorRepository.findAll();
-        return allDoctors.isEmpty() ? null : allDoctors.get(0);
+        return null;
     }
 }

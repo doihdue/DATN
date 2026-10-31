@@ -406,17 +406,17 @@
               <h2 class="console-heading">Bàn Gọi Bệnh Nhân Trực Tiếp</h2>
             </div>
 
-            <!-- Room Selector Dropdown if multiple rooms -->
-            @if (displayBoard().length > 0) {
-              <div class="room-selector-wrap">
-                <label for="roomSelect" class="selector-label">Phòng khám:</label>
-                <select id="roomSelect" class="room-select" [(ngModel)]="activeDoctorRoomId" (ngModelChange)="onDoctorRoomChange($event)">
-                  @for (room of displayBoard(); track room.roomId) {
-                    <option [value]="room.roomId">{{ room.roomNumber }} - {{ room.roomName }}</option>
-                  }
-                </select>
-              </div>
-            }
+            <!-- Bác sĩ chỉ gọi số tại phòng có ca trực hôm nay của mình -->
+            <div class="room-selector-wrap">
+              <span class="selector-label">Phòng khám:</span>
+              <span class="room-select">
+                @if (doctorRoomOverview(); as ov) {
+                  {{ ov.roomNumber }} - {{ ov.roomName }}
+                } @else {
+                  Chưa có ca trực hôm nay
+                }
+              </span>
+            </div>
           </div>
 
           <div class="console-body">

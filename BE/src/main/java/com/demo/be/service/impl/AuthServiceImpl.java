@@ -274,10 +274,12 @@ public class AuthServiceImpl implements AuthService {
         String avatarUrl = user.getPerson() != null ? user.getPerson().getAvatarUrl() : null;
         Long personId = user.getPerson() != null ? user.getPerson().getId() : null;
         String position = null;
+        String department = null;
         if (user.getPerson() instanceof Employee employee) {
             position = employee.getPosition();
-        } else if (user.getPerson() instanceof Doctor doctor) {
-            position = doctor.getPosition();
+        }
+        if (user.getPerson() instanceof LabTechnician technician) {
+            department = technician.getDepartment();
         }
 
         return UserSummaryResponse.builder()
@@ -290,6 +292,7 @@ public class AuthServiceImpl implements AuthService {
                 .status(user.getStatus())
                 .personId(personId)
                 .position(position)
+                .department(department)
                 .roles(roles)
                 .build();
     }

@@ -1,6 +1,7 @@
 package com.demo.be.service.impl;
 
 import com.demo.be.dto.response.LabServiceResponse;
+import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.LabService;
 import com.demo.be.repository.LabServiceRepository;
@@ -52,6 +53,18 @@ public class LabCatalogServiceImpl implements LabCatalogService {
     @Override
     @Transactional
     public LabServiceResponse createService(LabService service) {
+        if (service.getServiceCode() == null || service.getServiceCode().isBlank()
+                || service.getServiceName() == null || service.getServiceName().isBlank()) {
+            throw new BadRequestException("Mã và tên dịch vụ xét nghiệm không được để trống");
+        }
+        String code = service.getServiceCode().trim().toUpperCase();
+        if (labServiceRepository.findByServiceCode(code).isPresent()) {
+            throw new BadRequestException("Mã dịch vụ " + code + " đã tồn tại");
+        }
+        // Luôn tạo bản ghi mới: bỏ id client gửi lên
+        service.setId(null);
+        service.setServiceCode(code);
+        service.setIsActive(true);
         LabService saved = labServiceRepository.save(service);
         log.info("-> Đã tạo mới dịch vụ xét nghiệm: {} ({})", saved.getServiceName(), saved.getServiceCode());
         return LabServiceResponse.fromEntity(saved);

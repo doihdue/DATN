@@ -38,6 +38,7 @@ export interface LabOrder {
 
   queueTicketId?: number;
   ticketNumber?: string;
+  roomNumber?: string;
   patientId?: number;
   patientName?: string;
   patientGender?: string;
@@ -68,6 +69,4 @@ export interface UpdateLabOrderResultRequest {
   conclusion?: string;
   notes?: string;
   isAbnormal?: boolean;
-  performerId?: number;
-  status?: string;
 }
