@@ -49,6 +49,14 @@ import { SidebarService } from '../../services/sidebar.service';
             <div class="nav-icon"><i class="bi bi-diagram-3"></i></div>
             <span class="nav-label">QUẢN LÝ CHUYÊN KHOA</span>
           </a>
+          <a routerLink="/admin/doctors" routerLinkActive="active" class="nav-link-item" title="Quản lý đội ngũ bác sĩ">
+            <div class="nav-icon"><i class="bi bi-person-badge"></i></div>
+            <span class="nav-label">QUẢN LÝ BÁC SĨ</span>
+          </a>
+          <a routerLink="/admin/staff" routerLinkActive="active" class="nav-link-item" title="Quản lý nhân viên lễ tân">
+            <div class="nav-icon"><i class="bi bi-person-workspace"></i></div>
+            <span class="nav-label">QUẢN LÝ LỄ TÂN</span>
+          </a>
           <a routerLink="/admin/medicines" routerLinkActive="active" class="nav-link-item" title="Quản lý kho dược phẩm">
             <div class="nav-icon"><i class="bi bi-capsule"></i></div>
             <span class="nav-label">KHO DƯỢC &amp; THUỐC</span>
