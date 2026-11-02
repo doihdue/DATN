@@ -115,6 +115,7 @@ public class MedicalRecordController {
 
     // 4. Bác sĩ xem tiền sử bệnh của bệnh nhân (Lịch sử các lần khám trước)
     @GetMapping("/patient/{patientId}/history")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<PatientMedicalHistoryResponse>> getPatientHistory(@PathVariable Long patientId) {
         PatientMedicalHistoryResponse history = medicalRecordService.getPatientMedicalHistory(patientId);
         return ResponseEntity.ok(ApiResponse.success(history, "Lấy tiền sử bệnh của bệnh nhân thành công"));

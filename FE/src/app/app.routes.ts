@@ -20,6 +20,7 @@ import { LabTechniciansComponent } from './pages/lab-technicians/lab-technicians
 import { LabManagementComponent } from './pages/lab-management/lab-management.component';
 import { LabServicesComponent } from './pages/lab-services/lab-services.component';
 import { DoctorHistoryComponent } from './pages/doctor-history/doctor-history.component';
+import { PatientsComponent } from './pages/patients/patients.component';
 import { roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -66,6 +67,12 @@ export const routes: Routes = [
   {
     path: 'admin/lab-techs',
     redirectTo: 'admin/lab-technicians'
+  },
+  {
+    path: 'admin/patients',
+    component: PatientsComponent,
+    title: 'Quản lý Bệnh nhân - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
   },
   {
     path: 'admin/personnel',

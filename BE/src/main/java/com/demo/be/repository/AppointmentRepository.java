@@ -67,4 +67,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.appointmentDate = :date AND a.status = :status")
     long countTodayAppointmentsByStatus(@Param("date") LocalDate date, @Param("status") String status);
+
+    boolean existsByPatientId(Long patientId);
 }

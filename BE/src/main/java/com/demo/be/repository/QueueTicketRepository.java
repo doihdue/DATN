@@ -96,4 +96,6 @@ public interface QueueTicketRepository extends JpaRepository<QueueTicket, Long> 
            "AND q.patient.user.username = :username " +
            "ORDER BY q.id DESC")
     List<QueueTicket> findTodayTicketsByUsername(@Param("today") LocalDate today, @Param("username") String username);
+
+    boolean existsByPatientId(Long patientId);
 }
