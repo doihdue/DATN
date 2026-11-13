@@ -272,11 +272,19 @@ export class MyAppointmentsComponent implements OnInit {
   readonly upcoming = computed(() =>
     this.appointments()
       .filter(a => a.status === 'PENDING' || a.status === 'CONFIRMED' || a.status === 'CHECKED_IN')
-      .sort((a, b) => (a.appointmentDate + a.estimatedStartTime).localeCompare(b.appointmentDate + b.estimatedStartTime))
+      // Gần nhất (sớm nhất) ở trên -> xa nhất ở dưới
+      .sort((a, b) => this.sortKey(a).localeCompare(this.sortKey(b)))
   );
   readonly history = computed(() =>
-    this.appointments().filter(a => a.status === 'COMPLETED' || a.status === 'CANCELLED')
+    this.appointments()
+      .filter(a => a.status === 'COMPLETED' || a.status === 'CANCELLED')
+      // Gần hôm nay nhất (mới nhất) ở trên -> xa nhất (cũ nhất) ở dưới
+      .sort((a, b) => this.sortKey(b).localeCompare(this.sortKey(a)))
   );
+
+  private sortKey(a: Appointment): string {
+    return `${a.appointmentDate ?? ''}T${a.estimatedStartTime ?? a.shiftStartTime ?? ''}`;
+  }
   readonly visibleList = computed(() => this.tab() === 'upcoming' ? this.upcoming() : this.history());
 
   ngOnInit(): void {
