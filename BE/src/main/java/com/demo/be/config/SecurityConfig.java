@@ -58,6 +58,7 @@ public class SecurityConfig {
                                 "/api/medical-records/**",
                                 "/api/queue/check-in",
                                 "/api/appointments/available-schedules",
+                                "/api/chat/**",
                                 "/ws-queue/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

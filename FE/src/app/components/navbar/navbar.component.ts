@@ -458,6 +458,12 @@ import { AuthService } from '../../services/auth.service';
       }
     }
 
+    @media (max-width: 576px) {
+      .brand-text {
+        display: none;
+      }
+    }
+
     /* Dropdown Quản lý Nhân sự */
     .nav-dropdown {
       position: relative;
