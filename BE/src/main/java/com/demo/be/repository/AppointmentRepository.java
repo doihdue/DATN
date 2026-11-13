@@ -22,6 +22,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     List<Appointment> findByWorkScheduleIdAndStatusIn(Long workScheduleId, Collection<String> statuses);
 
+    List<Appointment> findByAppointmentDateAndStatusIn(LocalDate date, Collection<String> statuses);
+
     // Một bệnh nhân chỉ được giữ 1 lịch hẹn còn hiệu lực với cùng bác sĩ trong cùng ngày
     @Query("SELECT COUNT(a) > 0 FROM Appointment a " +
            "WHERE a.patient.id = :patientId " +

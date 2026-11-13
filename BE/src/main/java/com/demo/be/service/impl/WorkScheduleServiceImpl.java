@@ -5,6 +5,7 @@ import com.demo.be.dto.request.WorkScheduleRequest;
 import com.demo.be.dto.response.BatchWorkScheduleResponse;
 import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
+import com.demo.be.email.event.AppointmentCancelledEvent;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.Appointment;
@@ -20,6 +21,7 @@ import com.demo.be.repository.WorkScheduleRepository;
 import com.demo.be.service.WorkScheduleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
     private final ExaminationRoomRepository examinationRoomRepository;
     private final AppointmentRepository appointmentRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -304,6 +307,11 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
         for (Appointment appointment : activeAppointments) {
             appointment.setStatus("CANCELLED");
             appointment.setCancellationReason("Ca khám bị huỷ: " + reason);
+            try {
+                eventPublisher.publishEvent(new AppointmentCancelledEvent(appointment, appointment.getCancellationReason()));
+            } catch (Exception e) {
+                log.warn("Lỗi khi bắn sự kiện gửi mail hủy lịch cho lịch hẹn ID {}: {}", appointment.getId(), e.getMessage());
+            }
         }
         appointmentRepository.saveAll(activeAppointments);
         schedule.setCurrentBookedCount(Math.max(0,
