@@ -1,11 +1,14 @@
 package com.demo.be.controller;
 
+import com.demo.be.dto.request.ChangePasswordRequest;
 import com.demo.be.dto.request.CreateUserRequest;
 import com.demo.be.dto.request.LoginRequest;
 import com.demo.be.dto.request.RefreshTokenRequest;
 import com.demo.be.dto.request.RegisterRequest;
+import com.demo.be.dto.request.UpdateProfileRequest;
 import com.demo.be.dto.response.ApiResponse;
 import com.demo.be.dto.response.AuthResponse;
+import com.demo.be.dto.response.UserProfileResponse;
 import com.demo.be.dto.response.UserSummaryResponse;
 import com.demo.be.security.UserPrincipal;
 import com.demo.be.service.AuthService;
@@ -53,6 +56,31 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UserSummaryResponse>> getCurrentUser(@AuthenticationPrincipal UserPrincipal currentUser) {
         UserSummaryResponse response = authService.getCurrentUser(currentUser);
         return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin tài khoản hiện tại thành công"));
+    }
+
+    @GetMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile(@AuthenticationPrincipal UserPrincipal currentUser) {
+        UserProfileResponse response = authService.getProfile(currentUser);
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy thông tin hồ sơ thành công"));
+    }
+
+    @PutMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        UserProfileResponse response = authService.updateProfile(currentUser, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật hồ sơ cá nhân thành công"));
+    }
+
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(currentUser, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
     }
 
     @PostMapping("/admin/create-user")

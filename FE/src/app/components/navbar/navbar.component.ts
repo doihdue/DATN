@@ -177,7 +177,7 @@ import { AuthService } from '../../services/auth.service';
         <div class="nav-actions">
           @if (authService.isAuthenticated()) {
             <div class="user-pill-card">
-              <div class="user-main-info">
+              <a routerLink="/profile" class="user-main-info user-profile-link" title="Xem thông tin cá nhân & Đổi mật khẩu">
                 <div class="user-avatar-badge">
                   <i class="bi" [ngClass]="getRoleIconClass()"></i>
                 </div>
@@ -190,7 +190,11 @@ import { AuthService } from '../../services/auth.service';
                     {{ getPrimaryRoleDisplayName() }}
                   </span>
                 </div>
-              </div>
+              </a>
+
+              <a routerLink="/profile" class="btn-profile-circle" title="Hồ sơ cá nhân & Đổi mật khẩu" aria-label="Hồ sơ">
+                <i class="bi bi-person-gear"></i>
+              </a>
 
               <button (click)="logout()" class="btn-logout-circle" title="Đăng xuất khỏi hệ thống" aria-label="Đăng xuất">
                 <i class="bi bi-box-arrow-right"></i>
@@ -414,6 +418,34 @@ import { AuthService } from '../../services/auth.service';
       border-radius: 50%;
       background-color: #10b981;
       flex-shrink: 0;
+    }
+
+    .user-profile-link {
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .btn-profile-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .btn-profile-circle:hover {
+      background: #e0f2fe;
+      color: #0284c7;
+      border-color: #bae6fd;
+      transform: scale(1.05);
     }
 
     .btn-logout-circle {

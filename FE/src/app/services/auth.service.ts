@@ -1,7 +1,16 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
-import { ApiResponse, AuthResponse, LoginRequest, RegisterRequest, UserSummary } from '../models/auth.models';
+import {
+  ApiResponse,
+  AuthResponse,
+  ChangePasswordRequest,
+  LoginRequest,
+  RegisterRequest,
+  UpdateProfileRequest,
+  UserProfileResponse,
+  UserSummary
+} from '../models/auth.models';
 import { Router } from '@angular/router';
 
 @Injectable({
@@ -76,6 +85,35 @@ export class AuthService {
         }
       })
     );
+  }
+
+  getProfile(): Observable<ApiResponse<UserProfileResponse>> {
+    return this.http.get<ApiResponse<UserProfileResponse>>(`${this.apiUrl}/profile`);
+  }
+
+  updateProfile(request: UpdateProfileRequest): Observable<ApiResponse<UserProfileResponse>> {
+    return this.http.put<ApiResponse<UserProfileResponse>>(`${this.apiUrl}/profile`, request).pipe(
+      tap(res => {
+        if (res.success && res.data) {
+          const user = this.currentUser();
+          if (user) {
+            const updatedUser: UserSummary = {
+              ...user,
+              fullName: res.data.fullName || user.fullName,
+              email: res.data.email || user.email,
+              phoneNumber: res.data.phoneNumber || user.phoneNumber,
+              avatarUrl: res.data.avatarUrl || user.avatarUrl
+            };
+            this.currentUser.set(updatedUser);
+            localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
+          }
+        }
+      })
+    );
+  }
+
+  changePassword(request: ChangePasswordRequest): Observable<ApiResponse<void>> {
+    return this.http.post<ApiResponse<void>>(`${this.apiUrl}/change-password`, request);
   }
 
   hasRole(role: string): boolean {

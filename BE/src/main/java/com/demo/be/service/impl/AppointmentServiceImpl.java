@@ -6,6 +6,8 @@ import com.demo.be.dto.request.RescheduleAppointmentRequest;
 import com.demo.be.dto.response.AppointmentResponse;
 import com.demo.be.dto.response.QueueTicketResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
+import com.demo.be.email.event.AppointmentBookedEvent;
+import com.demo.be.email.event.AppointmentCancelledEvent;
 import com.demo.be.exception.AppException;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
@@ -21,6 +23,7 @@ import com.demo.be.service.WorkScheduleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +64,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final QueueTicketRepository queueTicketRepository;
     private final WorkScheduleService workScheduleService;
     private final QueueService queueService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // Bệnh nhân chỉ được huỷ/đổi lịch trước giờ khám dự kiến ít nhất N giờ
     @Value("${appointment.change-deadline-hours:2}")
@@ -120,6 +124,14 @@ public class AppointmentServiceImpl implements AppointmentService {
         log.info("-> Bệnh nhân {} đặt lịch {} với bác sĩ {} ngày {} (STT {})",
                 patient.getFullName(), appointment.getAppointmentCode(),
                 schedule.getDoctor().getFullName(), schedule.getWorkDate(), bookingNumber);
+
+        // Bắn sự kiện gửi email xác nhận đặt lịch tự động
+        try {
+            eventPublisher.publishEvent(new AppointmentBookedEvent(appointment));
+        } catch (Exception e) {
+            log.warn("Lỗi khi bắn sự kiện gửi mail đặt lịch: {}", e.getMessage());
+        }
+
         return mapToResponse(appointment);
     }
 
@@ -215,7 +227,16 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setCancellationReason(reason != null && !reason.isBlank() ? reason.trim() : defaultReason);
 
         log.info("-> Đã huỷ lịch hẹn {} (Lý do: {})", appointment.getAppointmentCode(), appointment.getCancellationReason());
-        return mapToResponse(appointmentRepository.save(appointment));
+        Appointment saved = appointmentRepository.save(appointment);
+
+        // Bắn sự kiện gửi email thông báo hủy lịch hẹn
+        try {
+            eventPublisher.publishEvent(new AppointmentCancelledEvent(saved, saved.getCancellationReason()));
+        } catch (Exception e) {
+            log.warn("Lỗi khi bắn sự kiện gửi mail hủy lịch: {}", e.getMessage());
+        }
+
+        return mapToResponse(saved);
     }
 
     @Override

@@ -21,13 +21,20 @@ import { LabManagementComponent } from './pages/lab-management/lab-management.co
 import { LabServicesComponent } from './pages/lab-services/lab-services.component';
 import { DoctorHistoryComponent } from './pages/doctor-history/doctor-history.component';
 import { PatientsComponent } from './pages/patients/patients.component';
-import { roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
+import { ProfileComponent } from './pages/profile/profile.component';
+import { authGuard, roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   // Trang chủ - ai cũng vào được
   { path: '', component: HomeComponent, title: 'MedQueue - Trang chủ' },
   { path: 'login', component: LoginComponent, title: 'Đăng nhập - MedQueue' },
   { path: 'register', component: RegisterComponent, title: 'Đăng ký hồ sơ khám - MedQueue' },
+  {
+    path: 'profile',
+    component: ProfileComponent,
+    title: 'Hồ sơ cá nhân & Đổi mật khẩu - MedQueue',
+    canActivate: [authGuard]
+  },
 
   // ========================
   // ADMIN - Quản trị hệ thống

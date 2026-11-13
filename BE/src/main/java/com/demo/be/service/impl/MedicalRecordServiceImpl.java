@@ -4,13 +4,16 @@ import com.demo.be.dto.request.CreateMedicalRecordRequest;
 import com.demo.be.dto.request.PrescriptionItemRequest;
 import com.demo.be.dto.response.MedicalRecordResponse;
 import com.demo.be.dto.response.PatientMedicalHistoryResponse;
+import com.demo.be.email.event.MedicalRecordCompletedEvent;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
 import com.demo.be.repository.*;
 import com.demo.be.service.MedicalRecordService;
+import com.demo.be.service.PdfExportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -38,6 +41,8 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     private final MedicineRepository medicineRepository;
     private final LabOrderRepository labOrderRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PdfExportService pdfExportService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -189,6 +194,14 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         log.info("-> Đã lưu thành công hồ sơ bệnh án ID: {} kèm đơn thuốc {}", 
                 saved.getId(), 
                 saved.getPrescription() != null ? "có " + saved.getPrescription().getItems().size() + " loại thuốc" : "không kê đơn");
+
+        // Tự động sinh PDF đơn thuốc và bắn sự kiện gửi email cho bệnh nhân
+        try {
+            byte[] pdfBytes = pdfExportService.exportMedicalRecordPdf(saved.getId());
+            eventPublisher.publishEvent(new MedicalRecordCompletedEvent(saved, pdfBytes));
+        } catch (Exception e) {
+            log.warn("Không thể sinh PDF hoặc gửi mail đơn thuốc cho bệnh án ID {}: {}", saved.getId(), e.getMessage());
+        }
 
         return MedicalRecordResponse.fromEntity(saved);
     }
