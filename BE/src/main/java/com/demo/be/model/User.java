@@ -37,6 +37,10 @@ public class User {
     @Column(name = "status", length = 50)
     private String status;
 
+    // Token cấp trước thời điểm này bị từ chối (đổi mật khẩu thì mọi phiên cũ phải đăng nhập lại)
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

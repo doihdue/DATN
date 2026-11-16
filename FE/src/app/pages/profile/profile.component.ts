@@ -1257,12 +1257,14 @@ export class ProfileComponent implements OnInit {
     this.authService.changePassword(this.passwordData).subscribe({
       next: (res) => {
         this.savingPassword.set(false);
-        this.passwordSuccess.set('Đổi mật khẩu thành công! Vui lòng ghi nhớ mật khẩu mới của bạn.');
+        this.passwordSuccess.set('Đổi mật khẩu thành công! Vui lòng đăng nhập lại bằng mật khẩu mới.');
         this.passwordData = {
           currentPassword: '',
           newPassword: '',
           confirmPassword: ''
         };
+        // Server đã vô hiệu hoá mọi token cũ (kể cả phiên này) nên chuyển về trang đăng nhập
+        setTimeout(() => this.authService.logout(), 2000);
       },
       error: (err) => {
         this.savingPassword.set(false);
