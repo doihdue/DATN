@@ -55,6 +55,8 @@ public class MedicalRecordController {
     @GetMapping(value = {"/{id}/export-pdf", "/{id}/pdf"}, produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyRole('DOCTOR', 'STAFF', 'ADMIN', 'PATIENT')")
     public ResponseEntity<byte[]> exportMedicalRecordPdf(@PathVariable Long id) {
+        // Kiểm tra quyền xem (bệnh nhân chỉ tải được phiếu của chính mình) trước khi xuất
+        medicalRecordService.getMedicalRecordById(id);
         byte[] pdfBytes = pdfExportService.exportMedicalRecordPdf(id);
 
         HttpHeaders headers = new HttpHeaders();
