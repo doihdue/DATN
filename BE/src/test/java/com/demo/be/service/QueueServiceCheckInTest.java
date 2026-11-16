@@ -72,9 +72,12 @@ class QueueServiceCheckInTest {
     // Phòng có 1 ca đang diễn ra (của afternoonDoctor)
     private void stubRoomWithCurrentShift() {
         LocalTime now = LocalTime.now();
+        // Giữ ca trong cùng một ngày: cộng / trừ giờ gần nửa đêm sẽ quay vòng và làm ca "đã kết thúc"
+        LocalTime start = now.isBefore(LocalTime.of(0, 30)) ? LocalTime.MIDNIGHT : now.minusMinutes(30);
+        LocalTime end = now.isAfter(LocalTime.of(22, 29)) ? LocalTime.MAX : now.plusMinutes(90);
         when(examinationRoomRepository.findByIdForUpdate(room.getId())).thenReturn(Optional.of(room));
         when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(room.getId()), any()))
-                .thenReturn(List.of(shift(afternoonDoctor, now.minusMinutes(30), now.plusMinutes(90), "AVAILABLE")));
+                .thenReturn(List.of(shift(afternoonDoctor, start, end, "AVAILABLE")));
     }
 
     private void stubSaveTicket() {
