@@ -9,6 +9,7 @@ import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
 import com.demo.be.repository.*;
+import com.demo.be.security.AccessGuard;
 import com.demo.be.service.LabOrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class LabOrderServiceImpl implements LabOrderService {
     private final DoctorRepository doctorRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AccessGuard accessGuard;
 
     @Override
     @Transactional
@@ -49,8 +51,9 @@ public class LabOrderServiceImpl implements LabOrderService {
         if ("COMPLETED".equals(ticket.getStatus()) || "CANCELLED".equals(ticket.getStatus())) {
             throw new BadRequestException("Ca khám của vé " + ticket.getTicketNumber() + " đã kết thúc, không thể gửi thêm chỉ định");
         }
+        accessGuard.assertDoctorWorksInRoom(ticket.getExaminationRoom());
 
-        Doctor doctor = resolveDoctor(request.getDoctorId());
+        Doctor doctor = accessGuard.currentDoctor().orElseGet(() -> resolveDoctor(request.getDoctorId()));
         if (doctor == null && ticket.getDoctor() != null) {
             doctor = ticket.getDoctor();
         }
@@ -159,6 +162,11 @@ public class LabOrderServiceImpl implements LabOrderService {
     @Override
     @Transactional(readOnly = true)
     public List<LabOrderResponse> getOrdersByMedicalRecordId(Long recordId) {
+        if (accessGuard.isPatientOnly()) {
+            MedicalRecord record = medicalRecordRepository.findById(recordId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ bệnh án", "id", recordId));
+            accessGuard.assertCanViewPatientData(record.getPatient());
+        }
         return labOrderRepository.findByMedicalRecordIdWithDetails(recordId).stream()
                 .map(LabOrderResponse::fromEntity)
                 .collect(Collectors.toList());
@@ -235,6 +243,10 @@ public class LabOrderServiceImpl implements LabOrderService {
     @Transactional
     public void cancelOrder(Long orderId) {
         LabOrder order = findOrder(orderId);
+        QueueTicket orderTicket = order.getMedicalRecord() != null ? order.getMedicalRecord().getQueueTicket() : null;
+        if (orderTicket != null) {
+            accessGuard.assertDoctorWorksInRoom(orderTicket.getExaminationRoom());
+        }
         if ("COMPLETED".equals(order.getStatus())) {
             throw new BadRequestException("Không thể hủy xét nghiệm đã có kết quả và được ký duyệt");
         }

@@ -6,6 +6,7 @@ import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
 import com.demo.be.repository.*;
+import com.demo.be.security.AccessGuard;
 import com.demo.be.service.QueueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class QueueServiceImpl implements QueueService {
     private final UserRepository userRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AccessGuard accessGuard;
 
     @Value("${ai.service.url:http://localhost:8000}")
     private String aiServiceUrl;
@@ -335,6 +337,7 @@ public class QueueServiceImpl implements QueueService {
     public QueueTicketResponse setEmergency(Long ticketId) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+        accessGuard.assertDoctorWorksInRoom(ticket.getExaminationRoom());
 
         ticket.setIsEmergency(true);
         ticket.setPriorityScore(ticket.getPriorityScore() + 100);
@@ -350,6 +353,7 @@ public class QueueServiceImpl implements QueueService {
     public QueueTicketResponse transferTicket(Long ticketId, Long targetRoomId, String reason) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+        accessGuard.assertDoctorWorksInRoom(ticket.getExaminationRoom());
 
         if (!"WAITING".equals(ticket.getStatus()) && !"SKIPPED".equals(ticket.getStatus())) {
             throw new BadRequestException("Chỉ có thể chuyển phòng cho lượt khám đang chờ hoặc nhỡ lượt (trạng thái hiện tại: " + ticket.getStatus() + ")");
@@ -395,6 +399,7 @@ public class QueueServiceImpl implements QueueService {
     public QueueTicketResponse cancelTicket(Long ticketId, String reason) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
+        accessGuard.assertDoctorWorksInRoom(ticket.getExaminationRoom());
 
         if ("COMPLETED".equals(ticket.getStatus())) {
             throw new BadRequestException("Không thể hủy lượt khám đã hoàn thành!");
