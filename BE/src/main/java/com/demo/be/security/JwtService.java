@@ -11,12 +11,20 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 public class JwtService {
+
+    // Phân biệt access token và refresh token: refresh token không được dùng để gọi API
+    static final String TOKEN_TYPE_CLAIM = "type";
+    static final String ACCESS_TOKEN = "access";
+    static final String REFRESH_TOKEN = "refresh";
 
     @Value("${application.security.jwt.secret-key:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
     private String secretKey;
@@ -47,30 +55,62 @@ public class JwtService {
                     .collect(Collectors.toList());
             extraClaims.put("roles", roles);
         }
+        extraClaims.put(TOKEN_TYPE_CLAIM, ACCESS_TOKEN);
         return buildToken(extraClaims, userDetails.getUsername(), jwtExpiration);
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails.getUsername(), refreshExpiration);
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(TOKEN_TYPE_CLAIM, REFRESH_TOKEN);
+        return buildToken(claims, userDetails.getUsername(), refreshExpiration);
     }
 
     private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(subject)
+                .id(UUID.randomUUID().toString()) // mỗi token khác nhau dù cấp trong cùng một giây
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSignInKey())
                 .compact();
     }
 
+    // Dùng cho bộ lọc xác thực: chỉ nhận access token của tài khoản đang hoạt động,
+    // cấp sau lần đổi mật khẩu gần nhất
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
-            final String username = extractUsername(token);
-            return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+            Claims claims = extractAllClaims(token);
+            return ACCESS_TOKEN.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))
+                    && claims.getSubject().equals(userDetails.getUsername())
+                    && claims.getExpiration().after(new Date())
+                    && userDetails.isEnabled()
+                    && userDetails.isAccountNonLocked()
+                    && !issuedBeforePasswordChange(claims, userDetails);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    // Dùng cho endpoint làm mới token: chữ ký hợp lệ, còn hạn và đúng loại refresh
+    public boolean isRefreshToken(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return REFRESH_TOKEN.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))
+                    && claims.getExpiration().after(new Date());
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    // iat của JWT chỉ chính xác tới giây nên so sánh sau khi làm tròn thời điểm đổi mật khẩu xuống giây
+    private boolean issuedBeforePasswordChange(Claims claims, UserDetails userDetails) {
+        if (!(userDetails instanceof UserPrincipal principal) || principal.getPasswordChangedAt() == null) {
+            return false;
+        }
+        Instant changedAt = principal.getPasswordChangedAt().atZone(ZoneId.systemDefault()).toInstant()
+                .truncatedTo(ChronoUnit.SECONDS);
+        return claims.getIssuedAt().toInstant().isBefore(changedAt);
     }
 
     public boolean isTokenExpired(String token) {

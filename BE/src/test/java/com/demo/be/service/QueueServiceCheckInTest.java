@@ -1,6 +1,7 @@
 package com.demo.be.service;
 
 import com.demo.be.dto.request.CheckInRequest;
+import com.demo.be.dto.response.MyTicketStatusResponse;
 import com.demo.be.dto.response.QueueTicketResponse;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.model.*;
@@ -35,7 +36,9 @@ class QueueServiceCheckInTest {
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
     @Mock private WorkScheduleRepository workScheduleRepository;
+    @Mock private AppointmentRepository appointmentRepository;
     @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock private com.demo.be.security.AccessGuard accessGuard;
 
     @InjectMocks
     private QueueServiceImpl service;
@@ -166,5 +169,93 @@ class QueueServiceCheckInTest {
         assertThat(created.getValue().getFullName()).isEqualTo("Nguyễn Bé Na");
         assertThat(parent.getFullName()).isEqualTo("Nguyễn Văn Nam");
         assertThat(res.getPatientId()).isEqualTo(11L);
+    }
+
+    // ================= Bệnh nhân tự lấy số online & kiểm tra lịch hẹn =================
+
+    // Lưu vé và cho phép tra lại đúng vé vừa lưu theo số vé (selfCheckIn trả về trạng thái phiếu)
+    private QueueTicket[] stubSaveAndLookupTicket() {
+        QueueTicket[] holder = new QueueTicket[1];
+        when(queueTicketRepository.save(any(QueueTicket.class))).thenAnswer(inv -> {
+            QueueTicket t = inv.getArgument(0);
+            t.setId(500L);
+            holder[0] = t;
+            return t;
+        });
+        when(queueTicketRepository.findByTicketNumberAndTicketDate(anyString(), any()))
+                .thenAnswer(inv -> Optional.ofNullable(holder[0]));
+        return holder;
+    }
+
+    @Test
+    void selfCheckIn_ignoresPrivilegedFields_andDoesNotEditExistingPatient() {
+        LocalTime now = LocalTime.now();
+        assumeTrue(now.getHour() >= 1 && now.isBefore(LocalTime.of(22, 25))); // ca giả lập kéo dài tới now + 90 phút
+        stubRoomWithCurrentShift();
+        patient.setDateOfBirth(LocalDate.of(1985, 3, 3));
+        when(patientRepository.findByPhoneNumber("0901234567")).thenReturn(List.of(patient));
+        QueueTicket[] saved = stubSaveAndLookupTicket();
+
+        CheckInRequest req = request("Nguyễn Văn Nam");
+        req.setPatientId(99L);
+        req.setDoctorId(morningDoctor.getId());
+        req.setAppointmentId(7L);
+        req.setIsEmergency(true);
+        req.setPatientDob(LocalDate.of(1990, 1, 1));
+
+        MyTicketStatusResponse res = service.selfCheckIn(req);
+
+        QueueTicket ticket = saved[0];
+        assertThat(ticket.getIsEmergency()).isFalse();
+        assertThat(ticket.getHasAppointment()).isFalse();
+        assertThat(ticket.getPriorityScore()).isZero();
+        assertThat(ticket.getDoctor()).isEqualTo(afternoonDoctor);
+        assertThat(ticket.getPatient()).isSameAs(patient);
+        // Hồ sơ có sẵn không bị sửa ngày sinh qua endpoint công khai
+        assertThat(patient.getDateOfBirth()).isEqualTo(LocalDate.of(1985, 3, 3));
+        verify(patientRepository, never()).findById(any());
+        verify(patientRepository, never()).save(any());
+        verifyNoInteractions(appointmentRepository);
+        // Người chưa đăng nhập chỉ thấy tên đã che
+        assertThat(res.getPatientName()).isEqualTo("Nguyễn V. Nam");
+    }
+
+    @Test
+    void staffCheckIn_appointmentOfAnotherPatient_isRejected() {
+        LocalTime now = LocalTime.now();
+        assumeTrue(now.getHour() >= 1 && now.isBefore(LocalTime.of(22, 25))); // ca giả lập kéo dài tới now + 90 phút
+        stubRoomWithCurrentShift();
+        when(patientRepository.findByPhoneNumber("0901234567")).thenReturn(List.of(patient));
+        Patient someoneElse = Patient.builder().id(77L).fullName("Người Khác").build();
+        when(appointmentRepository.findById(7L)).thenReturn(Optional.of(Appointment.builder()
+                .id(7L).appointmentCode("LH-007").patient(someoneElse)
+                .appointmentDate(LocalDate.now()).status("CONFIRMED").build()));
+
+        CheckInRequest req = request("Nguyễn Văn Nam");
+        req.setAppointmentId(7L);
+
+        assertThatThrownBy(() -> service.checkIn(req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("không hợp lệ");
+        verify(queueTicketRepository, never()).save(any());
+    }
+
+    @Test
+    void staffCheckIn_validAppointment_addsAppointmentPriority() {
+        LocalTime now = LocalTime.now();
+        assumeTrue(now.getHour() >= 1 && now.isBefore(LocalTime.of(22, 25))); // ca giả lập kéo dài tới now + 90 phút
+        stubRoomWithCurrentShift();
+        when(patientRepository.findByPhoneNumber("0901234567")).thenReturn(List.of(patient));
+        when(appointmentRepository.findById(7L)).thenReturn(Optional.of(Appointment.builder()
+                .id(7L).appointmentCode("LH-007").patient(patient)
+                .appointmentDate(LocalDate.now()).status("CONFIRMED").build()));
+        stubSaveTicket();
+
+        CheckInRequest req = request("Nguyễn Văn Nam");
+        req.setAppointmentId(7L);
+
+        QueueTicketResponse res = service.checkIn(req);
+
+        assertThat(res.getPriorityScore()).isEqualTo(20);
     }
 }

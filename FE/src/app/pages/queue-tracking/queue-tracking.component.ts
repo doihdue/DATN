@@ -1435,13 +1435,12 @@ export class QueueTrackingComponent implements OnInit {
     if (this.ticketResult()) return;
     if (this.authService.isAuthenticated() && !this.authService.hasRole('PATIENT')) return;
 
-    const userPhone = this.authService.currentUser()?.phoneNumber;
     const lastTicket = localStorage.getItem('medqueue_last_ticket');
 
     this.loadingSearch.set(true);
     this.errorMessage.set(null);
 
-    this.queueService.getMyActiveTicket(userPhone).subscribe({
+    this.queueService.getMyActiveTicket().subscribe({
       next: res => {
         if (res.success && res.data) {
           this.ticketResult.set(res.data);
@@ -1502,7 +1501,7 @@ export class QueueTrackingComponent implements OnInit {
     }
 
     this.submittingCheckIn.set(true);
-    this.queueService.checkIn(this.checkInForm).subscribe({
+    this.queueService.selfCheckIn(this.checkInForm).subscribe({
       next: res => {
         if (res.success && res.data) {
           const ticketNum = res.data.ticketNumber;

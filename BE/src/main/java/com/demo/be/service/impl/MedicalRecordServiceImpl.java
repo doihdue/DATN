@@ -10,6 +10,7 @@ import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
 import com.demo.be.repository.*;
+import com.demo.be.security.AccessGuard;
 import com.demo.be.service.MedicalRecordService;
 import com.demo.be.service.PdfExportService;
 import lombok.RequiredArgsConstructor;
@@ -46,14 +47,15 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     private final SimpMessagingTemplate messagingTemplate;
     private final PdfExportService pdfExportService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AccessGuard accessGuard;
 
     @Override
     @Transactional
     public MedicalRecordResponse createMedicalRecord(CreateMedicalRecordRequest request) {
         log.info("Bác sĩ đang lưu/hoàn tất hồ sơ bệnh án cho bệnh nhân ID: {}", request.getPatientId());
 
-        // 1. Xác định Bác sĩ phụ trách
-        Doctor doctor = resolveDoctor(request.getDoctorId());
+        // 1. Xác định Bác sĩ phụ trách: bác sĩ đăng nhập lưu hồ sơ thì luôn là chính họ, không tin doctorId gửi lên
+        Doctor doctor = accessGuard.currentDoctor().orElseGet(() -> resolveDoctor(request.getDoctorId()));
 
         // 2. Xác định Vé khám (nếu từ luồng hàng đợi)
         QueueTicket queueTicket = null;
@@ -62,6 +64,8 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         if (request.getQueueTicketId() != null) {
             queueTicket = queueTicketRepository.findById(request.getQueueTicketId())
                     .orElseThrow(() -> new ResourceNotFoundException("Phiếu khám hàng đợi", "id", request.getQueueTicketId()));
+            // Bác sĩ chỉ lưu hồ sơ cho vé thuộc phòng mình trực hôm nay
+            accessGuard.assertDoctorWorksInRoom(queueTicket.getExaminationRoom());
 
             // Ưu tiên tuyệt đối lấy bệnh nhân liên kết với vé khám đang phục vụ
             if (queueTicket.getPatient() != null) {
@@ -72,6 +76,13 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
             if (doctor == null && queueTicket.getDoctor() != null) {
                 doctor = queueTicket.getDoctor();
             }
+        }
+
+        // Kiểm tra hồ sơ gửi lên thuộc đúng vé trước khi thay đổi bất kỳ dữ liệu nào
+        MedicalRecord requestedRecord = null;
+        if (request.getRecordId() != null) {
+            requestedRecord = medicalRecordRepository.findById(request.getRecordId()).orElse(null);
+            assertRecordMatchesTicket(requestedRecord, queueTicket);
         }
 
         if (patient == null && request.getPatientId() != null) {
@@ -114,10 +125,7 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         }
 
         // 3. Khởi tạo hoặc Cập nhật Hồ sơ bệnh án (hỗ trợ Pha 2 hoàn tất ca khám)
-        MedicalRecord record = null;
-        if (request.getRecordId() != null) {
-            record = medicalRecordRepository.findById(request.getRecordId()).orElse(null);
-        }
+        MedicalRecord record = requestedRecord;
         if (record == null && queueTicket != null) {
             record = medicalRecordRepository.findByQueueTicketId(queueTicket.getId()).orElse(null);
         }
@@ -209,11 +217,27 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         return MedicalRecordResponse.fromEntity(saved);
     }
 
+    // recordId gửi lên phải là hồ sơ của chính vé đang khám (không ghi đè hồ sơ của bệnh nhân / phòng khác)
+    private void assertRecordMatchesTicket(MedicalRecord record, QueueTicket queueTicket) {
+        if (record == null) {
+            return;
+        }
+        QueueTicket recordTicket = record.getQueueTicket();
+        if (queueTicket != null) {
+            if (recordTicket != null && !recordTicket.getId().equals(queueTicket.getId())) {
+                throw new BadRequestException("Hồ sơ bệnh án không thuộc vé khám đang xử lý");
+            }
+        } else if (recordTicket != null) {
+            accessGuard.assertDoctorWorksInRoom(recordTicket.getExaminationRoom());
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
     public MedicalRecordResponse getMedicalRecordById(Long id) {
         MedicalRecord record = medicalRecordRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ bệnh án", "id", id));
+        accessGuard.assertCanViewPatientData(record.getPatient());
         List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(record.getId());
         record.setLabOrders(labOrders);
         return MedicalRecordResponse.fromEntity(record);
@@ -224,6 +248,7 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     public MedicalRecordResponse getMedicalRecordByTicketId(Long ticketId) {
         MedicalRecord record = medicalRecordRepository.findByQueueTicketIdWithDetails(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ bệnh án gắn với phiếu", "ticketId", ticketId));
+        accessGuard.assertCanViewPatientData(record.getPatient());
         List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(record.getId());
         record.setLabOrders(labOrders);
         return MedicalRecordResponse.fromEntity(record);
@@ -287,6 +312,7 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
     @Override
     @Transactional(readOnly = true)
     public List<MedicalRecordResponse> getRecordsByDoctorId(Long doctorId) {
+        accessGuard.assertIsCurrentDoctor(doctorId);
         return medicalRecordRepository.findByDoctorIdOrderByCreatedAtDesc(doctorId).stream()
                 .map(MedicalRecordResponse::fromEntity)
                 .collect(Collectors.toList());
