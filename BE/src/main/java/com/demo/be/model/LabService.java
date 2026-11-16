@@ -37,8 +37,10 @@ public class LabService {
     @Column(name = "unit", length = 50)
     private String unit; // Ví dụ: "mmol/L", "mg/dL", "G/L"
 
-    @Column(name = "category", length = 100)
-    private String category; // Ví dụ: "Huyết học", "Sinh hóa", "Chẩn đoán hình ảnh"
+    // Loại xét nghiệm (Huyết học, Sinh hóa máu, Chẩn đoán hình ảnh...)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lab_category_id")
+    private LabCategory category;
 
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
     private String description;
@@ -47,9 +49,14 @@ public class LabService {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    // Khoa thực hiện: nhóm "Chẩn đoán hình ảnh" do khoa CĐHA làm, các nhóm còn lại do khoa Xét nghiệm làm
+    // Khoa thực hiện lấy theo loại xét nghiệm; dịch vụ chưa gán loại mặc định do khoa Xét nghiệm làm
     @Transient
     public String getDepartment() {
-        return "Chẩn đoán hình ảnh".equalsIgnoreCase(category) ? "CHAN_DOAN_HINH_ANH" : "XET_NGHIEM";
+        return category != null && category.getDepartment() != null ? category.getDepartment() : LabCategory.XET_NGHIEM;
+    }
+
+    @Transient
+    public String getCategoryName() {
+        return category != null ? category.getName() : null;
     }
 }

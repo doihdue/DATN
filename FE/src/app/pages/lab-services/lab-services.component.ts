@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ClinicalLabService } from '../../services/lab.service';
 import { AuthService } from '../../services/auth.service';
-import { LabService } from '../../models/lab.model';
+import { LabService, LabCategory, LabDepartment, LabServiceRequest } from '../../models/lab.model';
 import { ApiResponse } from '../../models/auth.models';
 
 @Component({
@@ -266,8 +266,12 @@ import { ApiResponse } from '../../models/auth.models';
             <div class="modal-body-custom">
               <div class="detail-grid">
                 <div class="detail-item">
-                  <span class="detail-label">Phân Nhóm Kỹ Thuật:</span>
+                  <span class="detail-label">Loại Xét Nghiệm:</span>
                   <span class="detail-val font-semibold">{{ selectedServiceDetail()?.category }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Khoa Thực Hiện:</span>
+                  <span class="detail-val">{{ departmentLabel(selectedServiceDetail()?.department) }}</span>
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">Đơn Giá Kỹ Thuật:</span>
@@ -338,26 +342,35 @@ import { ApiResponse } from '../../models/auth.models';
                   </div>
 
                   <div class="form-group">
-                    <label class="form-label">Phân Nhóm Kỹ Thuật <span class="required">*</span></label>
-                    <input
-                      type="text"
-                      list="categorySuggestions"
-                      class="form-control"
-                      [(ngModel)]="formData.category"
-                      name="category"
-                      placeholder="Chọn hoặc nhập nhóm..."
-                      required
-                    />
-                    <datalist id="categorySuggestions">
-                      <option value="Huyết học"></option>
-                      <option value="Sinh hóa máu"></option>
-                      <option value="Men gan"></option>
-                      <option value="Mỡ máu"></option>
-                      <option value="Nước tiểu"></option>
-                      <option value="Miễn dịch"></option>
-                      <option value="Chẩn đoán hình ảnh"></option>
-                    </datalist>
+                    <label class="form-label">Loại Xét Nghiệm <span class="required">*</span></label>
+                    <select class="form-control" [(ngModel)]="formData.categoryId" name="categoryId" required>
+                      <option [ngValue]="null" disabled>-- Chọn loại xét nghiệm --</option>
+                      @for (c of labCategories(); track c.id) {
+                        <option [ngValue]="c.id">{{ c.name }} ({{ departmentLabel(c.department) }})</option>
+                      }
+                    </select>
+                    <button type="button" class="btn-link-add" (click)="toggleNewCategory()">
+                      <i class="bi" [ngClass]="showNewCategory() ? 'bi-dash-circle' : 'bi-plus-circle'"></i>
+                      {{ showNewCategory() ? 'Đóng' : 'Thêm loại mới' }}
+                    </button>
                   </div>
+
+                  @if (showNewCategory()) {
+                    <div class="form-group full-width new-category-box">
+                      <label class="form-label">Loại xét nghiệm mới</label>
+                      <div class="new-category-row">
+                        <input type="text" class="form-control" [(ngModel)]="newCategory.name"
+                               name="newCategoryName" placeholder="VD: Vi sinh" />
+                        <select class="form-control" [(ngModel)]="newCategory.department" name="newCategoryDept">
+                          <option value="XET_NGHIEM">Khoa Xét nghiệm</option>
+                          <option value="CHAN_DOAN_HINH_ANH">Khoa Chẩn đoán hình ảnh</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" [disabled]="savingCategory()" (click)="saveNewCategory()">
+                          {{ savingCategory() ? 'Đang lưu...' : 'Lưu loại' }}
+                        </button>
+                      </div>
+                    </div>
+                  }
 
                   <div class="form-group full-width">
                     <label class="form-label">Tên Dịch Vụ Xét Nghiệm <span class="required">*</span></label>
@@ -1196,6 +1209,33 @@ import { ApiResponse } from '../../models/auth.models';
       gap: 0.35rem;
     }
 
+    .btn-link-add {
+      background: none;
+      border: none;
+      padding: 4px 0 0;
+      color: #2563eb;
+      font-size: 0.82rem;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+
+    .new-category-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .new-category-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .new-category-row .form-control {
+      flex: 1 1 180px;
+    }
+
     .form-group.full-width {
       grid-column: 1 / -1;
     }
@@ -1335,11 +1375,17 @@ export class LabServicesComponent implements OnInit {
   readonly toastType = signal<'success' | 'error'>('success');
   private toastTimer: any = null;
 
+  // Loại xét nghiệm
+  readonly labCategories = signal<LabCategory[]>([]);
+  readonly showNewCategory = signal<boolean>(false);
+  readonly savingCategory = signal<boolean>(false);
+  newCategory = { name: '', department: 'XET_NGHIEM' as LabDepartment };
+
   // Form Model
   formData = {
     serviceCode: '',
     serviceName: '',
-    category: 'Huyết học',
+    categoryId: null as number | null,
     price: 50000,
     unit: '',
     referenceRange: '',
@@ -1462,7 +1508,7 @@ export class LabServicesComponent implements OnInit {
     this.formData = {
       serviceCode: 'XN-',
       serviceName: '',
-      category: 'Huyết học',
+      categoryId: this.labCategories()[0]?.id ?? null,
       price: 50000,
       unit: '',
       referenceRange: '',
@@ -1479,7 +1525,7 @@ export class LabServicesComponent implements OnInit {
     this.formData = {
       serviceCode: svc.serviceCode,
       serviceName: svc.serviceName,
-      category: svc.category || 'Huyết học',
+      categoryId: svc.categoryId ?? null,
       price: svc.price || 0,
       unit: svc.unit || '',
       referenceRange: svc.referenceRange || '',
@@ -1487,6 +1533,7 @@ export class LabServicesComponent implements OnInit {
       upperLimit: svc.upperLimit ?? null,
       description: svc.description || ''
     };
+    this.showNewCategory.set(false);
     this.showFormModal.set(true);
   }
 
@@ -1499,12 +1546,16 @@ export class LabServicesComponent implements OnInit {
       this.showToast('Vui lòng nhập đầy đủ mã và tên dịch vụ!', 'error');
       return;
     }
+    if (this.formData.categoryId === null) {
+      this.showToast('Vui lòng chọn loại xét nghiệm!', 'error');
+      return;
+    }
 
     const toNumber = (v: number | null) => v !== null && !isNaN(Number(v)) ? Number(v) : undefined;
-    const payload: Partial<LabService> = {
+    const payload: LabServiceRequest = {
       serviceCode: this.formData.serviceCode.trim().toUpperCase(),
       serviceName: this.formData.serviceName.trim(),
-      category: this.formData.category.trim(),
+      categoryId: this.formData.categoryId,
       price: Number(this.formData.price) || 0,
       unit: this.formData.unit.trim(),
       referenceRange: this.formData.referenceRange.trim(),
@@ -1570,6 +1621,49 @@ export class LabServicesComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadServices();
+    this.loadCategories();
+  }
+
+  loadCategories(): void {
+    this.labService.getLabCategories().subscribe({
+      next: res => this.labCategories.set(res.data || []),
+      error: () => this.labCategories.set([])
+    });
+  }
+
+  departmentLabel(department?: LabDepartment | null): string {
+    if (!department) return '---';
+    return department === 'CHAN_DOAN_HINH_ANH' ? 'Khoa Chẩn đoán hình ảnh' : 'Khoa Xét nghiệm';
+  }
+
+  toggleNewCategory(): void {
+    this.newCategory = { name: '', department: 'XET_NGHIEM' };
+    this.showNewCategory.update(v => !v);
+  }
+
+  saveNewCategory(): void {
+    const name = this.newCategory.name.trim();
+    if (!name) {
+      this.showToast('Vui lòng nhập tên loại xét nghiệm!', 'error');
+      return;
+    }
+    this.savingCategory.set(true);
+    this.labService.createLabCategory({ name, department: this.newCategory.department }).subscribe({
+      next: res => {
+        this.savingCategory.set(false);
+        if (res.data) {
+          const created = res.data;
+          this.labCategories.update(list => [...list, created]);
+          this.formData.categoryId = created.id;
+        }
+        this.showNewCategory.set(false);
+        this.showToast(`Đã thêm loại xét nghiệm "${name}"`, 'success');
+      },
+      error: err => {
+        this.savingCategory.set(false);
+        this.showToast(err.error?.message || 'Không thể thêm loại xét nghiệm', 'error');
+      }
+    });
   }
 
   loadServices(): void {

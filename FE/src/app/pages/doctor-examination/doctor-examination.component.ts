@@ -912,9 +912,9 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     this.router.navigate(['/doctor/calling']);
   }
 
-  // Nơi bệnh nhân sang làm: nhóm "Chẩn đoán hình ảnh" ở các phòng CĐHA, còn lại ở phòng xét nghiệm (giống quy tắc backend)
+  // Nơi bệnh nhân sang làm: theo khoa thực hiện của loại xét nghiệm (backend trả về sẵn)
   labRoomOf(service: LabService): string {
-    const department = service.category === 'Chẩn đoán hình ảnh' ? 'CHAN_DOAN_HINH_ANH' : 'XET_NGHIEM';
+    const department = service.department ?? 'XET_NGHIEM';
     const rooms = this.labRooms().filter(r => r.roomType === department);
     return rooms.length ? rooms.map(r => `${r.roomNumber} (${r.roomName})`).join(' hoặc ') : '---';
   }

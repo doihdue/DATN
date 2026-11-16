@@ -36,6 +36,7 @@ public class DataInitializer implements CommandLineRunner {
     private final QueueTicketRepository queueTicketRepository;
     private final AppointmentRepository appointmentRepository;
     private final LabServiceRepository labServiceRepository;
+    private final LabCategoryRepository labCategoryRepository;
     private final LabOrderRepository labOrderRepository;
     private final StaffShiftRepository staffShiftRepository;
     private final LabTechnicianRepository labTechnicianRepository;
@@ -51,6 +52,8 @@ public class DataInitializer implements CommandLineRunner {
         migrateLabTechnicians();
         migrateLabResults();
         dropUnusedSchema();
+        initLabCategories();
+        migrateLabCategories();
 
         // 1. Tạo các vai trò (Roles)
         Role adminRole = createRoleIfNotFound("ROLE_ADMIN", "Quản trị viên toàn hệ thống");
@@ -779,6 +782,58 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    // Danh mục loại xét nghiệm chuẩn; loại "Chẩn đoán hình ảnh" do khoa CĐHA thực hiện
+    private void initLabCategories() {
+        createLabCategoryIfNotFound("Huyết học", LabCategory.XET_NGHIEM,
+                "Xét nghiệm tế bào máu: bạch cầu, hồng cầu, tiểu cầu, công thức máu.");
+        createLabCategoryIfNotFound("Sinh hóa máu", LabCategory.XET_NGHIEM,
+                "Định lượng các chất trong máu: đường huyết, chức năng thận, acid uric.");
+        createLabCategoryIfNotFound("Men gan", LabCategory.XET_NGHIEM,
+                "Đánh giá chức năng và tổn thương tế bào gan, đường mật (AST, ALT, GGT).");
+        createLabCategoryIfNotFound("Mỡ máu", LabCategory.XET_NGHIEM,
+                "Bộ mỡ máu: Cholesterol, Triglycerid, HDL, LDL.");
+        createLabCategoryIfNotFound("Nước tiểu", LabCategory.XET_NGHIEM,
+                "Tổng phân tích nước tiểu, tầm soát bệnh thận - tiết niệu.");
+        createLabCategoryIfNotFound("Miễn dịch", LabCategory.XET_NGHIEM,
+                "Test nhanh, xét nghiệm kháng nguyên/kháng thể và chỉ số viêm.");
+        createLabCategoryIfNotFound("Chẩn đoán hình ảnh", LabCategory.CHAN_DOAN_HINH_ANH,
+                "X-Quang, siêu âm, điện tim, chụp cắt lớp: thực hiện tại các phòng Chẩn đoán hình ảnh.");
+    }
+
+    private LabCategory createLabCategoryIfNotFound(String name, String department, String description) {
+        LabCategory category = labCategoryRepository.findByNameIgnoreCase(name)
+                .orElseGet(() -> labCategoryRepository.save(LabCategory.builder()
+                        .name(name).department(department).description(description).build()));
+        if (category.getDescription() == null && description != null) {
+            category.setDescription(description);
+        }
+        return category;
+    }
+
+    // Chạy 1 lần trên DB cũ: loại xét nghiệm từng lưu dạng chữ ở lab_services.category
+    // -> chuyển sang bảng lab_categories (khoá ngoại lab_category_id) rồi bỏ cột cũ
+    private void migrateLabCategories() {
+        Integer hasOldColumn = jdbcTemplate.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH('lab_services', 'category') IS NULL THEN 0 ELSE 1 END", Integer.class);
+        if (hasOldColumn == null || hasOldColumn == 0) {
+            return;
+        }
+        List<String> names = jdbcTemplate.queryForList(
+                "SELECT DISTINCT LTRIM(RTRIM(category)) FROM lab_services " +
+                "WHERE category IS NOT NULL AND LTRIM(RTRIM(category)) <> ''", String.class);
+        for (String name : names) {
+            String department = "Chẩn đoán hình ảnh".equalsIgnoreCase(name)
+                    ? LabCategory.CHAN_DOAN_HINH_ANH : LabCategory.XET_NGHIEM;
+            createLabCategoryIfNotFound(name, department, null);
+        }
+        labCategoryRepository.flush();
+        int linked = jdbcTemplate.update("UPDATE ls SET ls.lab_category_id = c.id " +
+                "FROM lab_services ls JOIN lab_categories c ON c.name = LTRIM(RTRIM(ls.category)) " +
+                "WHERE ls.lab_category_id IS NULL");
+        jdbcTemplate.execute("ALTER TABLE lab_services DROP COLUMN category");
+        log.info("-> Đã gán loại xét nghiệm cho {} dịch vụ và bỏ cột lab_services.category", linked);
+    }
+
     // Bỏ bảng / cột không còn entity tương ứng: clinics, permissions, role_permissions (bảng trống),
     // examination_rooms.clinic_id, ai_chat_sessions.ended_at (chưa từng được ghi)
     private void dropUnusedSchema() {
@@ -1127,22 +1182,28 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private LabService createLabServiceIfNotFound(String code, String name, Double price, String refRange,
-                                                  Double lower, Double upper, String unit, String category, String desc) {
-        return labServiceRepository.findByServiceCode(code).orElseGet(() -> {
-            LabService s = LabService.builder()
-                    .serviceCode(code)
-                    .serviceName(name)
-                    .price(price)
-                    .referenceRange(refRange)
-                    .lowerLimit(lower)
-                    .upperLimit(upper)
-                    .unit(unit)
-                    .category(category)
-                    .description(desc)
-                    .isActive(true)
-                    .build();
-            return labServiceRepository.save(s);
-        });
+                                                  Double lower, Double upper, String unit, String categoryName, String desc) {
+        LabCategory category = labCategoryRepository.findByNameIgnoreCase(categoryName)
+                .orElseThrow(() -> new IllegalStateException("Chưa có loại xét nghiệm " + categoryName));
+        LabService existing = labServiceRepository.findByServiceCode(code).orElse(null);
+        if (existing != null) {
+            if (existing.getCategory() == null) {
+                existing.setCategory(category);
+            }
+            return existing;
+        }
+        return labServiceRepository.save(LabService.builder()
+                .serviceCode(code)
+                .serviceName(name)
+                .price(price)
+                .referenceRange(refRange)
+                .lowerLimit(lower)
+                .upperLimit(upper)
+                .unit(unit)
+                .category(category)
+                .description(desc)
+                .isActive(true)
+                .build());
     }
 
     /**

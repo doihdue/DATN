@@ -58,7 +58,7 @@ class LabOrderServiceTest {
                 .thenReturn(Optional.of(User.builder().username("ktv_lan").person(lan).build()));
 
         LabService glucose = LabService.builder().id(3L).serviceCode("XN-GLU-01").serviceName("Glucose")
-                .category("Sinh hóa").unit("mmol/L").referenceRange("3.9 - 6.4").lowerLimit(3.9).upperLimit(6.4).build();
+                .category(LabCategory.builder().id(2L).name("Sinh hóa máu").department(LabCategory.XET_NGHIEM).build()).unit("mmol/L").referenceRange("3.9 - 6.4").lowerLimit(3.9).upperLimit(6.4).build();
         QueueTicket ticket = QueueTicket.builder().id(11L).ticketNumber("P101-005").status("WAITING_FOR_RESULTS").build();
         MedicalRecord record = MedicalRecord.builder().id(21L).queueTicket(ticket).build();
         order = LabOrder.builder().id(31L).medicalRecord(record).labService(glucose).status("PENDING").build();

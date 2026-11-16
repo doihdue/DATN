@@ -100,7 +100,7 @@ public class LabOrderResponse {
             builder.lowerLimit(entity.getLabService().getLowerLimit());
             builder.upperLimit(entity.getLabService().getUpperLimit());
             builder.unit(entity.getLabService().getUnit());
-            builder.category(entity.getLabService().getCategory());
+            builder.category(entity.getLabService().getCategoryName());
             if (builder.price == null) {
                 builder.price(entity.getLabService().getPrice());
             }
