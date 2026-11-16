@@ -14,9 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import com.demo.be.exception.ResourceNotFoundException;
-import com.demo.be.model.QueueTicket;
-import com.demo.be.repository.QueueTicketRepository;
 import com.demo.be.service.PdfExportService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -31,7 +28,6 @@ public class MedicalRecordController {
 
     private final MedicalRecordService medicalRecordService;
     private final PdfExportService pdfExportService;
-    private final QueueTicketRepository queueTicketRepository;
 
     // 1. Bác sĩ lập hồ sơ bệnh án & Kê đơn thuốc & Hẹn ngày tái khám
     @PostMapping
@@ -84,16 +80,15 @@ public class MedicalRecordController {
                 .body(pdfBytes);
     }
 
-    // 2d. XUẤT PDF THEO MÃ SỐ VÉ KHÁM (Dành cho bệnh nhân tra cứu kết quả trên trang theo dõi)
+    // 2d. XUẤT PDF THEO MÃ SỐ VÉ KHÁM (bệnh nhân tra cứu không đăng nhập, phải kèm 4 số cuối SĐT trên phiếu)
     @GetMapping(value = "/ticket-number/{ticketNumber}/export-pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> exportPdfByTicketNumber(
             @PathVariable String ticketNumber,
+            @RequestParam(required = false) String phoneLast4,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         LocalDate searchDate = date != null ? date : LocalDate.now();
-        QueueTicket ticket = queueTicketRepository.findByTicketNumberAndTicketDate(ticketNumber, searchDate)
-                .orElseThrow(() -> new ResourceNotFoundException("Phiếu khám hàng đợi", "ticketNumber", ticketNumber));
-        MedicalRecordResponse record = medicalRecordService.getMedicalRecordByTicketId(ticket.getId());
-        byte[] pdfBytes = pdfExportService.exportMedicalRecordPdf(record.getId());
+        Long recordId = medicalRecordService.findRecordIdForPublicLookup(ticketNumber, searchDate, phoneLast4);
+        byte[] pdfBytes = pdfExportService.exportMedicalRecordPdf(recordId);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
