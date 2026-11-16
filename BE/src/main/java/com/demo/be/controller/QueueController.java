@@ -21,8 +21,17 @@ public class QueueController {
 
     // 1. Check-in tiếp đón & sinh số thứ tự
     @PostMapping("/check-in")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<QueueTicketResponse>> checkIn(@Valid @RequestBody CheckInRequest request) {
         QueueTicketResponse ticket = queueService.checkIn(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(ticket, "Đã cấp số thứ tự khám bệnh thành công: " + ticket.getTicketNumber()));
+    }
+
+    // 1b. Bệnh nhân tự lấy số online (công khai): server bỏ qua cờ cấp cứu, lịch hẹn, mã bệnh nhân, bác sĩ
+    @PostMapping("/self-check-in")
+    public ResponseEntity<ApiResponse<MyTicketStatusResponse>> selfCheckIn(@Valid @RequestBody CheckInRequest request) {
+        MyTicketStatusResponse ticket = queueService.selfCheckIn(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(ticket, "Đã cấp số thứ tự khám bệnh thành công: " + ticket.getTicketNumber()));
     }
@@ -43,8 +52,8 @@ public class QueueController {
 
     // 3b. Lấy phiếu khám đang hoạt động của người dùng (tự động theo tài khoản hoặc SĐT)
     @GetMapping("/my-active-ticket")
-    public ResponseEntity<ApiResponse<MyTicketStatusResponse>> getMyActiveTicket(@RequestParam(required = false) String phone) {
-        MyTicketStatusResponse status = queueService.getMyActiveTicket(phone);
+    public ResponseEntity<ApiResponse<MyTicketStatusResponse>> getMyActiveTicket() {
+        MyTicketStatusResponse status = queueService.getMyActiveTicket();
         if (status == null) {
             return ResponseEntity.ok(ApiResponse.success(null, "Không có phiếu khám nào trong ngày hôm nay"));
         }
@@ -77,6 +86,7 @@ public class QueueController {
 
     // 5.5. Lấy thông tin chi tiết vé khám theo ID
     @GetMapping("/ticket/{ticketId}")
+    @PreAuthorize("hasAnyRole('STAFF', 'DOCTOR', 'ADMIN')")
     public ResponseEntity<ApiResponse<QueueTicketResponse>> getTicketById(@PathVariable Long ticketId) {
         QueueTicketResponse ticket = queueService.getTicketById(ticketId);
         return ResponseEntity.ok(ApiResponse.success(ticket, "Lấy thông tin vé khám thành công"));
