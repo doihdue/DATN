@@ -85,6 +85,11 @@ import { SidebarService } from '../../services/sidebar.service';
             </div>
           </div>
 
+          <a routerLink="/admin/patients" routerLinkActive="active" (click)="closeAllDropdowns()" class="nav-link-item" title="Quản lý hồ sơ bệnh nhân">
+            <div class="nav-icon"><i class="bi bi-person-heart"></i></div>
+            <span class="nav-label">QUẢN LÝ BỆNH NHÂN</span>
+          </a>
+
           <!-- Nhóm 2: KHO DƯỢC & THUỐC (Accordion Collapsible y hệt Quản lý nhân sự) -->
           <div class="nav-group-item" [class.has-active-child]="isMedicinesActive()" [class.is-expanded]="isMedicinesOpen()">
             <button

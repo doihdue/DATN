@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhắc lịch khám bệnh hôm nay</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f4f6f9; }
+        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: #ffffff; padding: 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+        .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+        .content { padding: 24px; }
+        .greeting { font-size: 16px; margin-bottom: 16px; }
+        .highlight-box { background: #f0fdfa; border: 2px solid #14b8a6; border-radius: 8px; padding: 18px; text-align: center; margin: 20px 0; }
+        .highlight-text { font-size: 14px; color: #0f766e; font-weight: 600; text-transform: uppercase; }
+        .time-box { font-size: 32px; font-weight: 800; color: #115e59; margin: 6px 0; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+        .details-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+        .details-table td.label { width: 40%; color: #64748b; font-weight: 500; }
+        .details-table td.value { width: 60%; color: #0f172a; font-weight: 600; }
+        .checklist-box { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 13px; color: #92400e; }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>PHÒNG KHÁM THÔNG MINH SMARTCLINIC</h1>
+        <p>NHẮC NHỞ LỊCH HẸN KHÁM BỆNH HÔM NAY</p>
+    </div>
+
+    <div class="content">
+        <p class="greeting">Kính gửi Quý bệnh nhân <strong th:text="${patientName}">Nguyễn Văn An</strong>,</p>
+        <p>SmartClinic xin gửi thông báo nhắc nhở Quý khách có <strong>lịch hẹn khám bệnh trong ngày hôm nay</strong>:</p>
+
+        <div class="highlight-box">
+            <div class="highlight-text">Giờ khám dự kiến hôm nay</div>
+            <div class="time-box" th:text="${estimatedTime}">08:30</div>
+            <div style="font-size: 14px; color: #134e4a;">Mã lịch hẹn: <strong th:text="${appointmentCode}">LH261113-0001</strong> | STT: #<strong th:text="${bookingNumber}">1</strong></div>
+        </div>
+
+        <table class="details-table">
+            <tr>
+                <td class="label">Bác sĩ:</td>
+                <td class="value" th:text="${doctorName}">BS.CKII Nguyễn Văn Hùng</td>
+            </tr>
+            <tr>
+                <td class="label">Chuyên khoa:</td>
+                <td class="value" th:text="${specialtyName}">Khoa Nội Tổng Quát</td>
+            </tr>
+            <tr>
+                <td class="label">Phòng khám:</td>
+                <td class="value" th:text="${roomNumber}">Phòng 101</td>
+            </tr>
+        </table>
+
+        <div class="checklist-box">
+            <strong>Checklist chuẩn bị trước khi đến khám:</strong>
+            <ul style="margin: 6px 0 0; padding-left: 18px;">
+                <li>Mang theo Căn cước công dân (CCCD) hoặc Thẻ bảo hiểm y tế.</li>
+                <li>Đến trước <strong>15 phút</strong> để thực hiện check-in nhận số thứ tự tại quầy tiếp đón.</li>
+                <li>Nếu có chỉ định xét nghiệm máu hoặc siêu âm ổ bụng, quý khách nên <strong>nhịn ăn sáng</strong> để kết quả xét nghiệm được chuẩn xác nhất.</li>
+            </ul>
+        </div>
+
+        <p style="font-size: 14px; color: #475569;">Đội ngũ y bác sĩ SmartClinic rất hân hạnh được phục vụ và chăm sóc sức khỏe của Quý khách!</p>
+    </div>
+
+    <div class="footer">
+        <p><strong>Hệ Thống Y Tế & Phòng Khám Thông Minh SmartClinic</strong></p>
+        <p>Địa chỉ: Tầng 1 - Tòa nhà Y Tế Trung Tâm, TP. Hà Nội | Hotline: 1900 8888</p>
+        <p>Email này được gửi tự động từ hệ thống.</p>
+    </div>
+</div>
+</body>
+</html>
+

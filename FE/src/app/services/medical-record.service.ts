@@ -77,9 +77,12 @@ export class MedicalRecordService {
     });
   }
 
-  // 10. Tải file PDF theo mã số vé khám (Ví dụ: A001, P101-001...)
-  exportPdfByTicketNumber(ticketNumber: string): Observable<Blob> {
+  // 10. Tải file PDF theo mã số vé khám (không cần đăng nhập, phải kèm 4 số cuối SĐT trên phiếu)
+  exportPdfByTicketNumber(ticketNumber: string, phoneLast4: string, ticketDate?: string): Observable<Blob> {
+    let params = new HttpParams().set('phoneLast4', phoneLast4);
+    if (ticketDate) params = params.set('date', ticketDate);
     return this.http.get(`${this.baseUrl}/medical-records/ticket-number/${ticketNumber}/export-pdf`, {
+      params,
       responseType: 'blob'
     });
   }

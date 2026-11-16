@@ -27,8 +27,8 @@ import { AuthService } from '../../services/auth.service';
           <span>Màn hình TV</span>
         </a>
 
-        <!-- User Summary Pill -->
-        <div class="user-profile-badge">
+        <!-- User Summary Pill / Link to Profile -->
+        <a routerLink="/profile" class="user-profile-badge" title="Xem hồ sơ cá nhân & Đổi mật khẩu">
           <div class="user-avatar-small">
             <i class="bi" [ngClass]="getRoleIconClass()"></i>
           </div>
@@ -36,7 +36,8 @@ import { AuthService } from '../../services/auth.service';
             <span class="user-fullname">{{ authService.currentUser()?.fullName }}</span>
             <span class="user-role-label">{{ getPrimaryRoleDisplayName() }}</span>
           </div>
-        </div>
+          <i class="bi bi-chevron-right text-muted small ms-1"></i>
+        </a>
 
         <!-- Logout Action Button duy nhất chuẩn mực -->
         <button (click)="logout()" class="btn-logout" title="Đăng xuất khỏi hệ thống">
@@ -145,6 +146,15 @@ import { AuthService } from '../../services/auth.service';
       border-radius: 10px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .user-profile-badge:hover {
+      background: #f1f5f9;
+      border-color: #0284c7;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);
     }
 
     .user-avatar-small {

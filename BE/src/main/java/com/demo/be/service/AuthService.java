@@ -1,10 +1,13 @@
 package com.demo.be.service;
 
+import com.demo.be.dto.request.ChangePasswordRequest;
 import com.demo.be.dto.request.CreateUserRequest;
 import com.demo.be.dto.request.LoginRequest;
 import com.demo.be.dto.request.RefreshTokenRequest;
 import com.demo.be.dto.request.RegisterRequest;
+import com.demo.be.dto.request.UpdateProfileRequest;
 import com.demo.be.dto.response.AuthResponse;
+import com.demo.be.dto.response.UserProfileResponse;
 import com.demo.be.dto.response.UserSummaryResponse;
 import com.demo.be.security.UserPrincipal;
 
@@ -21,4 +24,10 @@ public interface AuthService {
     UserSummaryResponse getCurrentUser(UserPrincipal currentUser);
 
     UserSummaryResponse createUser(CreateUserRequest request);
+
+    void changePassword(UserPrincipal currentUser, ChangePasswordRequest request);
+
+    UserProfileResponse getProfile(UserPrincipal currentUser);
+
+    UserProfileResponse updateProfile(UserPrincipal currentUser, UpdateProfileRequest request);
 }

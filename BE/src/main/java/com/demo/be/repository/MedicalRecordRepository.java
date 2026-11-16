@@ -41,4 +41,12 @@ public interface MedicalRecordRepository extends JpaRepository<MedicalRecord, Lo
            "LEFT JOIN FETCH items.medicine " +
            "WHERE mr.queueTicket.id = :ticketId")
     Optional<MedicalRecord> findByQueueTicketIdWithDetails(@Param("ticketId") Long ticketId);
+
+    boolean existsByPatientId(Long patientId);
+
+    // Thống kê số lượt khám & lần khám gần nhất của từng bệnh nhân: [patientId, count, maxCreatedAt]
+    @Query("SELECT mr.patient.id, COUNT(mr), MAX(mr.createdAt) FROM MedicalRecord mr " +
+           "WHERE mr.patient IS NOT NULL AND (:patientId IS NULL OR mr.patient.id = :patientId) " +
+           "GROUP BY mr.patient.id")
+    List<Object[]> summarizeVisitsByPatient(@Param("patientId") Long patientId);
 }

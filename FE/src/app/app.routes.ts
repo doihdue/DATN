@@ -20,13 +20,21 @@ import { LabTechniciansComponent } from './pages/lab-technicians/lab-technicians
 import { LabManagementComponent } from './pages/lab-management/lab-management.component';
 import { LabServicesComponent } from './pages/lab-services/lab-services.component';
 import { DoctorHistoryComponent } from './pages/doctor-history/doctor-history.component';
-import { roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
+import { PatientsComponent } from './pages/patients/patients.component';
+import { ProfileComponent } from './pages/profile/profile.component';
+import { authGuard, roleGuard, patientOrGuestGuard, receptionistGuard, labTechGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   // Trang chủ - ai cũng vào được
   { path: '', component: HomeComponent, title: 'MedQueue - Trang chủ' },
   { path: 'login', component: LoginComponent, title: 'Đăng nhập - MedQueue' },
   { path: 'register', component: RegisterComponent, title: 'Đăng ký hồ sơ khám - MedQueue' },
+  {
+    path: 'profile',
+    component: ProfileComponent,
+    title: 'Hồ sơ cá nhân & Đổi mật khẩu - MedQueue',
+    canActivate: [authGuard]
+  },
 
   // ========================
   // ADMIN - Quản trị hệ thống
@@ -66,6 +74,12 @@ export const routes: Routes = [
   {
     path: 'admin/lab-techs',
     redirectTo: 'admin/lab-technicians'
+  },
+  {
+    path: 'admin/patients',
+    component: PatientsComponent,
+    title: 'Quản lý Bệnh nhân - MedQueue',
+    canActivate: [roleGuard(['ADMIN'])]
   },
   {
     path: 'admin/personnel',

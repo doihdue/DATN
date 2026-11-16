@@ -42,6 +42,7 @@ class AppointmentServiceImplTest {
     @Mock private QueueTicketRepository queueTicketRepository;
     @Mock private WorkScheduleService workScheduleService;
     @Mock private QueueService queueService;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AppointmentServiceImpl service;

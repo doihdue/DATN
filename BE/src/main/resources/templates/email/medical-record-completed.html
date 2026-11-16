@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kết quả khám bệnh & Đơn thuốc điện tử</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f4f6f9; }
+        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; padding: 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+        .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+        .content { padding: 24px; }
+        .greeting { font-size: 16px; margin-bottom: 16px; }
+        .pdf-card { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin: 20px 0; display: flex; align-items: center; }
+        .pdf-badge { background: #059669; color: #ffffff; font-weight: 700; font-size: 12px; padding: 4px 8px; border-radius: 4px; margin-right: 12px; display: inline-block; }
+        .section-title { font-size: 15px; font-weight: 700; color: #047857; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin: 20px 0 10px; }
+        .details-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
+        .details-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+        .details-table td.label { width: 35%; color: #64748b; font-weight: 500; }
+        .details-table td.value { width: 65%; color: #0f172a; font-weight: 600; }
+        .med-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+        .med-table th { background: #f8fafc; padding: 8px 10px; text-align: left; color: #475569; border-bottom: 2px solid #cbd5e1; font-weight: 600; }
+        .med-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+        .advice-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 14px; color: #1e3a8a; }
+        .revisit-box { background: #fefce8; border: 1px solid #fef08a; padding: 12px 16px; border-radius: 6px; margin: 16px 0; font-size: 14px; color: #854d0e; }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>PHÒNG KHÁM THÔNG MINH SMARTCLINIC</h1>
+        <p>KẾT QUẢ KHÁM BỆNH & ĐƠN THUỐC ĐIỆN TỬ</p>
+    </div>
+
+    <div class="content">
+        <p class="greeting">Kính gửi Quý bệnh nhân <strong th:text="${patientName}">Nguyễn Văn An</strong>,</p>
+        <p>Bác sĩ <strong th:text="${doctorName}">BS.CKII Nguyễn Văn Hùng</strong> vừa hoàn tất ca khám cho Quý khách. Dưới đây là tóm tắt kết quả chẩn đoán và đơn thuốc:</p>
+
+        <div class="pdf-card">
+            <div>
+                <span class="pdf-badge">FILE ĐÍNH KÈM</span>
+                <strong style="color: #065f46;">Phiếu khám & Đơn thuốc chuẩn y tế (PDF)</strong>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #047857;">Hệ thống đã đính kèm trực tiếp file PDF chính thức kèm chữ ký bác sĩ trong email này. Quý khách có thể tải về để in ấn hoặc xuất trình tại nhà thuốc.</p>
+            </div>
+        </div>
+
+        <div class="section-title">1. TÓM TẮT CHẨN ĐOÁN LÂM SÀNG</div>
+        <table class="details-table">
+            <tr>
+                <td class="label">Triệu chứng:</td>
+                <td class="value" th:text="${symptoms}">Đau đầu, sốt nhẹ</td>
+            </tr>
+            <tr>
+                <td class="label">Chẩn đoán xác định:</td>
+                <td class="value" style="color: #059669;" th:text="${finalDiagnosis}">Viêm đường hô hấp trên</td>
+            </tr>
+            <tr th:if="${icd10Code != null and !icd10Code.isEmpty()}">
+                <td class="label">Mã bệnh ICD-10:</td>
+                <td class="value"><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-family: monospace;" th:text="${icd10Code}">J02.9</span></td>
+            </tr>
+            <tr th:if="${bloodPressure != null and !bloodPressure.isEmpty()}">
+                <td class="label">Huyết áp:</td>
+                <td class="value" th:text="${bloodPressure}">120/80 mmHg</td>
+            </tr>
+        </table>
+
+        <!-- Bảng danh sách đơn thuốc nếu có -->
+        <div th:if="${prescriptionItems != null and !prescriptionItems.isEmpty()}">
+            <div class="section-title">2. ĐƠN THUỐC ĐIỆN TỬ</div>
+            <table class="med-table">
+                <thead>
+                <tr>
+                    <th style="width: 8%;">STT</th>
+                    <th style="width: 42%;">Tên thuốc / Hàm lượng</th>
+                    <th style="width: 15%;">SL</th>
+                    <th style="width: 35%;">Liều dùng & Cách dùng</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item, stat : ${prescriptionItems}">
+                    <td style="text-align: center;" th:text="${stat.count}">1</td>
+                    <td><strong th:text="${item.medicineName}">Paracetamol 500mg</strong></td>
+                    <td th:text="${item.quantity} + ' ' + ${item.unit != null ? item.unit : 'Viên'}">10 Viên</td>
+                    <td th:text="${item.dosage != null ? item.dosage : (item.instructions != null ? item.instructions : 'Theo chỉ định')}">1 viên/lần, 2 lần/ngày</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="advice-box" th:if="${notes != null and !notes.isEmpty()}">
+            <strong>Lời dặn của Bác sĩ:</strong>
+            <p style="margin: 4px 0 0;" th:text="${notes}">Nghỉ ngơi, uống nhiều nước ấm, tránh thức khuya.</p>
+        </div>
+
+        <div class="revisit-box" th:if="${revisitDate != null}">
+            <strong>Lịch hẹn tái khám:</strong> Ngày <strong th:text="${revisitDate}">21/11/2026</strong>
+            <p style="margin: 4px 0 0; font-size: 13px;" th:if="${revisitNotes != null}" th:text="${revisitNotes}">Tái khám nếu còn đau họng kéo dài.</p>
+        </div>
+
+        <p style="font-size: 14px; color: #475569;">Cảm ơn Quý khách đã tin tưởng và thăm khám tại SmartClinic. Kính chúc Quý khách mau chóng bình phục!</p>
+    </div>
+
+    <div class="footer">
+        <p><strong>Hệ Thống Y Tế & Phòng Khám Thông Minh SmartClinic</strong></p>
+        <p>Địa chỉ: Tầng 1 - Tòa nhà Y Tế Trung Tâm, TP. Hà Nội | Hotline: 1900 8888</p>
+        <p>Email này được gửi tự động từ hệ thống.</p>
+    </div>
+</div>
+</body>
+</html>
+

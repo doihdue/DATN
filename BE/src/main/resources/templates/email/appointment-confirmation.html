@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác nhận Đặt lịch khám bệnh</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f4f6f9; }
+        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; padding: 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+        .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+        .content { padding: 24px; }
+        .greeting { font-size: 16px; margin-bottom: 16px; }
+        .code-box { background: #f0fdf4; border: 2px dashed #16a34a; border-radius: 8px; padding: 16px; text-align: center; margin: 20px 0; }
+        .code-title { font-size: 13px; text-transform: uppercase; color: #15803d; font-weight: 600; letter-spacing: 1px; }
+        .code-value { font-size: 28px; font-weight: 800; color: #166534; margin: 4px 0; font-family: monospace; }
+        .stt-badge { display: inline-block; background: #15803d; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+        .details-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+        .details-table td.label { width: 40%; color: #64748b; font-weight: 500; }
+        .details-table td.value { width: 60%; color: #0f172a; font-weight: 600; }
+        .alert-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 13px; color: #1e40af; }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>PHÒNG KHÁM THÔNG MINH SMARTCLINIC</h1>
+        <p>XÁC NHẬN ĐẶT LỊCH HẸN KHÁM BỆNH</p>
+    </div>
+
+    <div class="content">
+        <p class="greeting">Kính gửi Quý bệnh nhân <strong th:text="${patientName}">Nguyễn Văn An</strong>,</p>
+        <p>Hệ thống SmartClinic xin thông báo lịch hẹn khám của Quý khách đã được tiếp nhận và xác nhận thành công.</p>
+
+        <div class="code-box">
+            <div class="code-title">Mã số lịch hẹn</div>
+            <div class="code-value" th:text="${appointmentCode}">LH261113-0001</div>
+            <div class="stt-badge">Số thứ tự hẹn trước: #<span th:text="${bookingNumber}">1</span></div>
+        </div>
+
+        <table class="details-table">
+            <tr>
+                <td class="label">Bác sĩ phụ trách:</td>
+                <td class="value" th:text="${doctorName}">BS.CKII Nguyễn Văn Hùng</td>
+            </tr>
+            <tr>
+                <td class="label">Chuyên khoa:</td>
+                <td class="value" th:text="${specialtyName}">Khoa Nội Tổng Quát</td>
+            </tr>
+            <tr>
+                <td class="label">Phòng khám:</td>
+                <td class="value" th:text="${roomNumber}">Phòng 101</td>
+            </tr>
+            <tr>
+                <td class="label">Ngày khám:</td>
+                <td class="value" th:text="${appointmentDate}">14/11/2026</td>
+            </tr>
+            <tr>
+                <td class="label">Giờ dự kiến:</td>
+                <td class="value" th:text="${estimatedTime}">08:30</td>
+            </tr>
+            <tr th:if="${reasonForVisit != null and !reasonForVisit.isEmpty()}">
+                <td class="label">Lý do khám:</td>
+                <td class="value" th:text="${reasonForVisit}">Đau đầu, kiểm tra huyết áp</td>
+            </tr>
+        </table>
+
+        <div class="alert-box">
+            <strong>Lưu ý quan trọng:</strong>
+            <ul style="margin: 6px 0 0; padding-left: 18px;">
+                <li>Quý khách vui lòng đến trước <strong>15 phút</strong> so với giờ hẹn để hoàn tất thủ tục check-in.</li>
+                <li>Xuất trình <strong>Mã số lịch hẹn</strong> này tại quầy tiếp đón hoặc ki-ốt thông minh để nhận phiếu số thứ tự vào phòng.</li>
+                <li>Nếu cần dời hoặc hủy lịch, vui lòng thực hiện trên trang web trước giờ khám ít nhất 2 giờ.</li>
+            </ul>
+        </div>
+
+        <p style="font-size: 14px; color: #475569;">Chúc Quý khách luôn dồi dào sức khỏe và có trải nghiệm khám chữa bệnh hài lòng tại SmartClinic!</p>
+    </div>
+
+    <div class="footer">
+        <p><strong>Hệ Thống Y Tế & Phòng Khám Thông Minh SmartClinic</strong></p>
+        <p>Địa chỉ: Tầng 1 - Tòa nhà Y Tế Trung Tâm, TP. Hà Nội | Hotline: 1900 8888</p>
+        <p>Email này được gửi tự động từ hệ thống. Quý khách vui lòng không phản hồi thư này.</p>
+    </div>
+</div>
+</body>
+</html>
+

@@ -1,10 +1,13 @@
 package com.demo.be.service.impl;
 
+import com.demo.be.dto.request.ChangePasswordRequest;
 import com.demo.be.dto.request.CreateUserRequest;
 import com.demo.be.dto.request.LoginRequest;
 import com.demo.be.dto.request.RefreshTokenRequest;
 import com.demo.be.dto.request.RegisterRequest;
+import com.demo.be.dto.request.UpdateProfileRequest;
 import com.demo.be.dto.response.AuthResponse;
+import com.demo.be.dto.response.UserProfileResponse;
 import com.demo.be.dto.response.UserSummaryResponse;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
@@ -39,6 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final DoctorRepository doctorRepository;
     private final EmployeeRepository employeeRepository;
     private final SpecialtyRepository specialtyRepository;
+    private final PersonRepository personRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
@@ -295,5 +299,187 @@ public class AuthServiceImpl implements AuthService {
                 .department(department)
                 .roles(roles)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(UserPrincipal currentUser, ChangePasswordRequest request) {
+        if (currentUser == null) {
+            throw new BadRequestException("Chưa đăng nhập");
+        }
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("Mật khẩu xác nhận không khớp với mật khẩu mới");
+        }
+
+        User user = userRepository.findByUsername(currentUser.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", currentUser.getUsername()));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu hiện tại không chính xác");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu mới không được trùng với mật khẩu hiện tại");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        refreshTokenRepository.deleteByUser(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(UserPrincipal currentUser) {
+        if (currentUser == null) {
+            throw new BadRequestException("Chưa đăng nhập");
+        }
+
+        User user = userRepository.findByUsername(currentUser.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", currentUser.getUsername()));
+
+        return mapToUserProfile(user);
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse updateProfile(UserPrincipal currentUser, UpdateProfileRequest request) {
+        if (currentUser == null) {
+            throw new BadRequestException("Chưa đăng nhập");
+        }
+
+        User user = userRepository.findByUsername(currentUser.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", currentUser.getUsername()));
+
+        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+            String newEmail = request.getEmail().trim();
+            if (userRepository.existsByEmailAndIdNot(newEmail, user.getId())) {
+                throw new BadRequestException("Email đã được sử dụng bởi một tài khoản khác trong hệ thống");
+            }
+            user.setEmail(newEmail);
+        }
+
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+
+        Person person = user.getPerson();
+        if (person == null) {
+            person = Person.builder()
+                    .fullName(request.getFullName() != null ? request.getFullName().trim() : user.getUsername())
+                    .gender(request.getGender())
+                    .dateOfBirth(request.getDateOfBirth())
+                    .address(request.getAddress())
+                    .avatarUrl(request.getAvatarUrl())
+                    .build();
+            person = personRepository.save(person);
+            user.setPerson(person);
+        } else {
+            if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+                person.setFullName(request.getFullName().trim());
+            }
+            if (request.getGender() != null) {
+                person.setGender(request.getGender());
+            }
+            if (request.getDateOfBirth() != null) {
+                person.setDateOfBirth(request.getDateOfBirth());
+            }
+            if (request.getAddress() != null) {
+                person.setAddress(request.getAddress());
+            }
+            if (request.getAvatarUrl() != null) {
+                person.setAvatarUrl(request.getAvatarUrl());
+            }
+
+            if (person instanceof Doctor doctor) {
+                if (request.getAcademicTitle() != null) {
+                    doctor.setAcademicTitle(request.getAcademicTitle());
+                }
+                if (request.getYearsOfExperience() != null) {
+                    doctor.setYearsOfExperience(request.getYearsOfExperience());
+                }
+                if (request.getBiography() != null) {
+                    doctor.setBiography(request.getBiography());
+                }
+                doctorRepository.save(doctor);
+            } else if (person instanceof Patient patient) {
+                if (request.getBloodGroup() != null) {
+                    patient.setBloodGroup(request.getBloodGroup());
+                }
+                if (request.getAllergies() != null) {
+                    patient.setAllergies(request.getAllergies());
+                }
+                if (request.getEmergencyContactName() != null) {
+                    patient.setEmergencyContactName(request.getEmergencyContactName());
+                }
+                if (request.getEmergencyContactPhone() != null) {
+                    patient.setEmergencyContactPhone(request.getEmergencyContactPhone());
+                }
+                patientRepository.save(patient);
+            } else if (person instanceof Employee employee) {
+                employeeRepository.save(employee);
+            } else {
+                personRepository.save(person);
+            }
+        }
+
+        user = userRepository.save(user);
+        return mapToUserProfile(user);
+    }
+
+    private UserProfileResponse mapToUserProfile(User user) {
+        List<String> roles = user.getUserRoles().stream()
+                .map(ur -> ur.getRole().getName())
+                .collect(Collectors.toList());
+
+        Person person = user.getPerson();
+
+        UserProfileResponse.UserProfileResponseBuilder builder = UserProfileResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .status(user.getStatus())
+                .roles(roles);
+
+        if (person != null) {
+            builder.personId(person.getId())
+                    .fullName(person.getFullName())
+                    .gender(person.getGender())
+                    .dateOfBirth(person.getDateOfBirth())
+                    .address(person.getAddress())
+                    .nationalId(person.getNationalId())
+                    .avatarUrl(person.getAvatarUrl());
+
+            if (person instanceof Doctor doctor) {
+                builder.employeeCode(doctor.getEmployeeCode())
+                        .position(doctor.getPosition())
+                        .academicTitle(doctor.getAcademicTitle())
+                        .yearsOfExperience(doctor.getYearsOfExperience())
+                        .biography(doctor.getBiography());
+                if (doctor.getSpecialty() != null) {
+                    builder.specialtyId(doctor.getSpecialty().getId())
+                            .specialtyName(doctor.getSpecialty().getName());
+                }
+            } else if (person instanceof LabTechnician labTech) {
+                builder.employeeCode(labTech.getEmployeeCode())
+                        .position(labTech.getPosition())
+                        .department(labTech.getDepartment());
+            } else if (person instanceof Employee employee) {
+                builder.employeeCode(employee.getEmployeeCode())
+                        .position(employee.getPosition());
+            }
+
+            if (person instanceof Patient patient) {
+                builder.bloodGroup(patient.getBloodGroup())
+                        .allergies(patient.getAllergies())
+                        .medicalHistorySummary(patient.getMedicalHistorySummary())
+                        .emergencyContactName(patient.getEmergencyContactName())
+                        .emergencyContactPhone(patient.getEmergencyContactPhone());
+            }
+        }
+
+        return builder.build();
     }
 }
