@@ -34,32 +34,24 @@ public class LabOrder {
     @Column(name = "order_time", nullable = false)
     private LocalDateTime orderTime;
 
-    @Column(name = "result_value", length = 500)
-    private String resultValue;
-
-    @Column(name = "is_abnormal")
-    @Builder.Default
-    private Boolean isAbnormal = false;
-
-    @Column(name = "conclusion", columnDefinition = "NVARCHAR(MAX)")
-    private String conclusion;
-
     @Builder.Default
     @Column(name = "status", nullable = false, length = 50)
     private String status = "PENDING"; // PENDING, PROCESSING, COMPLETED, CANCELLED
 
-    @Column(name = "performed_time")
-    private LocalDateTime performedTime;
-
     @Column(name = "notes", length = 500)
     private String notes;
 
-    // KTV tiếp nhận mẫu và ký duyệt kết quả (null khi bác sĩ vừa chỉ định)
+    // KTV tiếp nhận mẫu, thực hiện và ký kết quả (null khi bác sĩ vừa chỉ định)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "performed_by_id", foreignKey = @ForeignKey(name = "fk_lab_order_performer"))
     private LabTechnician performer;
 
+    // Ca trực (phòng cận lâm sàng + khung giờ) của KTV lúc thực hiện; null nếu KTV làm ngoài ca trực
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "work_schedule_id")
-    private WorkSchedule workSchedule; // Ca làm việc tại phòng xét nghiệm (nullable lúc chỉ định)
+    @JoinColumn(name = "staff_shift_id")
+    private StaffShift staffShift;
+
+    // Kết quả xét nghiệm (null khi chưa có kết quả)
+    @OneToOne(mappedBy = "labOrder", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private LabResult result;
 }

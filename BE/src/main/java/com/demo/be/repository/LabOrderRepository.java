@@ -17,6 +17,9 @@ public interface LabOrderRepository extends JpaRepository<LabOrder, Long> {
     @Query("SELECT lo FROM LabOrder lo " +
            "JOIN FETCH lo.labService ls " +
            "LEFT JOIN FETCH lo.performer p " +
+           "LEFT JOIN FETCH lo.result r " +
+           "LEFT JOIN FETCH lo.staffShift ss " +
+           "LEFT JOIN FETCH ss.room ssr " +
            "WHERE lo.medicalRecord.id = :recordId " +
            "ORDER BY lo.id ASC")
     List<LabOrder> findByMedicalRecordIdWithDetails(@Param("recordId") Long recordId);
@@ -29,6 +32,9 @@ public interface LabOrderRepository extends JpaRepository<LabOrder, Long> {
            "LEFT JOIN FETCH mr.queueTicket qt " +
            "LEFT JOIN FETCH qt.examinationRoom er " +
            "LEFT JOIN FETCH lo.performer p " +
+           "LEFT JOIN FETCH lo.result r " +
+           "LEFT JOIN FETCH lo.staffShift ss " +
+           "LEFT JOIN FETCH ss.room ssr " +
            "WHERE (lo.orderTime >= :from AND lo.orderTime < :to) " +
            "OR lo.status IN ('PENDING', 'PROCESSING') " +
            "ORDER BY lo.orderTime ASC")

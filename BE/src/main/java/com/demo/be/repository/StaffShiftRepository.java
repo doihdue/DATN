@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Repository
@@ -22,4 +23,11 @@ public interface StaffShiftRepository extends JpaRepository<StaffShift, Long> {
                                          @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     boolean existsByTechnicianId(Long technicianId);
+
+    // Ca trực đang diễn ra của KTV (ngày + giờ hiện tại nằm trong khung giờ của ca)
+    @Query("SELECT s FROM StaffShift s JOIN FETCH s.room " +
+           "WHERE s.technician.id = :technicianId AND s.workDate = :date " +
+           "AND s.startTime <= :time AND s.endTime > :time ORDER BY s.startTime")
+    List<StaffShift> findCurrentShifts(@Param("technicianId") Long technicianId,
+                                       @Param("date") LocalDate date, @Param("time") LocalTime time);
 }

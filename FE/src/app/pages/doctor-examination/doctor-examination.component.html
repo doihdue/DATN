@@ -372,8 +372,11 @@
                     </td>
                     <td>
                       <div class="performer-name">{{ order.performerName || 'Đang cập nhật' }}</div>
+                      @if (order.shiftLabel) {
+                        <div class="performed-time small text-muted">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
+                      }
                       @if (order.performedTime) {
-                        <div class="performed-time small text-muted">{{ order.performedTime | date:'HH:mm dd/MM' }}</div>
+                        <div class="performed-time small text-muted">Có kết quả: {{ order.performedTime | date:'HH:mm dd/MM' }}</div>
                       }
                     </td>
                     <td style="text-align: center;">
