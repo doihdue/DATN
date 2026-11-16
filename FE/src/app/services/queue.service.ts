@@ -18,8 +18,14 @@ export class QueueService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = 'http://localhost:8080/api/queue';
 
+  // Quầy lễ tân cấp số (yêu cầu đăng nhập vai trò lễ tân / admin)
   checkIn(request: CheckInRequest): Observable<ApiResponse<QueueTicket>> {
     return this.http.post<ApiResponse<QueueTicket>>(`${this.baseUrl}/check-in`, request);
+  }
+
+  // Bệnh nhân tự lấy số online: server bỏ qua cờ cấp cứu, lịch hẹn, mã bệnh nhân
+  selfCheckIn(request: CheckInRequest): Observable<ApiResponse<MyTicketStatus>> {
+    return this.http.post<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/self-check-in`, request);
   }
 
   getDisplayBoard(): Observable<ApiResponse<ClinicDisplayBoard[]>> {
@@ -30,10 +36,9 @@ export class QueueService {
     return this.http.get<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/my-ticket/${ticketNumber}`);
   }
 
-  getMyActiveTicket(phone?: string): Observable<ApiResponse<MyTicketStatus>> {
-    const params: Record<string, string> = {};
-    if (phone && phone.trim()) params['phone'] = phone.trim();
-    return this.http.get<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/my-active-ticket`, { params });
+  // Phiếu hôm nay của tài khoản đang đăng nhập (server tự xác định theo tài khoản)
+  getMyActiveTicket(): Observable<ApiResponse<MyTicketStatus>> {
+    return this.http.get<ApiResponse<MyTicketStatus>>(`${this.baseUrl}/my-active-ticket`);
   }
 
   getTicketById(ticketId: number): Observable<ApiResponse<QueueTicket>> {

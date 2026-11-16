@@ -43,6 +43,7 @@ public class QueueServiceImpl implements QueueService {
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
     private final WorkScheduleRepository workScheduleRepository;
+    private final AppointmentRepository appointmentRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${ai.service.url:http://localhost:8000}")
@@ -53,6 +54,19 @@ public class QueueServiceImpl implements QueueService {
     @Override
     @Transactional
     public QueueTicketResponse checkIn(CheckInRequest request) {
+        return mapToResponse(issueTicket(request, true));
+    }
+
+    @Override
+    @Transactional
+    public MyTicketStatusResponse selfCheckIn(CheckInRequest request) {
+        QueueTicket ticket = issueTicket(request, false);
+        return getMyTicketStatus(ticket.getTicketNumber());
+    }
+
+    // staffDesk = false (bệnh nhân tự lấy số): bỏ qua mã bệnh nhân, bác sĩ, cờ cấp cứu, lịch hẹn
+    // và không sửa hồ sơ bệnh nhân có sẵn, vì endpoint này không yêu cầu đăng nhập
+    private QueueTicket issueTicket(CheckInRequest request, boolean staffDesk) {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
@@ -65,7 +79,7 @@ public class QueueServiceImpl implements QueueService {
                         + " không còn ca trực nào trong hôm nay, vui lòng chọn phòng khác"));
 
         Doctor doctor = null;
-        if (request.getDoctorId() != null) {
+        if (staffDesk && request.getDoctorId() != null) {
             doctor = doctorRepository.findById(request.getDoctorId()).orElse(null);
         }
         if (doctor == null) {
@@ -85,7 +99,7 @@ public class QueueServiceImpl implements QueueService {
                 ? request.getPatientGender().trim() : "Chưa rõ";
 
         Patient patient = null;
-        if (request.getPatientId() != null) {
+        if (staffDesk && request.getPatientId() != null) {
             patient = patientRepository.findById(request.getPatientId()).orElse(null);
         }
 
@@ -109,7 +123,7 @@ public class QueueServiceImpl implements QueueService {
                     .bloodGroup(null)
                     .build();
             patient = patientRepository.save(patient);
-        } else {
+        } else if (staffDesk) {
             // Cập nhật ngày sinh / giới tính nếu bệnh nhân đã tồn tại và thông tin được điều chỉnh ở quầy
             boolean changed = false;
             if (dob != null && !dob.equals(patient.getDateOfBirth())) {
@@ -153,8 +167,11 @@ public class QueueServiceImpl implements QueueService {
 
         // Tính điểm ưu tiên (Priority Score Algorithm)
         int priorityScore = 0;
-        boolean isEmergency = Boolean.TRUE.equals(request.getIsEmergency());
-        boolean hasAppointment = request.getAppointmentId() != null;
+        boolean isEmergency = staffDesk && Boolean.TRUE.equals(request.getIsEmergency());
+        boolean hasAppointment = staffDesk && request.getAppointmentId() != null;
+        if (hasAppointment) {
+            assertValidAppointment(request.getAppointmentId(), patient, today);
+        }
 
         if (isEmergency) {
             priorityScore += 100; // Cấp cứu: lên đầu ngay lập tức
@@ -207,7 +224,19 @@ public class QueueServiceImpl implements QueueService {
         // Broadcast sự kiện Real-time qua WebSocket
         broadcastQueueEvent("TICKET_CREATED", saved, "Đã cấp số thứ tự mới: " + ticketNumber);
 
-        return mapToResponse(saved);
+        return saved;
+    }
+
+    // Chỉ cộng điểm "đã đặt lịch" khi lịch hẹn có thật, đúng ngày, đúng bệnh nhân và chưa huỷ / chưa khám
+    private void assertValidAppointment(Long appointmentId, Patient patient, LocalDate today) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new BadRequestException("Lịch hẹn không tồn tại"));
+        boolean samePatient = appointment.getPatient() != null && appointment.getPatient().getId().equals(patient.getId());
+        boolean usable = !"CANCELLED".equals(appointment.getStatus()) && !"COMPLETED".equals(appointment.getStatus());
+        if (!samePatient || !today.equals(appointment.getAppointmentDate()) || !usable) {
+            throw new BadRequestException("Lịch hẹn " + appointment.getAppointmentCode()
+                    + " không hợp lệ cho bệnh nhân này trong hôm nay");
+        }
     }
 
     @Override
@@ -445,39 +474,10 @@ public class QueueServiceImpl implements QueueService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public QueueTicketResponse getTicketById(Long ticketId) {
         QueueTicket ticket = queueTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vé khám", "id", ticketId));
-
-        // Tự động liên kết hoặc tạo hồ sơ bệnh nhân nếu vé chưa có patient
-        if (ticket.getPatient() == null && ticket.getPatientName() != null && !ticket.getPatientName().trim().isEmpty()) {
-            // Tìm theo SĐT rồi khớp tên (giống lúc check-in), không tải toàn bộ bệnh nhân
-            String ticketName = ticket.getPatientName().trim();
-            Patient matchedPatient = null;
-            if (ticket.getPatientPhone() != null && !ticket.getPatientPhone().trim().isEmpty()) {
-                matchedPatient = patientRepository.findByPhoneNumber(ticket.getPatientPhone().trim()).stream()
-                        .filter(p -> p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(ticketName))
-                        .findFirst()
-                        .orElse(null);
-            }
-            if (matchedPatient == null) {
-                LocalDate dob = ticket.getPatientDob();
-                if (dob == null && ticket.getPatientYearOfBirth() != null) {
-                    dob = LocalDate.of(ticket.getPatientYearOfBirth(), 1, 1);
-                }
-                matchedPatient = Patient.builder()
-                        .fullName(ticket.getPatientName().trim())
-                        .gender("Chưa rõ")
-                        .dateOfBirth(dob)
-                        .emergencyContactPhone(ticket.getPatientPhone())
-                        .bloodGroup(null)
-                        .build();
-                matchedPatient = patientRepository.save(matchedPatient);
-            }
-            ticket.setPatient(matchedPatient);
-            ticket = queueTicketRepository.save(ticket);
-        }
 
         return mapToResponse(ticket);
     }
@@ -661,7 +661,7 @@ public class QueueServiceImpl implements QueueService {
         return MyTicketStatusResponse.builder()
                 .ticketNumber(ticket.getTicketNumber())
                 .ticketDate(ticket.getTicketDate())
-                .patientName(ticket.getPatientName())
+                .patientName(canSeeFullName(ticket) ? ticket.getPatientName() : maskName(ticket.getPatientName()))
                 .status(ticket.getStatus())
                 .priorityScore(ticket.getPriorityScore())
                 .roomId(room != null ? room.getId() : null)
@@ -680,7 +680,7 @@ public class QueueServiceImpl implements QueueService {
 
     @Override
     @Transactional(readOnly = true)
-    public MyTicketStatusResponse getMyActiveTicket(String phone) {
+    public MyTicketStatusResponse getMyActiveTicket() {
         LocalDate today = LocalDate.now();
         List<QueueTicket> tickets = new ArrayList<>();
 
@@ -701,11 +701,7 @@ public class QueueServiceImpl implements QueueService {
             log.debug("Lỗi khi kiểm tra Authentication trong getMyActiveTicket: {}", e.getMessage());
         }
 
-        // 2. Nếu chưa tìm thấy và có số điện thoại được truyền lên
-        if (tickets.isEmpty() && phone != null && !phone.trim().isEmpty()) {
-            tickets.addAll(queueTicketRepository.findTodayTicketsByPhone(today, phone.trim()));
-        }
-
+        // Người chưa đăng nhập không được tra phiếu theo SĐT tuỳ ý: chỉ tra bằng số vé (tên đã che)
         if (tickets.isEmpty()) {
             return null;
         }
@@ -809,6 +805,21 @@ public class QueueServiceImpl implements QueueService {
         } catch (Exception e) {
             log.error("Lỗi khi gửi WebSocket message: {}", e.getMessage());
         }
+    }
+
+    // Nhân viên y tế và chính chủ phiếu (bệnh nhân đã đăng nhập) thấy đủ họ tên; người khác chỉ thấy tên đã che
+    private boolean canSeeFullName(QueueTicket ticket) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            return false;
+        }
+        boolean medicalStaff = auth.getAuthorities().stream().map(a -> a.getAuthority())
+                .anyMatch(r -> r.equals("ROLE_ADMIN") || r.equals("ROLE_STAFF") || r.equals("ROLE_DOCTOR") || r.equals("ROLE_LAB_TECH"));
+        if (medicalStaff) {
+            return true;
+        }
+        Patient owner = ticket.getPatient();
+        return owner != null && owner.getUser() != null && auth.getName().equals(owner.getUser().getUsername());
     }
 
     private String maskName(String name) {
