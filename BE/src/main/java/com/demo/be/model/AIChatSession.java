@@ -31,9 +31,6 @@ public class AIChatSession {
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 
-    @Column(name = "ended_at")
-    private LocalDateTime endedAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_id")
     private Patient patient;

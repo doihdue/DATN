@@ -5,8 +5,6 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @Setter
@@ -50,8 +48,4 @@ public class WorkSchedule {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "doctor_id")
     private Doctor doctor;
-
-    @Builder.Default
-    @OneToMany(mappedBy = "workSchedule")
-    private List<Appointment> appointments = new ArrayList<>();
 }
