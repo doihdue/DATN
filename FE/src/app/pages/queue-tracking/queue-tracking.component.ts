@@ -275,6 +275,27 @@ import { toIsoDate } from '../../utils/date.utils';
               </div>
             </div>
 
+            <!-- Xác minh 4 số cuối SĐT trước khi tải phiếu kết quả -->
+            @if (ticketResult()!.status === 'COMPLETED' && showPdfVerify()) {
+              <div class="pdf-verify-box">
+                <label for="pdfPhoneLast4">Nhập 4 số cuối số điện thoại đã đăng ký khi lấy số để tải phiếu kết quả</label>
+                <div class="pdf-verify-row">
+                  <input id="pdfPhoneLast4" type="text" inputmode="numeric" maxlength="4" placeholder="VD: 4321"
+                         [ngModel]="pdfPhoneLast4()" (ngModelChange)="pdfPhoneLast4.set($event)"
+                         (keyup.enter)="downloadPdfByTicket(ticketResult()!.ticketNumber, ticketResult()!.ticketDate)" />
+                  <button type="button" class="btn btn-pdf" [disabled]="downloadingPdf() || pdfPhoneLast4().length !== 4"
+                          (click)="downloadPdfByTicket(ticketResult()!.ticketNumber, ticketResult()!.ticketDate)">
+                    <i class="bi" [class.bi-download]="!downloadingPdf()" [class.bi-hourglass-split]="downloadingPdf()"></i>
+                    {{ downloadingPdf() ? 'Đang tải...' : 'Tải PDF' }}
+                  </button>
+                  <button type="button" class="btn-link" (click)="closePdfVerify()">Huỷ</button>
+                </div>
+                @if (pdfError()) {
+                  <p class="pdf-verify-error" role="alert">{{ pdfError() }}</p>
+                }
+              </div>
+            }
+
             <!-- Footer Action Controls -->
             <div class="pass-footer-actions">
               <div class="footer-sync-status">
@@ -282,15 +303,9 @@ import { toIsoDate } from '../../utils/date.utils';
                 <span>Hệ thống tự động đồng bộ theo thời gian thực</span>
               </div>
               <div class="footer-buttons">
-                @if (ticketResult()!.status === 'COMPLETED') {
-                  <button
-                    type="button"
-                    class="btn btn-pdf"
-                    [disabled]="downloadingPdf()"
-                    (click)="downloadPdfByTicket(ticketResult()!.ticketNumber)"
-                  >
-                    <i class="bi" [class.bi-file-earmark-pdf-fill]="!downloadingPdf()" [class.bi-hourglass-split]="downloadingPdf()"></i>
-                    {{ downloadingPdf() ? 'Đang tải...' : 'Tải Đơn Thuốc & Kết Quả (PDF)' }}
+                @if (ticketResult()!.status === 'COMPLETED' && !showPdfVerify()) {
+                  <button type="button" class="btn btn-pdf" (click)="openPdfVerify()">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Tải Đơn Thuốc &amp; Kết Quả (PDF)
                   </button>
                 }
                 <button type="button" class="btn btn-modern-refresh" [disabled]="loadingSearch()" (click)="refreshTicket()">
@@ -1144,6 +1159,46 @@ import { toIsoDate } from '../../utils/date.utils';
       transition: all 0.2s ease;
     }
 
+    .pdf-verify-box {
+      margin-top: 1rem;
+      padding: 0.9rem 1rem;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      background: #fff7f7;
+    }
+
+    .pdf-verify-box label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 0.5rem;
+    }
+
+    .pdf-verify-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .pdf-verify-row input {
+      width: 120px;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+    }
+
+    .pdf-verify-error {
+      margin: 0.5rem 0 0;
+      font-size: 0.85rem;
+      color: #b91c1c;
+    }
+
+    .btn-pdf:disabled { opacity: 0.6; cursor: not-allowed; }
+
     .btn-pdf:hover {
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
@@ -1301,6 +1356,10 @@ export class QueueTrackingComponent implements OnInit {
   readonly loadingSearch = signal(false);
   readonly submittingCheckIn = signal(false);
   readonly downloadingPdf = signal(false);
+  // Xác minh 4 số cuối SĐT trước khi tải phiếu kết quả (người không đăng nhập)
+  readonly showPdfVerify = signal(false);
+  readonly pdfPhoneLast4 = signal('');
+  readonly pdfError = signal<string | null>(null);
   readonly ticketResult = signal<MyTicketStatus | null>(null);
   readonly errorMessage = signal<string | null>(null);
   readonly rooms = signal<ExaminationRoom[]>([]);
@@ -1531,11 +1590,29 @@ export class QueueTrackingComponent implements OnInit {
     }
   }
 
-  downloadPdfByTicket(ticketNumber: string): void {
+  openPdfVerify(): void {
+    this.pdfPhoneLast4.set('');
+    this.pdfError.set(null);
+    this.showPdfVerify.set(true);
+  }
+
+  closePdfVerify(): void {
+    this.showPdfVerify.set(false);
+    this.pdfError.set(null);
+  }
+
+  downloadPdfByTicket(ticketNumber: string, ticketDate?: string): void {
+    const last4 = this.pdfPhoneLast4().trim();
+    if (!/^\d{4}$/.test(last4)) {
+      this.pdfError.set('Vui lòng nhập đúng 4 chữ số.');
+      return;
+    }
+    this.pdfError.set(null);
     this.downloadingPdf.set(true);
-    this.medicalRecordService.exportPdfByTicketNumber(ticketNumber).subscribe({
+    this.medicalRecordService.exportPdfByTicketNumber(ticketNumber, last4, ticketDate).subscribe({
       next: (blob: Blob) => {
         this.downloadingPdf.set(false);
+        this.closePdfVerify();
         const fileUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = fileUrl;
@@ -1545,11 +1622,20 @@ export class QueueTrackingComponent implements OnInit {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(fileUrl);
       },
-      error: err => {
+      error: async err => {
         this.downloadingPdf.set(false);
-        console.error('Lỗi khi tải PDF phiếu khám:', err);
-        alert('Hồ sơ bệnh án cho phiếu khám này chưa sẵn sàng hoặc có lỗi từ máy chủ!');
+        this.pdfError.set(await this.readBlobError(err) ?? 'Không tải được phiếu kết quả. Vui lòng thử lại sau.');
       }
     });
+  }
+
+  // Lỗi của request responseType 'blob' trả về dạng Blob: đọc ra để lấy thông báo của máy chủ
+  private async readBlobError(err: { error?: unknown }): Promise<string | null> {
+    try {
+      if (err.error instanceof Blob) {
+        return JSON.parse(await err.error.text())?.message ?? null;
+      }
+    } catch {}
+    return null;
   }
 }

@@ -5,6 +5,7 @@ import com.demo.be.dto.request.PrescriptionItemRequest;
 import com.demo.be.dto.response.MedicalRecordResponse;
 import com.demo.be.dto.response.PatientMedicalHistoryResponse;
 import com.demo.be.email.event.MedicalRecordCompletedEvent;
+import com.demo.be.exception.AppException;
 import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
@@ -14,12 +15,14 @@ import com.demo.be.service.PdfExportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -224,6 +227,35 @@ public class MedicalRecordServiceImpl implements MedicalRecordService {
         List<LabOrder> labOrders = labOrderRepository.findByMedicalRecordIdWithDetails(record.getId());
         record.setLabOrders(labOrders);
         return MedicalRecordResponse.fromEntity(record);
+    }
+
+    // Cùng một thông báo cho "không có vé" và "sai SĐT" để không dò được số vé nào có thật
+    static final String PUBLIC_LOOKUP_MISMATCH = "Thông tin tra cứu không khớp. Vui lòng kiểm tra số vé, ngày khám và 4 số cuối số điện thoại.";
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long findRecordIdForPublicLookup(String ticketNumber, LocalDate ticketDate, String phoneLast4) {
+        String last4 = phoneLast4 == null ? "" : phoneLast4.replaceAll("\\D", "");
+        if (last4.length() != 4) {
+            throw new BadRequestException("Vui lòng nhập đúng 4 số cuối của số điện thoại");
+        }
+        QueueTicket ticket = queueTicketRepository.findByTicketNumberAndTicketDate(ticketNumber, ticketDate)
+                .orElseThrow(() -> new AppException(PUBLIC_LOOKUP_MISMATCH, HttpStatus.FORBIDDEN));
+
+        String phone = ticket.getPatientPhone();
+        if ((phone == null || phone.isBlank()) && ticket.getPatient() != null) {
+            phone = ticket.getPatient().getPhoneNumber();
+        }
+        String digits = phone == null ? "" : phone.replaceAll("\\D", "");
+        if (digits.length() < 4 || !digits.endsWith(last4)) {
+            throw new AppException(PUBLIC_LOOKUP_MISMATCH, HttpStatus.FORBIDDEN);
+        }
+        if (!"COMPLETED".equals(ticket.getStatus())) {
+            throw new BadRequestException("Ca khám chưa hoàn tất nên chưa có phiếu kết quả");
+        }
+        return medicalRecordRepository.findByQueueTicketId(ticket.getId())
+                .map(MedicalRecord::getId)
+                .orElseThrow(() -> new BadRequestException("Ca khám chưa có hồ sơ bệnh án"));
     }
 
     @Override

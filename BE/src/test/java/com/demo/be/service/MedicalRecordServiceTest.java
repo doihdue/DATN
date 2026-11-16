@@ -4,6 +4,8 @@ import com.demo.be.dto.request.CreateMedicalRecordRequest;
 import com.demo.be.dto.request.PrescriptionItemRequest;
 import com.demo.be.dto.response.MedicalRecordResponse;
 import com.demo.be.dto.response.PatientMedicalHistoryResponse;
+import com.demo.be.exception.AppException;
+import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
 import com.demo.be.repository.*;
@@ -264,5 +266,61 @@ class MedicalRecordServiceTest {
         assertThatThrownBy(() -> service.getMedicalRecordById(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Hồ sơ bệnh án");
+    }
+
+    // ================= Tra cứu phiếu kết quả không đăng nhập =================
+
+    private QueueTicket completedTicket(String phone) {
+        return QueueTicket.builder().id(20L).ticketNumber("P101-005").patientPhone(phone).status("COMPLETED").build();
+    }
+
+    @Test
+    void publicLookup_correctLast4_returnsRecordId() {
+        LocalDate day = LocalDate.of(2026, 11, 16);
+        when(queueTicketRepository.findByTicketNumberAndTicketDate("P101-005", day))
+                .thenReturn(Optional.of(completedTicket("0912 345 678")));
+        when(medicalRecordRepository.findByQueueTicketId(20L))
+                .thenReturn(Optional.of(MedicalRecord.builder().id(99L).build()));
+
+        assertThat(service.findRecordIdForPublicLookup("P101-005", day, "5678")).isEqualTo(99L);
+    }
+
+    @Test
+    void publicLookup_wrongLast4_andUnknownTicket_giveSameForbiddenMessage() {
+        LocalDate day = LocalDate.of(2026, 11, 16);
+        when(queueTicketRepository.findByTicketNumberAndTicketDate("P101-005", day))
+                .thenReturn(Optional.of(completedTicket("0912345678")));
+        when(queueTicketRepository.findByTicketNumberAndTicketDate("P101-999", day)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findRecordIdForPublicLookup("P101-005", day, "1111"))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("Thông tin tra cứu không khớp");
+        assertThatThrownBy(() -> service.findRecordIdForPublicLookup("P101-999", day, "5678"))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("Thông tin tra cứu không khớp");
+        verify(medicalRecordRepository, never()).findByQueueTicketId(any());
+    }
+
+    @Test
+    void publicLookup_ticketWithoutPhone_isRejected() {
+        LocalDate day = LocalDate.of(2026, 11, 16);
+        when(queueTicketRepository.findByTicketNumberAndTicketDate("P101-005", day))
+                .thenReturn(Optional.of(completedTicket(null)));
+
+        assertThatThrownBy(() -> service.findRecordIdForPublicLookup("P101-005", day, "5678"))
+                .isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void publicLookup_notCompleted_orBadInput_isBadRequest() {
+        LocalDate day = LocalDate.of(2026, 11, 16);
+        QueueTicket waiting = completedTicket("0912345678");
+        waiting.setStatus("WAITING");
+        when(queueTicketRepository.findByTicketNumberAndTicketDate("P101-005", day)).thenReturn(Optional.of(waiting));
+
+        assertThatThrownBy(() -> service.findRecordIdForPublicLookup("P101-005", day, "5678"))
+                .isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.findRecordIdForPublicLookup("P101-005", day, "56"))
+                .isInstanceOf(BadRequestException.class);
     }
 }

@@ -55,7 +55,8 @@ public class SecurityConfig {
                                 "/api/queue/my-ticket/**",
                                 "/api/queue/my-active-ticket",
                                 "/api/queue/ticket/**",
-                                "/api/medical-records/**",
+                                // Chỉ endpoint tải phiếu khám theo số vé (có kiểm tra 4 số cuối SĐT) mới công khai
+                                "/api/medical-records/ticket-number/*/export-pdf",
                                 "/api/queue/check-in",
                                 "/api/appointments/available-schedules",
                                 "/api/chat/**",
