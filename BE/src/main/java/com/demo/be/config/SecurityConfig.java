@@ -54,9 +54,8 @@ public class SecurityConfig {
                                 "/api/queue/display-board",
                                 "/api/queue/my-ticket/**",
                                 "/api/queue/my-active-ticket",
-                                "/api/queue/ticket/**",
                                 "/api/medical-records/**",
-                                "/api/queue/check-in",
+                                "/api/queue/self-check-in",
                                 "/api/appointments/available-schedules",
                                 "/api/chat/**",
                                 "/ws-queue/**"
