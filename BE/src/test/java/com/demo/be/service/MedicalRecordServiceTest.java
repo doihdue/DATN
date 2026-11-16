@@ -4,6 +4,7 @@ import com.demo.be.dto.request.CreateMedicalRecordRequest;
 import com.demo.be.dto.request.PrescriptionItemRequest;
 import com.demo.be.dto.response.MedicalRecordResponse;
 import com.demo.be.dto.response.PatientMedicalHistoryResponse;
+import com.demo.be.exception.BadRequestException;
 import com.demo.be.exception.ResourceNotFoundException;
 import com.demo.be.model.*;
 import com.demo.be.repository.*;
@@ -40,6 +41,7 @@ class MedicalRecordServiceTest {
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private com.demo.be.service.PdfExportService pdfExportService;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock private com.demo.be.security.AccessGuard accessGuard;
 
     @InjectMocks
     private MedicalRecordServiceImpl service;
@@ -264,5 +266,29 @@ class MedicalRecordServiceTest {
         assertThatThrownBy(() -> service.getMedicalRecordById(999L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Hồ sơ bệnh án");
+    }
+
+    @Test
+    void createMedicalRecord_recordOfAnotherTicket_isRejectedBeforeAnyChange() {
+        QueueTicket otherTicket = QueueTicket.builder().id(99L).ticketNumber("P102-003").build();
+        MedicalRecord otherRecord = MedicalRecord.builder().id(777L).queueTicket(otherTicket).build();
+
+        CreateMedicalRecordRequest request = CreateMedicalRecordRequest.builder()
+                .recordId(777L)
+                .queueTicketId(ticket.getId())
+                .symptoms("Ho")
+                .finalDiagnosis("Viêm họng")
+                .build();
+
+        when(queueTicketRepository.findById(ticket.getId())).thenReturn(Optional.of(ticket));
+        when(medicalRecordRepository.findById(777L)).thenReturn(Optional.of(otherRecord));
+
+        assertThatThrownBy(() -> service.createMedicalRecord(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("không thuộc vé khám");
+        // Vé đang khám không bị chuyển sang hoàn tất, hồ sơ của vé khác không bị ghi đè
+        assertThat(ticket.getStatus()).isEqualTo("IN_PROGRESS");
+        verify(queueTicketRepository, never()).save(any());
+        verify(medicalRecordRepository, never()).save(any());
     }
 }

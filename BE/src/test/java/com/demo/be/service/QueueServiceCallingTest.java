@@ -39,6 +39,8 @@ class QueueServiceCallingTest {
     @Mock private WorkScheduleRepository workScheduleRepository;
     @Mock private SimpMessagingTemplate messagingTemplate;
 
+    @Mock private com.demo.be.security.AccessGuard accessGuard;
+
     @InjectMocks
     private QueueServiceImpl service;
 
