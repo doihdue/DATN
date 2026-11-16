@@ -7,7 +7,11 @@ import java.util.List;
 
 public interface QueueService {
 
+    // Quầy lễ tân cấp số: tin các trường đặc quyền (bệnh nhân có sẵn, cấp cứu, lịch hẹn, bác sĩ)
     QueueTicketResponse checkIn(CheckInRequest request);
+
+    // Bệnh nhân tự lấy số online (không đăng nhập): chỉ dùng họ tên, SĐT, ngày sinh, phòng, triệu chứng
+    MyTicketStatusResponse selfCheckIn(CheckInRequest request);
 
     QueueTicketResponse callNext(Long roomId);
 
@@ -38,7 +42,7 @@ public interface QueueService {
 
     MyTicketStatusResponse getMyTicketStatus(String ticketNumber);
 
-    MyTicketStatusResponse getMyActiveTicket(String phone);
+    MyTicketStatusResponse getMyActiveTicket();
 
     QueueTicketResponse getTicketById(Long ticketId);
 }

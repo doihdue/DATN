@@ -242,8 +242,7 @@ export class HomeComponent implements OnInit {
 
     // 2. If Patient, load active ticket today
     if (this.authService.hasRole('PATIENT')) {
-      const userPhone = this.authService.currentUser()?.phoneNumber;
-      this.queueService.getMyActiveTicket(userPhone).subscribe({
+      this.queueService.getMyActiveTicket().subscribe({
         next: res => {
           if (res.success && res.data) {
             this.myActiveTicket.set(res.data);
