@@ -18,7 +18,9 @@ public class LabServiceResponse {
     private Double lowerLimit;
     private Double upperLimit;
     private String unit;
-    private String category;
+    private Long categoryId;
+    private String category;   // tên loại xét nghiệm
+    private String department; // khoa thực hiện (theo loại xét nghiệm)
     private String description;
     private Boolean isActive;
 
@@ -33,7 +35,9 @@ public class LabServiceResponse {
                 .lowerLimit(entity.getLowerLimit())
                 .upperLimit(entity.getUpperLimit())
                 .unit(entity.getUnit())
-                .category(entity.getCategory())
+                .categoryId(entity.getCategory() != null ? entity.getCategory().getId() : null)
+                .category(entity.getCategoryName())
+                .department(entity.getDepartment())
                 .description(entity.getDescription())
                 .isActive(entity.getIsActive())
                 .build();

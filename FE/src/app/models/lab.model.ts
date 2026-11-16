@@ -7,9 +7,40 @@ export interface LabService {
   lowerLimit?: number;
   upperLimit?: number;
   unit?: string;
-  category?: string;
+  categoryId?: number;
+  category?: string;      // tên loại xét nghiệm
+  department?: LabDepartment; // khoa thực hiện, theo loại xét nghiệm
   description?: string;
   isActive: boolean;
+}
+
+export type LabDepartment = 'XET_NGHIEM' | 'CHAN_DOAN_HINH_ANH';
+
+// Loại xét nghiệm (Huyết học, Sinh hóa máu, Chẩn đoán hình ảnh...)
+export interface LabCategory {
+  id: number;
+  name: string;
+  department: LabDepartment;
+  description?: string;
+  serviceCount: number;
+}
+
+export interface LabCategoryRequest {
+  name: string;
+  department: LabDepartment;
+  description?: string;
+}
+
+export interface LabServiceRequest {
+  serviceCode: string;
+  serviceName: string;
+  categoryId: number;
+  price: number;
+  unit?: string;
+  referenceRange?: string;
+  lowerLimit?: number;
+  upperLimit?: number;
+  description?: string;
 }
 
 export interface LabOrder {

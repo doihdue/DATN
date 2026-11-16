@@ -16,6 +16,7 @@ public interface LabOrderRepository extends JpaRepository<LabOrder, Long> {
 
     @Query("SELECT lo FROM LabOrder lo " +
            "JOIN FETCH lo.labService ls " +
+           "LEFT JOIN FETCH ls.category lc " +
            "LEFT JOIN FETCH lo.performer p " +
            "LEFT JOIN FETCH lo.result r " +
            "LEFT JOIN FETCH lo.staffShift ss " +
@@ -27,6 +28,7 @@ public interface LabOrderRepository extends JpaRepository<LabOrder, Long> {
     // Chỉ định phát sinh trong ngày + các chỉ định còn dang dở (chờ làm / đang đo) của những ngày trước
     @Query("SELECT lo FROM LabOrder lo " +
            "JOIN FETCH lo.labService ls " +
+           "LEFT JOIN FETCH ls.category lc " +
            "JOIN FETCH lo.medicalRecord mr " +
            "LEFT JOIN FETCH mr.patient pat " +
            "LEFT JOIN FETCH mr.queueTicket qt " +

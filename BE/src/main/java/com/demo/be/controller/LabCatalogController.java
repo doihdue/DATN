@@ -1,9 +1,10 @@
 package com.demo.be.controller;
 
+import com.demo.be.dto.request.LabServiceRequest;
 import com.demo.be.dto.response.ApiResponse;
 import com.demo.be.dto.response.LabServiceResponse;
-import com.demo.be.model.LabService;
 import com.demo.be.service.LabCatalogService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,8 +38,8 @@ public class LabCatalogController {
     // 3. Tạo mới dịch vụ xét nghiệm (Admin)
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<LabServiceResponse>> createLabService(@RequestBody LabService service) {
-        LabServiceResponse res = labCatalogService.createService(service);
+    public ResponseEntity<ApiResponse<LabServiceResponse>> createLabService(@Valid @RequestBody LabServiceRequest request) {
+        LabServiceResponse res = labCatalogService.createService(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(res, "Tạo mới dịch vụ xét nghiệm thành công"));
     }
@@ -48,8 +49,8 @@ public class LabCatalogController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<LabServiceResponse>> updateLabService(
             @PathVariable Long id,
-            @RequestBody LabService service) {
-        LabServiceResponse res = labCatalogService.updateService(id, service);
+            @Valid @RequestBody LabServiceRequest request) {
+        LabServiceResponse res = labCatalogService.updateService(id, request);
         return ResponseEntity.ok(ApiResponse.success(res, "Cập nhật dịch vụ xét nghiệm thành công"));
     }
 

@@ -2,7 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiResponse } from '../models/auth.models';
-import { LabService, LabOrder, SendLabOrdersRequest, UpdateLabOrderResultRequest } from '../models/lab.model';
+import {
+  LabService, LabOrder, SendLabOrdersRequest, UpdateLabOrderResultRequest,
+  LabCategory, LabCategoryRequest, LabServiceRequest
+} from '../models/lab.model';
 import { MedicalRecordResponse } from '../models/medical-record.model';
 
 @Injectable({
@@ -22,18 +25,28 @@ export class ClinicalLabService {
   }
 
   // 1.1 Tạo mới kỹ thuật xét nghiệm (Admin)
-  createLabService(service: Partial<LabService>): Observable<ApiResponse<LabService>> {
+  createLabService(service: LabServiceRequest): Observable<ApiResponse<LabService>> {
     return this.http.post<ApiResponse<LabService>>(`${this.baseUrl}/lab-services`, service);
   }
 
   // 1.2 Cập nhật dịch vụ xét nghiệm (Admin)
-  updateLabService(id: number, service: Partial<LabService>): Observable<ApiResponse<LabService>> {
+  updateLabService(id: number, service: LabServiceRequest): Observable<ApiResponse<LabService>> {
     return this.http.put<ApiResponse<LabService>>(`${this.baseUrl}/lab-services/${id}`, service);
   }
 
   // 1.3 Xóa dịch vụ xét nghiệm (Admin)
   deleteLabService(id: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.baseUrl}/lab-services/${id}`);
+  }
+
+  // 1.4 Danh sách loại xét nghiệm
+  getLabCategories(): Observable<ApiResponse<LabCategory[]>> {
+    return this.http.get<ApiResponse<LabCategory[]>>(`${this.baseUrl}/lab-categories`);
+  }
+
+  // 1.5 Thêm loại xét nghiệm (Admin)
+  createLabCategory(request: LabCategoryRequest): Observable<ApiResponse<LabCategory>> {
+    return this.http.post<ApiResponse<LabCategory>>(`${this.baseUrl}/lab-categories`, request);
   }
 
   // 2. Bác sĩ gửi chỉ định cận lâm sàng (Pha 1)
