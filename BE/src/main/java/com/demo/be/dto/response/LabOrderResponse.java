@@ -1,10 +1,13 @@
 package com.demo.be.dto.response;
 
 import com.demo.be.model.LabOrder;
+import com.demo.be.model.LabResult;
+import com.demo.be.model.StaffShift;
 import com.demo.be.model.QueueTicket;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Getter
 @Setter
@@ -36,6 +39,11 @@ public class LabOrderResponse {
     private Long performerId;
     private String performerName;
 
+    // Ca trực của KTV lúc thực hiện (null + performer có giá trị = làm ngoài ca trực)
+    private Long staffShiftId;
+    private String shiftLabel;
+    private String labRoomNumber;
+
     // Thông tin ca khám / bệnh nhân đi kèm
     private Long queueTicketId;
     private String ticketNumber;
@@ -52,11 +60,8 @@ public class LabOrderResponse {
                 .id(entity.getId())
                 .price(entity.getPrice())
                 .orderTime(entity.getOrderTime())
-                .resultValue(entity.getResultValue())
-                .isAbnormal(entity.getIsAbnormal() != null ? entity.getIsAbnormal() : false)
-                .conclusion(entity.getConclusion())
+                .isAbnormal(false)
                 .status(entity.getStatus())
-                .performedTime(entity.getPerformedTime())
                 .notes(entity.getNotes());
 
         if (entity.getMedicalRecord() != null) {
@@ -101,11 +106,45 @@ public class LabOrderResponse {
             }
         }
 
+        LabResult result = entity.getResult();
+        if (result != null) {
+            builder.resultValue(result.getResultValue())
+                    .isAbnormal(Boolean.TRUE.equals(result.getIsAbnormal()))
+                    .conclusion(result.getConclusion())
+                    .performedTime(result.getResultTime());
+            // Đơn vị / khoảng tham chiếu theo đúng lúc có kết quả
+            if (result.getUnit() != null) builder.unit(result.getUnit());
+            if (result.getReferenceRange() != null) builder.referenceRange(result.getReferenceRange());
+        }
+
         if (entity.getPerformer() != null) {
             builder.performerId(entity.getPerformer().getId());
             builder.performerName(entity.getPerformer().getFullName());
         }
 
+        StaffShift shift = entity.getStaffShift();
+        if (shift != null) {
+            builder.staffShiftId(shift.getId())
+                    .shiftLabel(shiftName(shift.getShiftType()) + " " + shift.getWorkDate().format(DAY) + " ("
+                            + shift.getStartTime().format(HOUR) + "–" + shift.getEndTime().format(HOUR) + ")")
+                    .labRoomNumber(shift.getRoom() != null ? shift.getRoom().getRoomNumber() : null);
+        } else if (entity.getPerformer() != null) {
+            builder.shiftLabel("Ngoài ca trực");
+        }
+
         return builder.build();
+    }
+
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
+
+    private static String shiftName(String shiftType) {
+        if (shiftType == null) return "Ca trực";
+        return switch (shiftType) {
+            case "CA_SÁNG" -> "Ca sáng";
+            case "CA_CHIỀU" -> "Ca chiều";
+            case "CA_TỐI" -> "Ca tối";
+            default -> "Ca trực";
+        };
     }
 }

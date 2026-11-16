@@ -36,6 +36,11 @@ export interface LabOrder {
   performerId?: number;
   performerName?: string;
 
+  // Ca trực của KTV lúc thực hiện ("Ngoài ca trực" nếu KTV làm ngoài ca)
+  staffShiftId?: number;
+  shiftLabel?: string;
+  labRoomNumber?: string;
+
   queueTicketId?: number;
   ticketNumber?: string;
   roomNumber?: string;

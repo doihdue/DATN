@@ -211,10 +211,16 @@ import { toIsoDate } from '../../utils/date.utils';
                         <div class="signed-by text-muted small">
                           {{ order.performerName || 'KTV' }} · {{ formatDateTime(order.performedTime) }}
                         </div>
+                        @if (order.shiftLabel) {
+                          <div class="signed-by text-muted small">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
+                        }
                       } @else if (order.status === 'PROCESSING') {
                         <span class="badge badge-waiting">Đang đo</span>
                         @if (order.performerName) {
                           <div class="signed-by text-muted small">Tiếp nhận: {{ order.performerName }}</div>
+                          @if (order.shiftLabel) {
+                            <div class="signed-by text-muted small">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
+                          }
                         }
                       } @else {
                         <span class="badge badge-waiting">Chưa có kết quả</span>

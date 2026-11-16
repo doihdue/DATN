@@ -49,6 +49,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // 0. Dữ liệu cũ: KTV từng lưu là Employee kèm cột employees.department -> chuyển sang bảng lab_technicians
         migrateLabTechnicians();
+        migrateLabResults();
 
         // 1. Tạo các vai trò (Roles)
         Role adminRole = createRoleIfNotFound("ROLE_ADMIN", "Quản trị viên toàn hệ thống");
@@ -747,6 +748,52 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    // Chạy 1 lần trên DB cũ: kết quả xét nghiệm tách từ lab_orders sang bảng lab_results;
+    // bỏ cột work_schedule_id (lịch bác sĩ khám, chưa từng được dùng cho chỉ định xét nghiệm)
+    private void migrateLabResults() {
+        Integer hasOldColumns = jdbcTemplate.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH('lab_orders', 'result_value') IS NULL THEN 0 ELSE 1 END", Integer.class);
+        if (hasOldColumns != null && hasOldColumns == 1) {
+            int moved = jdbcTemplate.update("INSERT INTO lab_results " +
+                    "(lab_order_id, result_value, unit, reference_range, is_abnormal, conclusion, result_time) " +
+                    "SELECT lo.id, lo.result_value, ls.unit, ls.reference_range, ISNULL(lo.is_abnormal, 0), lo.conclusion, " +
+                    "ISNULL(lo.performed_time, lo.order_time) " +
+                    "FROM lab_orders lo JOIN lab_services ls ON ls.id = lo.lab_service_id " +
+                    "WHERE lo.status = 'COMPLETED' AND lo.result_value IS NOT NULL " +
+                    "AND NOT EXISTS (SELECT 1 FROM lab_results r WHERE r.lab_order_id = lo.id)");
+            for (String column : List.of("result_value", "is_abnormal", "conclusion", "performed_time")) {
+                if (jdbcTemplate.queryForObject("SELECT CASE WHEN COL_LENGTH('lab_orders', ?) IS NULL THEN 0 ELSE 1 END",
+                        Integer.class, column) == 1) {
+                    jdbcTemplate.execute("ALTER TABLE lab_orders DROP COLUMN " + column);
+                }
+            }
+            log.info("-> Đã chuyển {} kết quả xét nghiệm sang bảng lab_results", moved);
+        }
+        Integer hasWorkSchedule = jdbcTemplate.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH('lab_orders', 'work_schedule_id') IS NULL THEN 0 ELSE 1 END", Integer.class);
+        if (hasWorkSchedule != null && hasWorkSchedule == 1) {
+            dropForeignKeys("lab_orders", "work_schedule_id", null);
+            jdbcTemplate.execute("ALTER TABLE lab_orders DROP COLUMN work_schedule_id");
+            log.info("-> Đã bỏ cột lab_orders.work_schedule_id không dùng");
+        }
+    }
+
+    // Kết quả mẫu cho chỉ định đã hoàn thành
+    private LabResult sampleResult(LabService service, String value, boolean abnormal, String conclusion, int minutesAgo) {
+        return LabResult.builder()
+                .resultValue(value).isAbnormal(abnormal).conclusion(conclusion)
+                .unit(service.getUnit()).referenceRange(service.getReferenceRange())
+                .resultTime(LocalDateTime.now().minusMinutes(minutesAgo))
+                .build();
+    }
+
+    // Gắn kết quả vào chỉ định (hai chiều) trước khi lưu
+    private LabOrder withResult(LabOrder order, LabResult result) {
+        result.setLabOrder(order);
+        order.setResult(result);
+        return order;
+    }
+
     // Xoá các khoá ngoại trên một cột (referencedTable = null: mọi bảng đích); tên khoá do Hibernate sinh ngẫu nhiên nên tra theo cột
     private void dropForeignKeys(String table, String column, String referencedTable) {
         List<String> names = jdbcTemplate.queryForList(
@@ -1239,17 +1286,17 @@ public class DataInitializer implements CommandLineRunner {
             List<LabOrder> orders2 = new ArrayList<>();
             if (chol != null) {
                 orders2.add(LabOrder.builder().medicalRecord(record2).labService(chol).price(chol.getPrice())
-                        .status("PROCESSING").resultValue("Đang ly tâm mẫu huyết thanh").notes("Mẫu máu lấy lúc 09:10").build());
+                        .status("PROCESSING").notes("Mẫu máu lấy lúc 09:10, đang ly tâm mẫu huyết thanh").build());
             }
             if (ldl != null) {
                 orders2.add(LabOrder.builder().medicalRecord(record2).labService(ldl).price(ldl.getPrice())
-                        .status("PROCESSING").resultValue("Đang ủ hóa chất đo quang").notes("Chờ đọc kết quả máy tự động").build());
+                        .status("PROCESSING").notes("Đang ủ hóa chất đo quang, chờ đọc kết quả máy tự động").build());
             }
             if (ecg != null) {
-                orders2.add(LabOrder.builder().medicalRecord(record2).labService(ecg).price(ecg.getPrice())
-                        .status("COMPLETED").resultValue("Nhịp xoang đều, 76 ck/phút, ST không chênh")
-                        .conclusion("Chưa thấy hình ảnh thiếu máu cục bộ cơ tim trên điện tâm đồ").performedTime(LocalDateTime.now().minusMinutes(20))
-                        .notes("Đã in bản ghi 12 cần").build());
+                orders2.add(withResult(LabOrder.builder().medicalRecord(record2).labService(ecg).price(ecg.getPrice())
+                        .status("COMPLETED").notes("Đã in bản ghi 12 cần").build(),
+                        sampleResult(ecg, "Nhịp xoang đều, 76 ck/phút, ST không chênh", false,
+                                "Chưa thấy hình ảnh thiếu máu cục bộ cơ tim trên điện tâm đồ", 20)));
             }
             labOrderRepository.saveAll(orders2);
             log.info("-> Đã tạo ca P102-003 (Bùi Thanh Hương) với 2 chỉ định PROCESSING và 1 COMPLETED!");
@@ -1290,19 +1337,19 @@ public class DataInitializer implements CommandLineRunner {
 
             List<LabOrder> orders3 = new ArrayList<>();
             if (glu != null) {
-                orders3.add(LabOrder.builder().medicalRecord(record3).labService(glu).price(glu.getPrice())
-                        .resultValue("9.8").isAbnormal(true).conclusion("Đường huyết lúc đói tăng cao vượt ngưỡng tham chiếu (3.9 - 6.4 mmol/L)")
-                        .status("COMPLETED").performedTime(LocalDateTime.now().minusMinutes(15)).notes("Đã kiểm tra lại 2 lần trên máy sinh hóa").build());
+                orders3.add(withResult(LabOrder.builder().medicalRecord(record3).labService(glu).price(glu.getPrice())
+                        .status("COMPLETED").notes("Đã kiểm tra lại 2 lần trên máy sinh hóa").build(),
+                        sampleResult(glu, "9.8", true, "Đường huyết lúc đói tăng cao vượt ngưỡng tham chiếu (3.9 - 6.4 mmol/L)", 15)));
             }
             if (alt != null) {
-                orders3.add(LabOrder.builder().medicalRecord(record3).labService(alt).price(alt.getPrice())
-                        .resultValue("68.0").isAbnormal(true).conclusion("Hoạt độ men gan ALT tăng gấp 1.7 lần giới hạn trên (< 40 U/L)")
-                        .status("COMPLETED").performedTime(LocalDateTime.now().minusMinutes(15)).notes("Huyết thanh đục nhẹ").build());
+                orders3.add(withResult(LabOrder.builder().medicalRecord(record3).labService(alt).price(alt.getPrice())
+                        .status("COMPLETED").notes("Huyết thanh đục nhẹ").build(),
+                        sampleResult(alt, "68.0", true, "Hoạt độ men gan ALT tăng gấp 1.7 lần giới hạn trên (< 40 U/L)", 15)));
             }
             if (hba1c != null) {
-                orders3.add(LabOrder.builder().medicalRecord(record3).labService(hba1c).price(hba1c.getPrice())
-                        .resultValue("7.8").isAbnormal(true).conclusion("Chỉ số HbA1c tăng cao (> 6.5%), xác định đái tháo đường chưa kiểm soát")
-                        .status("COMPLETED").performedTime(LocalDateTime.now().minusMinutes(15)).notes("Chạy sắc ký lỏng cao áp").build());
+                orders3.add(withResult(LabOrder.builder().medicalRecord(record3).labService(hba1c).price(hba1c.getPrice())
+                        .status("COMPLETED").notes("Chạy sắc ký lỏng cao áp").build(),
+                        sampleResult(hba1c, "7.8", true, "Chỉ số HbA1c tăng cao (> 6.5%), xác định đái tháo đường chưa kiểm soát", 15)));
             }
             labOrderRepository.saveAll(orders3);
             log.info("-> Đã tạo ca P101-006 (Lê Thị Mai) với 3 chỉ định COMPLETED bất thường!");

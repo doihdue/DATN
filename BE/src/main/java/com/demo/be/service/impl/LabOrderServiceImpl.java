@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,6 +41,7 @@ public class LabOrderServiceImpl implements LabOrderService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final AccessGuard accessGuard;
+    private final StaffShiftRepository staffShiftRepository;
 
     @Override
     @Transactional
@@ -133,7 +135,6 @@ public class LabOrderServiceImpl implements LabOrderService {
                     .price(service.getPrice())
                     .status("PENDING")
                     .orderTime(now)
-                    .isAbnormal(false)
                     .build();
             newOrders.add(order);
         }
@@ -201,8 +202,10 @@ public class LabOrderServiceImpl implements LabOrderService {
         if (!"PENDING".equals(order.getStatus())) {
             throw new BadRequestException("Chỉ tiếp nhận được chỉ định đang chờ làm (trạng thái hiện tại: " + order.getStatus() + ")");
         }
+        LabTechnician tech = getDepartmentTech(order);
         order.setStatus("PROCESSING");
-        order.setPerformer(getDepartmentTech(order));
+        order.setPerformer(tech);
+        order.setStaffShift(findCurrentShift(tech));
         LabOrder saved = labOrderRepository.save(order);
         log.info("-> KTV {} tiếp nhận mẫu cho chỉ định LabOrder ID: {}", saved.getPerformer().getFullName(), orderId);
         return LabOrderResponse.fromEntity(saved);
@@ -220,20 +223,31 @@ public class LabOrderServiceImpl implements LabOrderService {
             throw new BadRequestException("Ca khám của bệnh nhân đã kết thúc, không thể sửa kết quả xét nghiệm");
         }
 
-        order.setResultValue(request.getResultValue().trim());
-        order.setConclusion(trimToNull(request.getConclusion()));
-        order.setNotes(trimToNull(request.getNotes()));
-        order.setPerformedTime(LocalDateTime.now());
-        order.setPerformer(getDepartmentTech(order));
-        order.setStatus("COMPLETED");
+        LabTechnician tech = getDepartmentTech(order);
+        // Sửa kết quả đã nhập thì cập nhật bản ghi cũ, không tạo kết quả thứ hai
+        LabResult result = order.getResult() != null ? order.getResult() : LabResult.builder().labOrder(order).build();
+        String value = request.getResultValue().trim();
+        result.setResultValue(value);
+        result.setConclusion(trimToNull(request.getConclusion()));
+        result.setUnit(order.getLabService().getUnit());
+        result.setReferenceRange(order.getLabService().getReferenceRange());
+        result.setResultTime(LocalDateTime.now());
         // KTV không đánh dấu thì tự so với ngưỡng tham chiếu của dịch vụ
-        order.setIsAbnormal(request.getIsAbnormal() != null
+        result.setIsAbnormal(request.getIsAbnormal() != null
                 ? request.getIsAbnormal()
-                : checkAbnormal(order.getResultValue(), order.getLabService()));
+                : checkAbnormal(value, order.getLabService()));
+        order.setResult(result);
+
+        order.setNotes(trimToNull(request.getNotes()));
+        order.setPerformer(tech);
+        if (order.getStaffShift() == null) {
+            order.setStaffShift(findCurrentShift(tech));
+        }
+        order.setStatus("COMPLETED");
 
         LabOrder saved = labOrderRepository.save(order);
         log.info("-> Đã nhập kết quả chỉ định LabOrder ID: {} - Giá trị: {}, Bất thường: {}",
-                saved.getId(), saved.getResultValue(), saved.getIsAbnormal());
+                saved.getId(), result.getResultValue(), result.getIsAbnormal());
 
         refreshTicketStatus(saved.getMedicalRecord());
         return LabOrderResponse.fromEntity(saved);
@@ -305,6 +319,12 @@ public class LabOrderServiceImpl implements LabOrderService {
                     + " không thuộc khoa của bạn", HttpStatus.FORBIDDEN);
         }
         return tech;
+    }
+
+    // Ca trực đang diễn ra của KTV; null nếu KTV làm ngoài ca (vẫn cho làm, ví dụ tăng ca)
+    private StaffShift findCurrentShift(LabTechnician tech) {
+        return staffShiftRepository.findCurrentShifts(tech.getId(), LocalDate.now(), LocalTime.now())
+                .stream().findFirst().orElse(null);
     }
 
     private boolean isAdmin() {

@@ -454,8 +454,11 @@ import { MedicalRecordResponse } from '../../models/medical-record.model';
                             @if (order.performerName) {
                               <div class="res-row text-muted small">
                                 <span>KTV thực hiện: {{ order.performerName }}</span>
+                                @if (order.shiftLabel) {
+                                  <span> - {{ order.shiftLabel }}{{ order.labRoomNumber ? ', ' + order.labRoomNumber : '' }}</span>
+                                }
                                 @if (order.performedTime) {
-                                  <span> - Lúc: {{ order.performedTime | date: 'HH:mm dd/MM/yyyy' }}</span>
+                                  <span> - Có kết quả lúc: {{ order.performedTime | date: 'HH:mm dd/MM/yyyy' }}</span>
                                 }
                               </div>
                             }
