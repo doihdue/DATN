@@ -50,6 +50,7 @@ public class DataInitializer implements CommandLineRunner {
         // 0. Dữ liệu cũ: KTV từng lưu là Employee kèm cột employees.department -> chuyển sang bảng lab_technicians
         migrateLabTechnicians();
         migrateLabResults();
+        dropUnusedSchema();
 
         // 1. Tạo các vai trò (Roles)
         Role adminRole = createRoleIfNotFound("ROLE_ADMIN", "Quản trị viên toàn hệ thống");
@@ -775,6 +776,37 @@ public class DataInitializer implements CommandLineRunner {
             dropForeignKeys("lab_orders", "work_schedule_id", null);
             jdbcTemplate.execute("ALTER TABLE lab_orders DROP COLUMN work_schedule_id");
             log.info("-> Đã bỏ cột lab_orders.work_schedule_id không dùng");
+        }
+    }
+
+    // Bỏ bảng / cột không còn entity tương ứng: clinics, permissions, role_permissions (bảng trống),
+    // examination_rooms.clinic_id, ai_chat_sessions.ended_at (chưa từng được ghi)
+    private void dropUnusedSchema() {
+        dropColumnIfExists("examination_rooms", "clinic_id");
+        dropColumnIfExists("ai_chat_sessions", "ended_at");
+        for (String table : List.of("role_permissions", "permissions", "clinics")) {
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT CASE WHEN OBJECT_ID(?, 'U') IS NULL THEN 0 ELSE 1 END", Integer.class, table);
+            if (exists == null || exists == 0) {
+                continue;
+            }
+            Integer rows = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+            if (rows != null && rows == 0) {
+                jdbcTemplate.execute("DROP TABLE " + table);
+                log.info("-> Đã bỏ bảng không dùng: {}", table);
+            } else {
+                log.warn("-> Giữ bảng {} vì vẫn còn {} dòng dữ liệu", table, rows);
+            }
+        }
+    }
+
+    private void dropColumnIfExists(String table, String column) {
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT CASE WHEN COL_LENGTH(?, ?) IS NULL THEN 0 ELSE 1 END", Integer.class, table, column);
+        if (exists != null && exists == 1) {
+            dropForeignKeys(table, column, null);
+            jdbcTemplate.execute("ALTER TABLE " + table + " DROP COLUMN " + column);
+            log.info("-> Đã bỏ cột không dùng: {}.{}", table, column);
         }
     }
 

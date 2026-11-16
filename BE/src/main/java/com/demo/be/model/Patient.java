@@ -36,17 +36,6 @@ public class Patient extends Person {
     @OneToMany(mappedBy = "patient", cascade = CascadeType.ALL)
     private List<AIChatSession> chatSessions = new ArrayList<>();
 
-    @Builder.Default
-    @OneToMany(mappedBy = "patient")
-    private List<Appointment> appointments = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "patient")
-    private List<QueueTicket> queueTickets = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "patient")
-    private List<MedicalRecord> medicalRecords = new ArrayList<>();
 
     public String getPhoneNumber() {
         if (getUser() != null && getUser().getPhoneNumber() != null) {

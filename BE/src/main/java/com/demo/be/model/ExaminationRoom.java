@@ -3,8 +3,6 @@ package com.demo.be.model;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @Setter
@@ -32,11 +30,4 @@ public class ExaminationRoom {
     @Column(name = "room_type", length = 30)
     private String roomType;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "clinic_id")
-    private Clinic clinic;
-
-    @Builder.Default
-    @OneToMany(mappedBy = "examinationRoom")
-    private List<WorkSchedule> workSchedules = new ArrayList<>();
 }

@@ -26,10 +26,6 @@ public class Role {
     private String description;
 
     @Builder.Default
-    @OneToMany(mappedBy = "role", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RolePermission> rolePermissions = new ArrayList<>();
-
-    @Builder.Default
     @OneToMany(mappedBy = "role")
     private List<UserRole> userRoles = new ArrayList<>();
 }
