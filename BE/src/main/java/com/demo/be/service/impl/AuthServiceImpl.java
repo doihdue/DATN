@@ -129,6 +129,9 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request) {
         String tokenStr = request.getRefreshToken();
+        if (!jwtService.isRefreshToken(tokenStr)) {
+            throw new BadRequestException("Refresh token không hợp lệ hoặc đã hết hạn, vui lòng đăng nhập lại");
+        }
         RefreshToken refreshToken = refreshTokenRepository.findByToken(tokenStr)
                 .orElseThrow(() -> new BadRequestException("Refresh token không hợp lệ hoặc không tồn tại"));
 
@@ -142,6 +145,9 @@ public class AuthServiceImpl implements AuthService {
 
         User user = refreshToken.getUser();
         UserPrincipal userPrincipal = UserPrincipal.create(user);
+        if (!userPrincipal.isEnabled() || !userPrincipal.isAccountNonLocked()) {
+            throw new BadRequestException("Tài khoản đã bị khoá hoặc ngừng hoạt động");
+        }
 
         String newAccessToken = jwtService.generateToken(userPrincipal);
         String newRefreshToken = jwtService.generateRefreshToken(userPrincipal);
@@ -324,6 +330,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        // Mọi token cấp trước thời điểm này (kể cả phiên hiện tại) không còn dùng được
+        user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
 
         refreshTokenRepository.deleteByUser(user);
