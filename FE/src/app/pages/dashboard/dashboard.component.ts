@@ -168,34 +168,45 @@ import { DashboardOverview, DailyStat, RoomStat } from '../../models/dashboard.m
               <div class="chart-legend">
                 <span class="legend-item"><span class="legend-box bar-color"></span> Số ca đã khám hoàn tất</span>
                 <span class="legend-item"><span class="legend-box wait-color"></span> Thời gian chờ TB (phút)</span>
+                @if (selectedPeriod() === 'MONTH') {
+                  <span class="legend-scroll-hint text-muted ms-auto">
+                    <i class="bi bi-arrows-expand-vertical"></i> Cuộn ngang để xem tất cả 30 ngày
+                  </span>
+                }
               </div>
 
               <!-- CSS / SVG Bar Chart Representation -->
-              <div class="bar-chart-container">
-                @for (d of data()?.dailyStats; track d.date) {
-                  <div class="bar-column">
-                    <div class="bar-metric-top">
-                      <span class="wait-pill" title="Chờ TB: {{ d.avgWaitingMinutes }} phút">
-                        {{ d.avgWaitingMinutes }}p
-                      </span>
-                    </div>
+              <div class="chart-scroll-wrapper" [class.period-month]="selectedPeriod() === 'MONTH'">
+                <div class="bar-chart-container" [class.container-month]="selectedPeriod() === 'MONTH'">
+                  @for (d of data()?.dailyStats; track d.date) {
+                    <div class="bar-column" [class.column-month]="selectedPeriod() === 'MONTH'">
+                      <div class="bar-metric-top">
+                        @if (d.avgWaitingMinutes > 0) {
+                          <span class="wait-pill" title="Chờ TB: {{ d.avgWaitingMinutes }} phút">
+                            {{ d.avgWaitingMinutes }}p
+                          </span>
+                        }
+                      </div>
 
-                    <div class="bar-track">
-                      <div
-                        class="bar-fill"
-                        [style.height.%]="getBarHeightPercent(d.completedExaminations)"
-                        [title]="d.completedExaminations + ' ca hoàn tất'"
-                      >
-                        <span class="bar-val-inside">{{ d.completedExaminations }}</span>
+                      <div class="bar-track">
+                        @if (d.completedExaminations > 0) {
+                          <div
+                            class="bar-fill"
+                            [style.height.%]="getBarHeightPercent(d.completedExaminations)"
+                            [title]="d.completedExaminations + ' ca hoàn tất'"
+                          >
+                            <span class="bar-val-inside">{{ d.completedExaminations }}</span>
+                          </div>
+                        }
+                      </div>
+
+                      <div class="bar-label-group">
+                        <span class="bar-dow">{{ formatDayOfWeek(d.dayOfWeek) }}</span>
+                        <span class="bar-date">{{ d.date | date:'dd/MM' }}</span>
                       </div>
                     </div>
-
-                    <div class="bar-label-group">
-                      <span class="bar-dow">{{ d.dayOfWeek }}</span>
-                      <span class="bar-date">{{ d.date | date:'dd/MM' }}</span>
-                    </div>
-                  </div>
-                }
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -689,6 +700,39 @@ import { DashboardOverview, DailyStat, RoomStat } from '../../models/dashboard.m
     .bar-color { background-color: var(--primary-600); }
     .wait-color { background-color: #f59e0b; }
 
+    .legend-scroll-hint {
+      font-size: 0.775rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--primary-600);
+      background: var(--primary-50);
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--primary-200);
+    }
+
+    .chart-scroll-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 8px;
+
+      /* Thanh cuộn ngang thanh mảnh */
+      &::-webkit-scrollbar {
+        height: 6px;
+      }
+      &::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+        &:hover { background: #94a3b8; }
+      }
+    }
+
     .bar-chart-container {
       display: flex;
       align-items: flex-end;
@@ -697,6 +741,12 @@ import { DashboardOverview, DailyStat, RoomStat } from '../../models/dashboard.m
       padding-top: 1.5rem;
       padding-bottom: 0.5rem;
       border-bottom: 1px solid var(--border-color);
+      width: 100%;
+
+      &.container-month {
+        min-width: 1300px;
+        gap: 0.5rem;
+      }
     }
 
     .bar-column {
@@ -705,6 +755,11 @@ import { DashboardOverview, DailyStat, RoomStat } from '../../models/dashboard.m
       flex-direction: column;
       align-items: center;
       height: 100%;
+      min-width: 0;
+
+      &.column-month {
+        min-width: 36px;
+      }
     }
 
     .bar-metric-top {
@@ -1011,6 +1066,30 @@ export class DashboardComponent implements OnInit {
   changePeriod(p: 'TODAY' | 'WEEK' | 'MONTH'): void {
     this.selectedPeriod.set(p);
     this.loadData();
+    if (p === 'MONTH') {
+      setTimeout(() => {
+        const el = document.querySelector('.chart-scroll-wrapper');
+        if (el) {
+          el.scrollLeft = el.scrollWidth;
+        }
+      }, 300);
+    }
+  }
+
+  formatDayOfWeek(dow: string | undefined): string {
+    if (!dow) return '';
+    if (this.selectedPeriod() !== 'MONTH') {
+      return dow;
+    }
+    const lower = dow.toLowerCase().trim();
+    if (lower.includes('chủ') || lower.includes('cn')) return 'CN';
+    if (lower.includes('2')) return 'T2';
+    if (lower.includes('3')) return 'T3';
+    if (lower.includes('4')) return 'T4';
+    if (lower.includes('5')) return 'T5';
+    if (lower.includes('6')) return 'T6';
+    if (lower.includes('7')) return 'T7';
+    return dow.substring(0, 3);
   }
 
   loadData(): void {
@@ -1080,10 +1159,11 @@ export class DashboardComponent implements OnInit {
   }
 
   getBarHeightPercent(count: number): number {
+    if (count <= 0) return 0;
     const list = this.data()?.dailyStats ?? [];
-    if (list.length === 0) return 10;
+    if (list.length === 0) return 0;
     const max = Math.max(...list.map(d => d.completedExaminations), 1);
     const pct = Math.round((count / max) * 100);
-    return Math.max(pct, 12); // minimum height so it's visible
+    return Math.max(pct, 14); // Chiều cao tối thiểu khi có ca khám
   }
 }
