@@ -196,6 +196,10 @@ import { SidebarService } from '../../services/sidebar.service';
           </a>
         } @else {
           <!-- 4. STAFF / CHUNG MENU (Lễ tân, Điều phối hoặc Fallback an toàn) -->
+          <a routerLink="/staff/appointments" routerLinkActive="active" class="nav-link-item" title="Quản lý & xác nhận lịch hẹn">
+            <div class="nav-icon"><i class="bi bi-calendar-check-fill"></i></div>
+            <span class="nav-label">LỊCH HẸN</span>
+          </a>
           <a routerLink="/staff/check-in" routerLinkActive="active" class="nav-link-item" title="Tiếp đón & cấp số">
             <div class="nav-icon"><i class="bi bi-person-check-fill"></i></div>
             <span class="nav-label">TIẾP ĐÓN &amp; CẤP SỐ</span>
