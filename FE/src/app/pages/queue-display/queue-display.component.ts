@@ -1,24 +1,33 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { QueueService } from '../../services/queue.service';
+import { AuthService } from '../../services/auth.service';
 import { ClinicDisplayBoard } from '../../models/queue.model';
 
 @Component({
   selector: 'app-queue-display',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   template: `
     <div class="tv-display-container">
-      <!-- TV Header -->
       <header class="tv-header">
         <div class="tv-brand">
-          <div class="brand-icon">
-            <i class="bi bi-hospital-fill"></i>
-          </div>
-          <div class="brand-text">
-            <h1 class="brand-title">MEDQUEUE CLINIC</h1>
-            <span class="brand-sub">BẢNG GỌI SỐ THỨ TỰ KHÁM BỆNH ĐIỆN TỬ</span>
-          </div>
+          <h1 class="brand-title">MedQueue</h1>
+          <span class="brand-sub">Bảng gọi số khám bệnh</span>
+        </div>
+
+        <div class="tv-header-actions">
+          <button type="button" class="tv-btn-action" (click)="toggleFullscreen()" title="Bật/Tắt chế độ Toàn màn hình TV (F11)">
+            <i class="bi" [ngClass]="isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'"></i>
+            <span>{{ isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình' }}</span>
+          </button>
+          @if (authService.isAuthenticated()) {
+            <a [routerLink]="getReturnUrl()" class="tv-btn-action tv-btn-back" title="Quay lại bàn làm việc">
+              <i class="bi bi-arrow-left"></i>
+              <span>Quay lại</span>
+            </a>
+          }
         </div>
 
         <div class="tv-clock">
@@ -27,64 +36,50 @@ import { ClinicDisplayBoard } from '../../models/queue.model';
         </div>
       </header>
 
-      <!-- TV Main Room Cards Grid -->
       <main class="tv-content">
         @if (loading() && boards().length === 0) {
           <div class="tv-loading">
             <div class="tv-spinner"></div>
-            <p>Đang kết nối hệ thống điều phối hàng đợi...</p>
+            <p>Đang tải dữ liệu hàng đợi...</p>
           </div>
         } @else {
           <div class="room-tv-grid">
             @for (room of boards(); track room.roomId) {
-              <div class="room-tv-card">
-                <!-- Card Header -->
+              <section class="room-tv-card">
                 <div class="card-room-header">
                   <div class="room-num-badge">{{ room.roomNumber }}</div>
                   <div class="room-meta">
                     <h2 class="room-title">{{ room.roomName }}</h2>
-                    <span class="room-doc"><i class="bi bi-person-fill"></i> {{ room.doctorName }} ({{ room.specialtyName }})</span>
+                    <span class="room-doc">{{ room.doctorName }}{{ room.specialtyName ? ' · ' + room.specialtyName : '' }}</span>
                   </div>
-                  <div class="room-waiting-pill">
-                    Đang chờ: <strong>{{ room.waitingCount }}</strong>
+                  <div class="room-waiting">
+                    <span class="room-waiting-label">Đang chờ</span>
+                    <strong>{{ room.waitingCount }}</strong>
                   </div>
                 </div>
 
-                <!-- Card Body: Current Call & Current Exam -->
                 <div class="card-room-body">
-                  <!-- Section: Đang Gọi (CALLED) -->
                   <div class="status-box box-called">
-                    <div class="box-label">
-                      <span class="pulse-indicator"></span> MỜI VÀO PHÒNG KHÁM
-                    </div>
-                    <div class="box-ticket-number neon-yellow">
-                      {{ room.currentCalledTicketNumber }}
-                    </div>
-                    <div class="box-patient-name">
-                      {{ room.currentCalledPatientName || '---' }}
-                    </div>
+                    <div class="box-label">Mời vào phòng</div>
+                    <!-- Phần tử được tạo lại khi số gọi thay đổi để chạy hiệu ứng nhấn mạnh một lần -->
+                    @for (calledNo of [room.currentCalledTicketNumber]; track calledNo) {
+                      <div class="box-ticket-number called-number">{{ calledNo }}</div>
+                    }
+                    <div class="box-patient-name">{{ room.currentCalledPatientName || '—' }}</div>
                   </div>
 
-                  <!-- Section: Đang Khám (IN_PROGRESS) -->
                   <div class="status-box box-examining">
-                    <div class="box-label">
-                      <i class="bi bi-heart-pulse-fill"></i> ĐANG KHÁM
-                    </div>
-                    <div class="box-ticket-number neon-green">
-                      {{ room.currentExaminingTicketNumber }}
-                    </div>
-                    <div class="box-patient-name">
-                      {{ room.currentExaminingPatientName || '---' }}
-                    </div>
+                    <div class="box-label">Đang khám</div>
+                    <div class="box-ticket-number examining-number">{{ room.currentExaminingTicketNumber }}</div>
+                    <div class="box-patient-name">{{ room.currentExaminingPatientName || '—' }}</div>
                   </div>
                 </div>
 
-                <!-- Card Footer: Upcoming Tickets -->
                 <div class="card-room-footer">
-                  <span class="footer-label">Chuẩn bị:</span>
+                  <span class="footer-label">Số tiếp theo</span>
                   <div class="upcoming-tags">
                     @if (room.upcomingTicketNumbers.length === 0) {
-                      <span class="no-upcoming">Không có số chờ tiếp theo</span>
+                      <span class="no-upcoming">Không có</span>
                     } @else {
                       @for (num of room.upcomingTicketNumbers; track num) {
                         <span class="upcoming-tag">{{ num }}</span>
@@ -92,392 +87,340 @@ import { ClinicDisplayBoard } from '../../models/queue.model';
                     }
                   </div>
                 </div>
-              </div>
+              </section>
             }
           </div>
         }
       </main>
 
-      <!-- TV Marquee Ticker -->
       <footer class="tv-footer-ticker">
-        <div class="ticker-label"><i class="bi bi-megaphone-fill"></i> THÔNG BÁO:</div>
-        <div class="ticker-scroll">
-          <span class="ticker-text">
-            Quý bệnh nhân vui lòng theo dõi số thứ tự trên màn hình và chuẩn bị sẵn CCCD / thẻ BHYT khi được gọi tên vào phòng khám. 
-            Để tra cứu thời gian chờ trên điện thoại, vui lòng quét mã QR tại quầy tiếp đón. Trân trọng cảm ơn!
-          </span>
-        </div>
+        <span class="ticker-label">Lưu ý</span>
+        <span class="ticker-text">
+          Theo dõi số thứ tự trên màn hình và chuẩn bị CCCD / thẻ BHYT khi được gọi.
+          Tra cứu thời gian chờ bằng mã QR tại quầy tiếp đón.
+        </span>
       </footer>
     </div>
   `,
   styles: [`
     :host {
+      --tv-bg: #111418;
+      --tv-surface: #191d23;
+      --tv-surface-2: #20252c;
+      --tv-border: #2b313a;
+      --tv-text: #f2f4f7;
+      --tv-muted: #9aa3af;
+      --tv-called: #f5c451;
+      --tv-called-bg: rgba(245, 196, 81, 0.08);
+
       display: block;
-      width: 100vw;
+      width: 100%;
       min-height: 100vh;
-      background: #090d16;
-      color: #f8fafc;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--tv-bg);
+      color: var(--tv-text);
+      font-family: var(--font-family);
       overflow-x: hidden;
+      box-sizing: border-box;
     }
 
     .tv-display-container {
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      background: radial-gradient(circle at top right, #131c31 0%, #090d16 100%);
-      padding: 1.5rem 2rem;
+      padding: 20px 24px;
       box-sizing: border-box;
+      width: 100%;
     }
 
-    /* Header */
     .tv-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 1.25rem;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-      margin-bottom: 1.5rem;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--tv-border);
+      margin-bottom: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
     }
 
-    .tv-brand {
+    .tv-header-actions {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 10px;
     }
 
-    .brand-icon {
-      width: 60px;
-      height: 60px;
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      color: #ffffff;
-      border-radius: 14px;
-      display: flex;
+    .tv-btn-action {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      box-shadow: 0 0 25px rgba(2, 132, 199, 0.5);
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md, 8px);
+      background: var(--tv-surface-2);
+      border: 1px solid var(--tv-border);
+      color: var(--tv-text);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
     }
 
-    .brand-title {
-      font-size: 1.75rem;
-      font-weight: 900;
-      letter-spacing: 0.05em;
-      margin: 0;
-      color: #38bdf8;
+    .tv-btn-action:hover {
+      background: var(--tv-border);
+      color: var(--tv-called);
+      border-color: var(--tv-called);
     }
 
-    .brand-sub {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #94a3b8;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+    .tv-btn-back:hover {
+      color: #60a5fa;
+      border-color: #3b82f6;
     }
 
-    .tv-clock {
-      text-align: right;
-    }
+    .tv-brand { display: flex; flex-direction: column; gap: 2px; }
+    .brand-title { font-size: 26px; font-weight: 600; margin: 0; color: var(--tv-text); }
+    .brand-sub { font-size: 16px; color: var(--tv-muted); }
 
+    .tv-clock { text-align: right; }
     .clock-time {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 2.25rem;
-      font-weight: 900;
-      color: #38bdf8;
-      line-height: 1;
-      letter-spacing: 0.05em;
-      text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
-    }
-
-    .clock-date {
-      font-size: 0.9rem;
-      color: #94a3b8;
+      font-size: 40px;
       font-weight: 600;
-      margin-top: 0.25rem;
+      line-height: 1;
+      color: var(--tv-text);
+      font-variant-numeric: tabular-nums;
     }
+    .clock-date { font-size: 15px; color: var(--tv-muted); margin-top: 6px; }
 
-    /* Main Grid */
-    .tv-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
+    .tv-content { flex: 1; width: 100%; }
 
     .room-tv-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-      gap: 1.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 18px;
+      width: 100%;
+    }
+
+    @media (min-width: 1160px) and (max-width: 1550px) {
+      .room-tv-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
     }
 
     .room-tv-card {
-      background: rgba(18, 26, 47, 0.75);
-      border: 1px solid rgba(56, 189, 248, 0.2);
-      border-radius: 20px;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(10px);
-      transition: all 0.3s;
-    }
-
-    .room-tv-card:hover {
-      border-color: rgba(56, 189, 248, 0.5);
-      box-shadow: 0 20px 45px -5px rgba(2, 132, 199, 0.3);
+      background: var(--tv-surface);
+      border: 1px solid var(--tv-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
     }
 
     .card-room-header {
-      background: rgba(30, 41, 59, 0.8);
-      padding: 1rem 1.5rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--tv-border);
     }
 
     .room-num-badge {
-      font-family: monospace;
-      font-size: 1.6rem;
-      font-weight: 900;
-      background: #0284c7;
-      color: #ffffff;
-      padding: 0.3rem 0.75rem;
-      border-radius: 8px;
-      letter-spacing: 0.05em;
-    }
-
-    .room-meta {
-      flex: 1;
-    }
-
-    .room-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      margin: 0;
-      color: #f1f5f9;
-    }
-
-    .room-doc {
-      font-size: 0.85rem;
-      color: #38bdf8;
-      display: block;
-      margin-top: 0.15rem;
-    }
-
-    .room-waiting-pill {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 0.35rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      color: #cbd5e1;
-    }
-
-    .room-waiting-pill strong {
-      color: #f59e0b;
-    }
-
-    /* Card Body */
-    .card-room-body {
-      padding: 1.5rem;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.25rem;
-      flex: 1;
-    }
-
-    .status-box {
-      border-radius: 14px;
-      padding: 1.25rem 1rem;
+      flex-shrink: 0;
+      min-width: 72px;
+      padding: 6px 10px;
       text-align: center;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      border: 1px solid transparent;
-    }
-
-    .box-called {
-      background: rgba(245, 158, 11, 0.08);
-      border-color: rgba(245, 158, 11, 0.3);
-    }
-
-    .box-examining {
-      background: rgba(16, 185, 129, 0.08);
-      border-color: rgba(16, 185, 129, 0.3);
-    }
-
-    .box-label {
-      font-size: 0.8rem;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-    }
-
-    .box-called .box-label { color: #f59e0b; }
-    .box-examining .box-label { color: #10b981; }
-
-    .pulse-indicator {
-      width: 10px;
-      height: 10px;
-      background: #f59e0b;
-      border-radius: 50%;
-      box-shadow: 0 0 10px #f59e0b;
-      animation: pulseAlert 1.2s infinite;
-    }
-
-    @keyframes pulseAlert {
-      0% { transform: scale(0.9); opacity: 0.7; }
-      50% { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(0.9); opacity: 0.7; }
-    }
-
-    .box-ticket-number {
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, monospace;
-      font-size: 3.25rem;
-      font-weight: 900;
-      line-height: 1;
-      letter-spacing: 0.04em;
-      margin-bottom: 0.4rem;
+      font-size: 22px;
+      font-weight: 600;
       font-variant-numeric: tabular-nums;
+      color: var(--tv-text);
+      background: var(--tv-surface-2);
+      border: 1px solid var(--tv-border);
+      border-radius: var(--radius-md);
     }
 
-    .neon-yellow {
-      color: #fbbf24;
+    .room-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .room-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--tv-text);
+      line-height: 1.3;
     }
-
-    .neon-green {
-      color: #34d399;
-    }
-
-    .box-patient-name {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #e2e8f0;
+    .room-doc {
+      font-size: 14px;
+      color: var(--tv-muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    /* Footer Upcoming */
-    .card-room-footer {
-      background: rgba(15, 23, 42, 0.6);
-      padding: 0.85rem 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-    }
+    .room-waiting { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+    .room-waiting-label { font-size: 13px; color: var(--tv-muted); }
+    .room-waiting strong { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
 
-    .footer-label {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #94a3b8;
-      white-space: nowrap;
-    }
-
-    .upcoming-tags {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .upcoming-tag {
-      font-family: monospace;
-      font-size: 0.9rem;
-      font-weight: 800;
-      background: rgba(56, 189, 248, 0.15);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      padding: 0.2rem 0.5rem;
-      border-radius: 6px;
-    }
-
-    .no-upcoming {
-      font-size: 0.8rem;
-      color: #64748b;
-      font-style: italic;
-    }
-
-    /* Marquee */
-    .tv-footer-ticker {
-      margin-top: 1.5rem;
-      background: rgba(2, 132, 199, 0.15);
-      border: 1px solid rgba(2, 132, 199, 0.3);
-      border-radius: 12px;
-      padding: 0.65rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      overflow: hidden;
-    }
-
-    .ticker-label {
-      font-size: 0.85rem;
-      font-weight: 900;
-      color: #38bdf8;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .ticker-scroll {
+    .card-room-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       flex: 1;
-      overflow: hidden;
-      white-space: nowrap;
     }
 
-    .ticker-text {
-      display: inline-block;
-      padding-left: 100%;
-      animation: marquee 25s linear infinite;
-      font-size: 0.95rem;
+    .status-box {
+      padding: 18px 16px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .box-called { background: var(--tv-called-bg); border-right: 1px solid var(--tv-border); }
+
+    .box-label { font-size: 15px; font-weight: 500; color: var(--tv-muted); }
+    .box-called .box-label { color: var(--tv-called); }
+
+    .box-ticket-number {
       font-weight: 600;
-      color: #e2e8f0;
+      line-height: 1.05;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
+      border-radius: var(--radius-md);
     }
 
-    @keyframes marquee {
-      0% { transform: translate(0, 0); }
-      100% { transform: translate(-100%, 0); }
+    .called-number {
+      font-size: 64px;
+      color: var(--tv-called);
+      animation: callHighlight 1s ease-out 3;
     }
+
+    .examining-number {
+      font-size: 44px;
+      color: var(--tv-text);
+    }
+
+    /* Nhấn mạnh tiết chế khi có số mới được gọi: nền sáng lên rồi tắt dần, lặp 3 lần */
+    @keyframes callHighlight {
+      0% { background-color: rgba(245, 196, 81, 0.28); }
+      100% { background-color: transparent; }
+    }
+
+    .box-patient-name {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--tv-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-room-footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      border-top: 1px solid var(--tv-border);
+      background: var(--tv-surface-2);
+    }
+
+    .footer-label { font-size: 14px; color: var(--tv-muted); white-space: nowrap; }
+    .upcoming-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .upcoming-tag {
+      font-size: 16px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--tv-text);
+      background: var(--tv-surface);
+      border: 1px solid var(--tv-border);
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+    }
+    .no-upcoming { font-size: 14px; color: var(--tv-muted); }
+
+    .tv-footer-ticker {
+      margin-top: 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding: 12px 18px;
+      background: var(--tv-surface);
+      border: 1px solid var(--tv-border);
+      border-radius: var(--radius-lg);
+    }
+    .ticker-label { font-size: 15px; font-weight: 600; color: var(--tv-text); white-space: nowrap; }
+    .ticker-text { font-size: 16px; color: var(--tv-muted); }
 
     .tv-loading {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      flex: 1;
       min-height: 400px;
+      color: var(--tv-muted);
+      font-size: 18px;
     }
 
     .tv-spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid rgba(56, 189, 248, 0.2);
-      border-top-color: #38bdf8;
+      width: 44px;
+      height: 44px;
+      border: 4px solid var(--tv-border);
+      border-top-color: var(--tv-text);
       border-radius: 50%;
       animation: spin 1s infinite linear;
-      margin-bottom: 1rem;
+      margin-bottom: 16px;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .called-number { animation: none; }
+    }
+
+    @media (max-width: 600px) {
+      .tv-display-container { padding: 16px; }
+      .room-tv-grid { grid-template-columns: 1fr; }
+      .called-number { font-size: 48px; }
+      .examining-number { font-size: 34px; }
     }
   `]
 })
 export class QueueDisplayComponent implements OnInit, OnDestroy {
   private readonly queueService = inject(QueueService);
+  readonly authService = inject(AuthService);
 
   readonly boards = signal<ClinicDisplayBoard[]>([]);
   readonly loading = signal(true);
   readonly currentTime = signal('');
   readonly currentDate = signal('');
 
+  isFullscreen = false;
+
   private clockTimer: any = null;
   private pollingTimer: any = null;
+
+  @HostListener('document:fullscreenchange')
+  onFullscreenChange(): void {
+    this.isFullscreen = !!document.fullscreenElement;
+  }
+
+  toggleFullscreen(): void {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        this.isFullscreen = true;
+      }).catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          this.isFullscreen = false;
+        }).catch(() => {});
+      }
+    }
+  }
+
+  getReturnUrl(): string {
+    if (this.authService.isAdmin()) return '/dashboard';
+    if (this.authService.isDoctor()) return '/doctor/examination';
+    if (this.authService.isStaff()) return '/staff/check-in';
+    if (this.authService.isLabTech()) return '/lab';
+    return '/';
+  }
 
   ngOnInit(): void {
     this.updateClock();

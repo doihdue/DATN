@@ -113,6 +113,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
   hasRevisit = false;
   revisitDate = '';
   revisitNotes = '';
+  minRevisitDate = toIsoDate(new Date());
 
   // UC: Kê đơn thuốc (Extend)
   hasPrescription = true;
@@ -495,7 +496,7 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     this.clearFieldError('prescribedItems');
 
     if (hasAllergy) {
-      this.showAlert(`⚠️ CẢNH BÁO: Bệnh nhân có tiền sử dị ứng liên quan tới thuốc "${med.name}"!`, 'danger');
+      this.showAlert(`Cảnh báo: bệnh nhân có tiền sử dị ứng liên quan tới thuốc "${med.name}".`, 'danger');
     }
   }
 
@@ -510,6 +511,20 @@ export class DoctorExaminationComponent implements OnInit, OnDestroy {
     this.clearFieldError('finalDiagnosis');
     if (!this.notes) {
       this.notes = diag.notes;
+    }
+  }
+
+  // Thêm nhanh mẫu lời dặn khám bệnh
+  addQuickAdvice(text: string): void {
+    if (!this.notes || this.notes.trim() === '') {
+      this.notes = text;
+    } else {
+      const trimmed = this.notes.trim();
+      if (!trimmed.endsWith('.') && !trimmed.endsWith(';') && !trimmed.endsWith('\n')) {
+        this.notes = trimmed + '. ' + text;
+      } else {
+        this.notes = trimmed + ' ' + text;
+      }
     }
   }
 

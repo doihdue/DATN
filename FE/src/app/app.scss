@@ -4,24 +4,31 @@
   flex-direction: column;
 }
 
-/* Sidebar Layout cho Nhân viên y tế */
+.tv-display-viewport {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: #111418;
+}
+
+/* Bố cục màn nội bộ */
 .app-sidebar-layout {
   min-height: 100vh;
   display: flex;
-  background: #f8fafc;
-  position: relative;
+  background: var(--bg-main);
 }
 
 .layout-body-wrapper {
   flex: 1;
-  margin-left: 68px; /* Cố định 68px, khi rê chuột (hover) sidebar sẽ mở dạng overlay nổi không đẩy body hay topbar */
+  margin-left: 68px; /* Menu thu gọn 68px; rê chuột thì mở dạng nổi, không đẩy nội dung */
   min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Chỉ đẩy body và menu ngang khi người dùng bấm nút ghim cố định Sidebar (<->) */
+  /* Chỉ đẩy nội dung khi người dùng ghim menu */
   &.sidebar-pinned {
     margin-left: 250px;
   }
@@ -57,41 +64,25 @@ app-navbar {
 .app-footer {
   background: #ffffff;
   border-top: 1px solid var(--border-color);
-  padding: 1.25rem 1.5rem;
+  padding: 16px 24px;
   margin-top: auto;
 }
 
 .footer-container {
-  max-width: 1300px;
+  max-width: 1200px;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
-  gap: 1rem;
+  font-size: 13px;
 }
 
 .footer-brand {
-  font-size: 1.1rem;
-  color: var(--primary-900);
-}
-
-.text-primary {
-  color: var(--primary-600);
+  font-weight: 600;
+  color: var(--text-main);
 }
 
 .footer-copy {
-  font-size: 0.825rem;
   color: var(--text-muted);
-  margin-top: 0.2rem;
-}
-
-.student-info {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--primary-800);
-  background: var(--primary-50);
-  border: 1px solid var(--primary-200);
-  padding: 0.4rem 0.85rem;
-  border-radius: var(--radius-full);
 }

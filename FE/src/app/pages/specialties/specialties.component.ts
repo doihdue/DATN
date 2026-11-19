@@ -9,44 +9,16 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="specialties-page">
-      <!-- Header Banner -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <i class="bi bi-diagram-3-fill"></i> Tầng Danh Mục Hệ Thống
-          </div>
-          <h1 class="page-title">Quản Lý Chuyên Khoa</h1>
-          <p class="page-subtitle">
-            Cấu hình danh mục chuyên khoa phòng khám, định tuyến phân bổ bác sĩ và phòng điều trị
-          </p>
+        <div>
+          <h1 class="page-title">Chuyên khoa</h1>
+          <p class="page-subtitle">{{ specialties().length }} chuyên khoa, {{ totalDoctors() }} bác sĩ</p>
         </div>
-        <div class="header-actions">
+        <div class="page-actions">
           <button class="btn btn-primary" (click)="openAddModal()">
-            <i class="bi bi-plus-circle-fill"></i> Thêm Chuyên Khoa Mới
+            <i class="bi bi-plus-lg"></i> Thêm chuyên khoa
           </button>
-        </div>
-      </div>
-
-      <!-- Filter & Search Bar -->
-      <div class="search-filter-card">
-        <div class="search-box">
-          <i class="bi bi-search"></i>
-          <input
-            type="text"
-            [(ngModel)]="searchKeyword"
-            (ngModelChange)="filterSpecialties()"
-            placeholder="Tìm kiếm theo tên chuyên khoa hoặc mô tả..."
-            class="search-input"
-          />
-        </div>
-        <div class="stats-summary">
-          <span class="stat-pill">
-            Tổng cộng: <strong>{{ specialties().length }}</strong> chuyên khoa
-          </span>
-          <span class="stat-pill stat-pill-highlight">
-            Đội ngũ: <strong>{{ totalDoctors() }}</strong> bác sĩ
-          </span>
         </div>
       </div>
 
@@ -68,71 +40,71 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
         </div>
       }
 
-      <!-- Table List of Specialties & Pagination -->
-      <div class="table-card">
+      <div class="panel">
+        <div class="toolbar">
+          <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              [(ngModel)]="searchKeyword"
+              (ngModelChange)="filterSpecialties()"
+              placeholder="Tìm theo tên hoặc mô tả"
+              class="search-input"
+            />
+          </div>
+        </div>
+
         @if (loading()) {
           <div class="loading-state">
             <div class="spinner"></div>
-            <p>Đang tải danh mục chuyên khoa...</p>
+            <p>Đang tải danh sách chuyên khoa...</p>
           </div>
         } @else if (filteredSpecialties().length === 0) {
           <div class="empty-state">
-            <i class="bi bi-inbox-fill"></i>
-            <h3>Không tìm thấy chuyên khoa nào</h3>
-            <p>Thử tìm kiếm với từ khóa khác hoặc nhấn "Thêm Chuyên Khoa Mới" để tạo.</p>
+            <h3>Không có chuyên khoa phù hợp</h3>
+            <p>Thử đổi từ khoá tìm kiếm.</p>
           </div>
         } @else {
           <div class="table-responsive">
-            <table class="clinical-table">
+            <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 90px; text-align: center;">Mã khoa</th>
-                  <th style="min-width: 240px;">Tên chuyên khoa</th>
-                  <th style="min-width: 320px;">Mô tả nhiệm vụ &amp; chức năng</th>
-                  <th style="width: 170px; text-align: center;">Đội ngũ bác sĩ</th>
-                  <th style="width: 130px; text-align: center;">Thao tác</th>
+                  <th style="width: 90px;">Mã</th>
+                  <th style="min-width: 220px;">Tên chuyên khoa</th>
+                  <th style="min-width: 320px;">Mô tả</th>
+                  <th style="width: 120px; text-align: right;">Bác sĩ</th>
+                  <th style="width: 90px;"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (item of paginatedSpecialties(); track item.id) {
-                  <tr class="table-row">
-                    <td style="text-align: center;">
-                      <span class="code-badge">CK-{{ item.id < 10 ? '0' + item.id : item.id }}</span>
-                    </td>
+                  <tr>
+                    <td class="mono text-muted">CK-{{ item.id < 10 ? '0' + item.id : item.id }}</td>
                     <td>
                       <div class="specialty-cell">
-                        <div class="specialty-icon-circle">
-                          @if (item.iconUrl) {
-                            <i [class]="item.iconUrl"></i>
-                          } @else {
-                            <i class="bi bi-heart-pulse-fill"></i>
-                          }
-                        </div>
-                        <div class="specialty-meta">
-                          <strong class="specialty-name">{{ item.name }}</strong>
-                          <span class="specialty-sub">Khoa chuyên môn điều trị</span>
-                        </div>
+                        <i class="specialty-icon" [class]="item.iconUrl || 'bi bi-heart-pulse'"></i>
+                        <strong class="specialty-name">{{ item.name }}</strong>
                       </div>
                     </td>
                     <td>
-                      <p class="specialty-desc" [title]="item.description || ''">
-                        {{ item.description || 'Chưa có thông tin mô tả chi tiết cho chuyên khoa này.' }}
-                      </p>
+                      @if (item.description) {
+                        <p class="specialty-desc" [title]="item.description">{{ item.description }}</p>
+                      } @else {
+                        <span class="text-muted">Chưa có mô tả</span>
+                      }
                     </td>
-                    <td style="text-align: center;">
-                      <button class="btn-doctor-badge" (click)="viewDoctors(item)" title="Xem danh sách bác sĩ thuộc khoa">
-                        <i class="bi bi-person-badge-fill"></i>
-                        <span>{{ item.doctorCount }} Bác sĩ</span>
-                        <i class="bi bi-chevron-right icon-arrow"></i>
+                    <td style="text-align: right;">
+                      <button class="link-btn mono" (click)="viewDoctors(item)" title="Xem danh sách bác sĩ thuộc khoa">
+                        {{ item.doctorCount }} bác sĩ
                       </button>
                     </td>
-                    <td style="text-align: center;">
-                      <div class="action-buttons-cell">
-                        <button class="btn-action btn-action-edit" (click)="openEditModal(item)" title="Chỉnh sửa thông tin">
-                          <i class="bi bi-pencil-fill"></i>
+                    <td>
+                      <div class="row-actions">
+                        <button class="icon-btn" (click)="openEditModal(item)" title="Chỉnh sửa" aria-label="Chỉnh sửa">
+                          <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn-action btn-action-delete" (click)="confirmDelete(item)" title="Xóa chuyên khoa">
-                          <i class="bi bi-trash3-fill"></i>
+                        <button class="icon-btn danger" (click)="confirmDelete(item)" title="Xóa" aria-label="Xóa">
+                          <i class="bi bi-trash3"></i>
                         </button>
                       </div>
                     </td>
@@ -142,14 +114,11 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
             </table>
           </div>
 
-          <!-- CLEAR & POWERFUL PAGINATION BAR -->
           <div class="pagination-footer">
             <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredSpecialties().length }}</strong> chuyên khoa
-              </span>
+              <span>{{ startIndex() }}–{{ endIndex() }} / {{ filteredSpecialties().length }}</span>
               <div class="page-size-selector">
-                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <label for="pageSizeSelect">Số dòng</label>
                 <select
                   id="pageSizeSelect"
                   [ngModel]="pageSize()"
@@ -163,54 +132,24 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
               </div>
             </div>
 
-            <!-- Pagination Navigation Buttons -->
             <div class="pagination-controls">
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="goToPage(1)"
-                title="Về trang đầu tiên"
-              >
+              <button class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Về trang đầu tiên">
                 <i class="bi bi-chevron-double-left"></i>
               </button>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="prevPage()"
-                title="Trang trước"
-              >
-                <i class="bi bi-chevron-left"></i> Trước
+              <button class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="prevPage()" title="Trang trước">
+                <i class="bi bi-chevron-left"></i>
               </button>
-
-              <!-- Page Number Pills -->
               <div class="page-numbers-group">
                 @for (p of pagesList(); track p) {
-                  <button
-                    class="btn-page btn-page-num"
-                    [class.active]="currentPage() === p"
-                    (click)="goToPage(p)"
-                  >
+                  <button class="btn-page btn-page-num" [class.active]="currentPage() === p" (click)="goToPage(p)">
                     {{ p }}
                   </button>
                 }
               </div>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="nextPage()"
-                title="Trang sau"
-              >
-                Sau <i class="bi bi-chevron-right"></i>
+              <button class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="nextPage()" title="Trang sau">
+                <i class="bi bi-chevron-right"></i>
               </button>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="goToPage(totalPages())"
-                title="Đến trang cuối cùng"
-              >
+              <button class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Đến trang cuối cùng">
                 <i class="bi bi-chevron-double-right"></i>
               </button>
             </div>
@@ -218,15 +157,13 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
         }
       </div>
 
-      <!-- Modal Thêm / Chỉnh Sửa Chuyên Khoa -->
+      <!-- Modal thêm / sửa chuyên khoa -->
       @if (showModal()) {
         <div class="modal-backdrop" (click)="closeModal()">
           <div class="modal-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                {{ isEditing() ? 'Cập Nhật Chuyên Khoa' : 'Thêm Chuyên Khoa Mới' }}
-              </h2>
-              <button class="modal-close-btn" (click)="closeModal()">×</button>
+              <h2 class="modal-title">{{ isEditing() ? 'Sửa chuyên khoa' : 'Thêm chuyên khoa' }}</h2>
+              <button class="modal-close-btn" (click)="closeModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               <div class="form-group">
@@ -234,45 +171,45 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
                 <input
                   type="text"
                   [(ngModel)]="formData.name"
-                  placeholder="Ví dụ: Khoa Khám bệnh tổng quát, Khoa Tim mạch..."
+                  placeholder="vd: Tim mạch"
                   class="form-control"
                   required
                 />
               </div>
 
               <div class="form-group">
-                <label class="form-label">Biểu tượng Icon (Bootstrap Icons)</label>
+                <label class="form-label">Biểu tượng (Bootstrap Icons)</label>
                 <div class="input-with-icon">
                   <input
                     type="text"
                     [(ngModel)]="formData.iconUrl"
-                    placeholder="bi bi-heart-pulse-fill"
+                    placeholder="bi bi-heart-pulse"
                     class="form-control"
                   />
-                  <div class="icon-preview">
+                  <div class="icon-preview" title="Xem trước">
                     <i [class]="formData.iconUrl || 'bi bi-heart-pulse-fill'"></i>
                   </div>
                 </div>
-                <small class="form-hint">Gợi ý: bi bi-heart-pulse, bi bi-capsule, bi bi-hospital, bi bi-eye, bi bi-activity</small>
+                <small class="form-hint">vd: bi bi-heart-pulse, bi bi-capsule, bi bi-hospital, bi bi-eye, bi bi-activity</small>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Mô tả nhiệm vụ & chức năng</label>
+                <label class="form-label">Mô tả</label>
                 <textarea
                   [(ngModel)]="formData.description"
                   rows="4"
-                  placeholder="Mô tả phạm vi khám, đối tượng điều trị..."
+                  placeholder="Phạm vi khám, đối tượng điều trị"
                   class="form-control"
                 ></textarea>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
+              <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
               <button class="btn btn-primary" [disabled]="submitting() || !formData.name.trim()" (click)="saveSpecialty()">
                 @if (submitting()) {
                   <span class="spinner-sm"></span> Đang lưu...
                 } @else {
-                  <i class="bi bi-check2-circle"></i> {{ isEditing() ? 'Lưu Thay Đổi' : 'Tạo Chuyên Khoa' }}
+                  {{ isEditing() ? 'Lưu thay đổi' : 'Thêm chuyên khoa' }}
                 }
               </button>
             </div>
@@ -280,42 +217,39 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
         </div>
       }
 
-      <!-- Modal Chi Tiết Danh Sách Bác Sĩ Của Khoa -->
+      <!-- Modal danh sách bác sĩ của khoa -->
       @if (selectedDetail()) {
         <div class="modal-backdrop" (click)="selectedDetail.set(null)">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi bi-hospital"></i> Bác sĩ thuộc: {{ selectedDetail()?.name }}
-              </h2>
-              <button class="modal-close-btn" (click)="selectedDetail.set(null)">×</button>
+              <h2 class="modal-title">Bác sĩ khoa {{ selectedDetail()?.name }}</h2>
+              <button class="modal-close-btn" (click)="selectedDetail.set(null)" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               @if (selectedDetail()!.doctors.length === 0) {
                 <div class="empty-state-sm">
-                  <i class="bi bi-person-x"></i>
-                  <p>Hiện chưa có bác sĩ nào được phân bổ vào chuyên khoa này.</p>
+                  <p>Chưa có bác sĩ nào thuộc chuyên khoa này.</p>
                 </div>
               } @else {
                 <div class="doctor-list-table-wrapper">
                   <table class="data-table">
                     <thead>
                       <tr>
-                        <th>Mã BS</th>
-                        <th>Họ và Tên Bác sĩ</th>
-                        <th>Học vị / Chức danh</th>
-                        <th>Kinh nghiệm</th>
-                        <th>Thời gian khám TB</th>
+                        <th>Mã</th>
+                        <th>Họ và tên</th>
+                        <th>Học hàm / học vị</th>
+                        <th style="text-align: right;">Kinh nghiệm</th>
+                        <th style="text-align: right;">Thời gian khám TB</th>
                       </tr>
                     </thead>
                     <tbody>
                       @for (doc of selectedDetail()!.doctors; track doc.id) {
                         <tr>
-                          <td><span class="code-badge">{{ doc.employeeCode || ('DOC' + doc.id) }}</span></td>
-                          <td><strong>{{ doc.fullName }}</strong></td>
-                          <td><span class="badge badge-accent">{{ doc.academicTitle || 'Bác sĩ chuyên khoa' }}</span></td>
-                          <td>{{ doc.yearsOfExperience || 0 }} năm</td>
-                          <td><i class="bi bi-clock"></i> {{ doc.averageConsultationTime || 15 }} phút/lượt</td>
+                          <td class="mono text-muted">{{ doc.employeeCode || ('DOC' + doc.id) }}</td>
+                          <td><strong class="specialty-name">{{ doc.fullName }}</strong></td>
+                          <td>{{ doc.academicTitle || 'Bác sĩ chuyên khoa' }}</td>
+                          <td class="mono" style="text-align: right;">{{ doc.yearsOfExperience || 0 }} năm</td>
+                          <td class="mono" style="text-align: right;">{{ doc.averageConsultationTime || 15 }} phút/lượt</td>
                         </tr>
                       }
                     </tbody>
@@ -324,7 +258,7 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
               }
             </div>
             <div class="modal-footer">
-              <button class="btn btn-primary" (click)="selectedDetail.set(null)">Đóng</button>
+              <button class="btn btn-secondary" (click)="selectedDetail.set(null)">Đóng</button>
             </div>
           </div>
         </div>
@@ -332,605 +266,192 @@ import { Specialty, SpecialtyDetail, SpecialtyRequest } from '../../models/speci
     </div>
   `,
   styles: [`
-    .specialties-page {
-      padding: 1.5rem 0 3rem;
-      max-width: 1250px;
-      margin: 0 auto;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      background: var(--primary-100);
-      color: var(--primary-800);
-      font-size: 0.8rem;
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: 0.5rem;
-    }
-
-    .page-title {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin: 0 0 0.4rem;
-      letter-spacing: -0.02em;
-    }
-
-    .page-subtitle {
-      color: var(--text-muted);
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    .search-filter-card {
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-color);
-      padding: 1rem 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 4px 15px -3px rgba(15, 23, 42, 0.04);
-      flex-wrap: wrap;
-    }
-
-    .search-box {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex: 1;
-      min-width: 280px;
-      background: #f8fafc;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 0.5rem 1rem;
+    .toolbar .search-box {
+      position: relative;
+      flex: 1 1 280px;
+      max-width: 420px;
     }
 
     .search-box i {
-      color: var(--text-muted);
-      font-size: 1.1rem;
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 14px;
     }
 
     .search-input {
-      border: none;
-      background: transparent;
-      outline: none;
       width: 100%;
-      font-size: 0.95rem;
+      height: 34px;
+      padding: 0 10px 0 32px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
       color: var(--text-main);
-    }
-
-    .stats-summary {
-      display: flex;
-      gap: 0.75rem;
-    }
-
-    .stat-pill {
-      background: #f1f5f9;
-      padding: 0.4rem 0.85rem;
-      border-radius: var(--radius-full);
-      font-size: 0.85rem;
-      color: var(--text-main);
-    }
-
-    .stat-pill-highlight {
-      background: var(--primary-50);
-      color: var(--primary-800);
-      border: 1px solid var(--primary-200);
-    }
-
-    /* Table Card & Responsive */
-    .table-card {
       background: #ffffff;
-      border-radius: var(--radius-xl);
-      border: 1px solid var(--border-color);
-      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
-      overflow: hidden;
-      animation: modalFadeIn 0.25s ease-out;
+      outline: none;
     }
 
-    .table-responsive {
-      overflow-x: auto;
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
-    .clinical-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.92rem;
-    }
+    .table-responsive { overflow-x: auto; }
+    .data-table td.text-muted { color: var(--text-muted); }
+    .data-table td.mono { white-space: nowrap; }
 
-    .clinical-table thead th {
-      background: #f8fafc;
-      color: #475569;
-      font-weight: 800;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 1rem 1.15rem;
-      border-bottom: 2px solid #e2e8f0;
-      white-space: nowrap;
-    }
-
-    .clinical-table tbody tr {
-      border-bottom: 1px solid #f1f5f9;
-      transition: background 0.15s;
-    }
-
-    .clinical-table tbody tr:hover {
-      background: #f8fafc;
-    }
-
-    .clinical-table td {
-      padding: 1rem 1.15rem;
-      vertical-align: middle;
-      color: #1e293b;
-    }
-
-    /* Specialty Cell */
     .specialty-cell {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
+      gap: 8px;
     }
 
-    .specialty-icon-circle {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.35rem;
+    .specialty-icon {
+      color: var(--text-muted);
+      font-size: 15px;
+      width: 16px;
+      text-align: center;
       flex-shrink: 0;
-      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
     }
 
-    .specialty-meta {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .specialty-name {
-      color: #0f172a;
-      font-size: 0.98rem;
-      font-weight: 800;
-    }
-
-    .specialty-sub {
-      color: #64748b;
-      font-size: 0.78rem;
-      font-weight: 600;
-    }
-
-    .code-badge {
-      background: #f5f3ff;
-      color: #6d28d9;
-      border: 1px solid #ddd6fe;
-      padding: 0.25rem 0.55rem;
-      border-radius: 6px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 800;
-      font-size: 0.8rem;
-      display: inline-block;
-    }
+    .specialty-name { font-weight: 500; }
 
     .specialty-desc {
-      color: #475569;
-      font-size: 0.88rem;
-      line-height: 1.45;
       margin: 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.45;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    .btn-doctor-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-      padding: 0.4rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-      font-weight: 700;
+    .link-btn {
+      border: none;
+      background: none;
+      padding: 0;
+      font: inherit;
+      color: var(--primary-600);
       cursor: pointer;
-      transition: all 0.2s;
     }
 
-    .btn-doctor-badge:hover {
-      background: #d1fae5;
-      border-color: #6ee7b7;
-      transform: translateY(-1px);
+    .link-btn:hover {
+      color: var(--primary-800);
+      text-decoration: underline;
     }
 
-    .btn-doctor-badge .icon-arrow {
-      font-size: 0.8rem;
-      opacity: 0.6;
-      transition: transform 0.2s;
-    }
-
-    .btn-doctor-badge:hover .icon-arrow {
-      transform: translateX(2px);
-      opacity: 1;
-    }
-
-    /* Action Buttons in Cell */
-    .action-buttons-cell {
+    .row-actions {
       display: flex;
-      justify-content: center;
-      gap: 0.45rem;
+      justify-content: flex-end;
+      gap: 2px;
     }
 
-    .btn-action {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 0.88rem;
-      transition: all 0.2s;
+    .loading-state,
+    .empty-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-muted);
     }
 
-    .btn-action-edit {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      color: #0284c7;
+    .empty-state h3 {
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
     }
 
-    .btn-action-edit:hover {
-      background: #0284c7;
-      color: #ffffff;
-      border-color: #0284c7;
+    .empty-state-sm {
+      padding: 32px 16px;
+      text-align: center;
+      color: var(--text-muted);
     }
 
-    .btn-action-delete {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #dc2626;
-    }
-
-    .btn-action-delete:hover {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
-
-    /* ==================== PAGINATION BAR ==================== */
     .pagination-footer {
-      padding: 1rem 1.35rem;
-      background: #ffffff;
-      border-top: 1.5px solid #f1f5f9;
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
+      gap: 12px;
       flex-wrap: wrap;
-      gap: 1rem;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .pagination-info {
+    .pagination-info,
+    .page-size-selector,
+    .pagination-controls,
+    .page-numbers-group {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
-      font-size: 0.88rem;
-      color: #475569;
+      gap: 8px;
     }
 
-    .pagination-info strong {
-      color: #0f172a;
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-    }
+    .pagination-info { gap: 16px; }
+    .pagination-controls, .page-numbers-group { gap: 4px; }
 
     .form-select-sm {
-      padding: 0.35rem 0.65rem;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 6px;
-      color: #0f172a;
-      font-weight: 700;
+      height: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 6px;
       background: #ffffff;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
     }
 
     .btn-page {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 0.5rem;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
       background: #ffffff;
-      color: #334155;
-      font-weight: 700;
-      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
     }
 
-    .btn-page:hover:not(:disabled) {
-      background: #f0f9ff;
-      border-color: #0284c7;
-      color: #0284c7;
-    }
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
 
     .btn-page.active {
-      background: #0284c7;
-      border-color: #0284c7;
-      color: #ffffff;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-    }
-
-    .btn-page:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      background: #f8fafc;
-      border-color: #e2e8f0;
-    }
-
-    .btn-page-nav {
-      gap: 0.25rem;
-      padding: 0 0.75rem;
-    }
-
-    .page-numbers-group {
-      display: flex;
-      gap: 0.3rem;
-    }
-
-    /* Modal Styles */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1050;
-      padding: 1rem;
-    }
-
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      width: 100%;
-      max-width: 540px;
-      overflow: hidden;
-      animation: modalFadeIn 0.2s ease-out;
-    }
-
-    .modal-lg {
-      max-width: 780px;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .modal-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin: 0;
-    }
-
-    .modal-close-btn {
-      background: none;
-      border: none;
-      font-size: 1.75rem;
-      line-height: 1;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-
-    .modal-footer {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
-    }
-
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-
-    .form-label {
-      display: block;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 0.4rem;
-    }
-
-    .form-label.required::after {
-      content: ' *';
-      color: var(--rose-600);
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      font-size: 0.95rem;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      transition: all 0.2s;
-    }
-
-    .form-control:focus {
-      outline: none;
+      background: var(--primary-600);
       border-color: var(--primary-600);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+      color: #ffffff;
     }
+
+    /* Modal */
+    .modal-dialog { max-width: 540px; }
+    .modal-lg { max-width: 780px; }
 
     .input-with-icon {
       display: flex;
-      gap: 0.5rem;
+      gap: 8px;
       align-items: center;
     }
 
     .icon-preview {
-      width: 44px;
-      height: 44px;
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius-md);
-      background: var(--primary-50);
-      color: var(--primary-700);
+      color: var(--text-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.3rem;
-      border: 1px solid var(--primary-200);
+      font-size: 16px;
     }
 
-    .form-hint {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-      display: block;
-    }
-
-    /* Table */
     .doctor-list-table-wrapper {
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       overflow: hidden;
-    }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      text-align: left;
-    }
-
-    .data-table th {
-      background: #f8fafc;
-      padding: 0.75rem 1rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .data-table td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid #f1f5f9;
-      color: var(--text-main);
-    }
-
-    .code-badge {
-      font-family: monospace;
-      font-weight: 700;
-      background: #f1f5f9;
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-      color: var(--primary-800);
-    }
-
-    .badge-accent {
-      background: #eff6ff;
-      color: var(--primary-700);
-      font-weight: 600;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px dashed var(--border-color);
-    }
-
-    .empty-state i {
-      font-size: 3rem;
-      color: var(--text-muted);
-    }
-
-    .empty-state-sm {
-      text-align: center;
-      padding: 2.5rem 1rem;
-      color: var(--text-muted);
-    }
-
-    .alert {
-      padding: 0.85rem 1.25rem;
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .alert-success {
-      background: #ecfdf5;
-      color: #065f46;
-      border: 1px solid #a7f3d0;
-    }
-
-    .alert-danger {
-      background: #fff1f2;
-      color: #9f1239;
-      border: 1px solid #fecdd3;
-    }
-
-    .alert-close {
-      margin-left: auto;
-      background: none;
-      border: none;
-      font-size: 1.25rem;
-      cursor: pointer;
-      color: inherit;
     }
   `]
 })

@@ -10,990 +10,665 @@ import { DashboardOverview, DailyStat, RoomStat } from '../../models/dashboard.m
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="dashboard-page">
-      <!-- Page Header -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <span class="live-dot"></span> BẢNG ĐIỀU KHIỂN TRUNG TÂM
-          </div>
-          <h1 class="page-title">
-            <i class="bi bi-speedometer2 text-primary"></i> Dashboard
-          </h1>
+        <div>
+          <h1 class="page-title">Tổng quan</h1>
           <p class="page-subtitle">
-            Tổng quan tình hình tiếp đón, hàng đợi khám chữa bệnh và hiệu suất phòng khám thời gian thực
+            @if (data()) {
+              Số liệu từ {{ data()?.fromDate | date:'dd/MM/yyyy' }} đến {{ data()?.toDate | date:'dd/MM/yyyy' }}
+            } @else {
+              Tiếp đón, hàng đợi và hiệu suất phòng khám
+            }
           </p>
         </div>
 
-        <div class="header-actions">
-          <!-- Period Selector -->
-          <div class="period-toggle-group">
-            <button
-              class="period-btn"
-              [class.active]="selectedPeriod() === 'TODAY'"
-              (click)="changePeriod('TODAY')"
-            >
+        <div class="page-actions">
+          <div class="segmented" role="group" aria-label="Khoảng thời gian">
+            <button type="button" class="segmented-btn" [class.active]="selectedPeriod() === 'TODAY'" (click)="changePeriod('TODAY')">
               Hôm nay
             </button>
-            <button
-              class="period-btn"
-              [class.active]="selectedPeriod() === 'WEEK'"
-              (click)="changePeriod('WEEK')"
-            >
-              7 ngày qua
+            <button type="button" class="segmented-btn" [class.active]="selectedPeriod() === 'WEEK'" (click)="changePeriod('WEEK')">
+              7 ngày
             </button>
-            <button
-              class="period-btn"
-              [class.active]="selectedPeriod() === 'MONTH'"
-              (click)="changePeriod('MONTH')"
-            >
-              30 ngày qua
+            <button type="button" class="segmented-btn" [class.active]="selectedPeriod() === 'MONTH'" (click)="changePeriod('MONTH')">
+              30 ngày
             </button>
           </div>
 
-          <button class="btn btn-outline" (click)="loadData()" [disabled]="isLoading()" title="Tải lại số liệu">
+          <button class="btn btn-secondary" (click)="loadData()" [disabled]="isLoading()" title="Tải lại số liệu">
             <i class="bi bi-arrow-clockwise" [class.spin]="isLoading()"></i> Làm mới
           </button>
 
-          <button class="btn btn-primary" (click)="triggerPrint()" title="In / Xuất PDF báo cáo">
-            <i class="bi bi-printer"></i> In Báo Cáo
+          <button class="btn btn-secondary" (click)="triggerPrint()" title="In / xuất PDF">
+            <i class="bi bi-printer"></i> In báo cáo
           </button>
         </div>
       </div>
 
-      <!-- Loading State -->
       @if (isLoading()) {
         <div class="loading-state">
           <div class="spinner"></div>
-          <p>Đang phân tích và tổng hợp số liệu thống kê y tế...</p>
+          <p>Đang tải số liệu...</p>
         </div>
       } @else if (data()) {
-        <!-- 4 Hero KPI Cards -->
+        <!-- Chỉ số chính -->
         <div class="kpi-grid">
-          <!-- Card 1: Số Lượt Khám -->
-          <div class="kpi-card card-blue">
-            <div class="kpi-icon-wrap bg-blue-subtle text-blue">
-              <i class="bi bi-clipboard2-check-fill"></i>
+          <div class="kpi-card">
+            <span class="kpi-label">Lượt khám hoàn tất</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value mono">{{ data()?.totalExaminationsCompleted }}</span>
+              <span class="kpi-unit">/ {{ data()?.totalTickets }} vé</span>
             </div>
-            <div class="kpi-info">
-              <span class="kpi-label">LƯỢT KHÁM HOÀN TẤT</span>
-              <div class="kpi-value-row">
-                <span class="kpi-value num">{{ data()?.totalExaminationsCompleted }}</span>
-                <span class="kpi-unit">/ {{ data()?.totalTickets }} vé</span>
-              </div>
-              <div class="kpi-meta">
-                <span class="badge badge-success">
-                  <i class="bi bi-check-circle-fill"></i> Hôm nay: {{ data()?.todayCompleted }} ca xong
-                </span>
-                <span class="meta-note">Tổng cấp hôm nay: {{ data()?.todayTickets }}</span>
-              </div>
+            <div class="kpi-meta">
+              Hôm nay <span class="mono">{{ data()?.todayCompleted }}</span> hoàn tất / <span class="mono">{{ data()?.todayTickets }}</span> vé
             </div>
           </div>
 
-          <!-- Card 2: Thời Gian Chờ Trung Bình -->
-          <div class="kpi-card" [ngClass]="getWaitTimeCardClass()">
-            <div class="kpi-icon-wrap" [ngClass]="getWaitTimeIconClass()">
-              <i class="bi bi-hourglass-split"></i>
+          <div class="kpi-card">
+            <span class="kpi-label">Thời gian chờ trung bình</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value mono">{{ data()?.avgWaitingMinutes }}</span>
+              <span class="kpi-unit">phút</span>
+              @if ((data()?.avgWaitingMinutes ?? 0) <= 15) {
+                <span class="status success">Tốt</span>
+              } @else if ((data()?.avgWaitingMinutes ?? 0) <= 30) {
+                <span class="status warning">Trung bình</span>
+              } @else {
+                <span class="status danger">Cao</span>
+              }
             </div>
-            <div class="kpi-info">
-              <span class="kpi-label">THỜI GIAN CHỜ TRUNG BÌNH</span>
-              <div class="kpi-value-row">
-                <span class="kpi-value num">{{ data()?.avgWaitingMinutes }}</span>
-                <span class="kpi-unit">phút / người</span>
-              </div>
-              <div class="kpi-meta">
-                <span class="badge" [ngClass]="getWaitTimeBadgeClass()">
-                  <i class="bi" [ngClass]="getWaitTimeBadgeIcon()"></i> {{ getWaitTimeAssessmentText() }}
-                </span>
-                <span class="meta-note">Tiêu chuẩn: ≤ 20 phút</span>
-              </div>
+            <div class="kpi-meta">Mục tiêu ≤ 20 phút</div>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Tỷ lệ hủy lịch hẹn</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value mono">{{ data()?.cancellationRate }}%</span>
+            </div>
+            <div class="kpi-meta">
+              <span class="mono">{{ data()?.cancelledAppointments }}</span> / <span class="mono">{{ data()?.totalAppointments }}</span> lịch hẹn bị hủy
             </div>
           </div>
 
-          <!-- Card 3: Tỷ Lệ Huỷ Lịch Hẹn -->
-          <div class="kpi-card card-rose">
-            <div class="kpi-icon-wrap bg-rose-subtle text-rose">
-              <i class="bi bi-calendar-x-fill"></i>
+          <div class="kpi-card">
+            <span class="kpi-label">Lịch hẹn</span>
+            <div class="kpi-value-row">
+              <span class="kpi-value mono">{{ data()?.totalAppointments }}</span>
             </div>
-            <div class="kpi-info">
-              <span class="kpi-label">TỶ LỆ HUỶ LỊCH HẸN</span>
-              <div class="kpi-value-row">
-                <span class="kpi-value num text-danger">{{ data()?.cancellationRate }}%</span>
-                <span class="kpi-unit">tỷ lệ huỷ</span>
-              </div>
-              <div class="kpi-meta">
-                <span class="badge badge-danger">
-                  <i class="bi bi-x-circle"></i> {{ data()?.cancelledAppointments }} lịch bị huỷ
-                </span>
-                <span class="meta-note">Tổng: {{ data()?.totalAppointments }} lịch hẹn</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card 4: Tổng Lịch Hẹn Đã Đặt -->
-          <div class="kpi-card card-purple">
-            <div class="kpi-icon-wrap bg-purple-subtle text-purple">
-              <i class="bi bi-calendar-check-fill"></i>
-            </div>
-            <div class="kpi-info">
-              <span class="kpi-label">TỔNG LỊCH HẸN KHÁM</span>
-              <div class="kpi-value-row">
-                <span class="kpi-value num">{{ data()?.totalAppointments }}</span>
-                <span class="kpi-unit">cuộc hẹn</span>
-              </div>
-              <div class="kpi-meta">
-                <span class="badge badge-info">
-                  <i class="bi bi-clock-history"></i> {{ data()?.confirmedAppointments }} đã xác nhận
-                </span>
-                <span class="meta-note">{{ data()?.completedAppointments }} đã hoàn tất</span>
-              </div>
+            <div class="kpi-meta">
+              <span class="mono">{{ data()?.confirmedAppointments }}</span> đã xác nhận · <span class="mono">{{ data()?.completedAppointments }}</span> đã hoàn tất
             </div>
           </div>
         </div>
 
-        <!-- Charts and Breakdown Grid -->
         <div class="analytics-grid">
-          <!-- Left: Daily Volume & Wait Chart -->
-          <div class="card-box chart-card">
-            <div class="card-box-header">
-              <div class="card-box-title">
-                <i class="bi bi-bar-chart-line-fill text-primary"></i>
-                Xu Hướng Lượt Khám &amp; Thời Gian Chờ Theo Ngày
-              </div>
-              <span class="date-range-badge">
-                {{ data()?.fromDate | date:'dd/MM' }} - {{ data()?.toDate | date:'dd/MM/yyyy' }}
-              </span>
-            </div>
-            <div class="card-box-body">
+          <!-- Lượt khám theo ngày -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Lượt khám theo ngày</h2>
               <div class="chart-legend">
-                <span class="legend-item"><span class="legend-box bar-color"></span> Số ca đã khám hoàn tất</span>
-                <span class="legend-item"><span class="legend-box wait-color"></span> Thời gian chờ TB (phút)</span>
+                <span class="legend-item"><span class="legend-swatch"></span> Ca hoàn tất</span>
+                <span class="legend-item text-muted">Dòng dưới: chờ TB (phút)</span>
               </div>
-
-              <!-- CSS / SVG Bar Chart Representation -->
-              <div class="bar-chart-container">
-                @for (d of data()?.dailyStats; track d.date) {
-                  <div class="bar-column">
-                    <div class="bar-metric-top">
-                      <span class="wait-pill" title="Chờ TB: {{ d.avgWaitingMinutes }} phút">
-                        {{ d.avgWaitingMinutes }}p
-                      </span>
-                    </div>
-
-                    <div class="bar-track">
-                      <div
-                        class="bar-fill"
-                        [style.height.%]="getBarHeightPercent(d.completedExaminations)"
-                        [title]="d.completedExaminations + ' ca hoàn tất'"
-                      >
-                        <span class="bar-val-inside">{{ d.completedExaminations }}</span>
+            </div>
+            <div class="panel-body">
+              <div class="chart-scroll-wrapper">
+                <div class="bar-chart" [class.period-month]="selectedPeriod() === 'MONTH'">
+                  @if (data()?.totalExaminationsCompleted === 0) {
+                    <div class="chart-empty">Chưa có ca khám hoàn tất trong khoảng thời gian này</div>
+                  }
+                  @for (d of data()?.dailyStats; track d.date) {
+                    <div class="bar-column" [title]="(d.dayOfWeek || '') + ' ' + (d.date | date:'dd/MM/yyyy') + ':\n• ' + d.completedExaminations + ' ca hoàn tất\n• Chờ TB: ' + d.avgWaitingMinutes + ' phút'">
+                      <div class="bar-track">
+                        @if (d.completedExaminations > 0 || selectedPeriod() !== 'MONTH') {
+                          <span class="bar-value mono" [class.bar-value-zero]="d.completedExaminations === 0">
+                            {{ d.completedExaminations }}
+                          </span>
+                        }
+                        <div
+                          class="bar-fill"
+                          [style.height.%]="d.completedExaminations > 0 ? getBarHeightPercent(d.completedExaminations) : 0"
+                        ></div>
+                      </div>
+                      <div class="bar-labels">
+                        <span class="bar-dow">{{ formatDayOfWeek(d.dayOfWeek) }}</span>
+                        <span class="bar-date mono">{{ d.date | date:'dd/MM' }}</span>
+                        <span class="bar-wait mono">
+                          @if (d.avgWaitingMinutes > 0) {
+                            {{ d.avgWaitingMinutes | number:'1.0-1' }}
+                          } @else {
+                            -
+                          }
+                        </span>
                       </div>
                     </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
 
-                    <div class="bar-label-group">
-                      <span class="bar-dow">{{ d.dayOfWeek }}</span>
-                      <span class="bar-date">{{ d.date | date:'dd/MM' }}</span>
-                    </div>
-                  </div>
+          <!-- Phân bổ trạng thái hàng đợi -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Trạng thái hàng đợi</h2>
+              <span class="text-muted panel-meta"><span class="mono">{{ data()?.totalTickets }}</span> vé</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack-bar">
+                <div class="stack-seg seg-completed" [style.width.%]="getStatusPercent('COMPLETED')"
+                     title="Hoàn tất: {{ getStatusCount('COMPLETED') }} vé"></div>
+                <div class="stack-seg seg-progress" [style.width.%]="getStatusPercent('IN_PROGRESS')"
+                     title="Đang khám: {{ getStatusCount('IN_PROGRESS') }} vé"></div>
+                <div class="stack-seg seg-waiting" [style.width.%]="getStatusPercent('WAITING')"
+                     title="Đang chờ: {{ getStatusCount('WAITING') }} vé"></div>
+                <div class="stack-seg seg-called" [style.width.%]="getStatusPercent('CALLED')"
+                     title="Đang gọi: {{ getStatusCount('CALLED') }} vé"></div>
+                <div class="stack-seg seg-cancelled" [style.width.%]="getStatusPercent('CANCELLED') + getStatusPercent('SKIPPED')"
+                     title="Hủy/nhỡ lượt: {{ getStatusCount('CANCELLED') + getStatusCount('SKIPPED') }} vé"></div>
+              </div>
+
+              <table class="legend-table">
+                <tbody>
+                  <tr>
+                    <td><span class="dot seg-completed"></span> Hoàn tất</td>
+                    <td class="mono num-col">{{ getStatusCount('COMPLETED') }}</td>
+                    <td class="mono num-col text-muted">{{ getStatusPercent('COMPLETED') | number:'1.1-1' }}%</td>
+                  </tr>
+                  <tr>
+                    <td><span class="dot seg-progress"></span> Đang khám</td>
+                    <td class="mono num-col">{{ getStatusCount('IN_PROGRESS') }}</td>
+                    <td class="mono num-col text-muted">{{ getStatusPercent('IN_PROGRESS') | number:'1.1-1' }}%</td>
+                  </tr>
+                  <tr>
+                    <td><span class="dot seg-waiting"></span> Đang chờ</td>
+                    <td class="mono num-col">{{ getStatusCount('WAITING') }}</td>
+                    <td class="mono num-col text-muted">{{ getStatusPercent('WAITING') | number:'1.1-1' }}%</td>
+                  </tr>
+                  <tr>
+                    <td><span class="dot seg-called"></span> Đang gọi</td>
+                    <td class="mono num-col">{{ getStatusCount('CALLED') }}</td>
+                    <td class="mono num-col text-muted">{{ getStatusPercent('CALLED') | number:'1.1-1' }}%</td>
+                  </tr>
+                  <tr>
+                    <td><span class="dot seg-cancelled"></span> Nhỡ lượt / đã hủy</td>
+                    <td class="mono num-col">{{ getStatusCount('CANCELLED') + getStatusCount('SKIPPED') }}</td>
+                    <td class="mono num-col text-muted">{{ (getStatusPercent('CANCELLED') + getStatusPercent('SKIPPED')) | number:'1.1-1' }}%</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="ops-note">
+                @if ((data()?.avgWaitingMinutes ?? 0) > 25) {
+                  Thời gian chờ trung bình vượt 25 phút. Cân nhắc bổ sung bác sĩ hoặc tăng tốc khâu tiếp đón.
+                } @else if ((data()?.cancellationRate ?? 0) > 15) {
+                  Tỷ lệ hủy lịch hẹn trên 15%. Nên bật nhắc lịch qua email/SMS trước 2 giờ.
+                } @else {
+                  Thời gian chờ và tỷ lệ hủy đang trong ngưỡng.
                 }
               </div>
             </div>
           </div>
-
-          <!-- Right: Queue Status Distribution -->
-          <div class="card-box distribution-card">
-            <div class="card-box-header">
-              <div class="card-box-title">
-                <i class="bi bi-pie-chart-fill text-primary"></i>
-                Phân Bổ Trạng Thái Hàng Đợi ({{ data()?.totalTickets }} vé)
-              </div>
-            </div>
-            <div class="card-box-body">
-              <!-- Visual Multi-segment Progress Bar -->
-              <div class="multi-progress-bar">
-                <div
-                  class="progress-seg seg-completed"
-                  [style.width.%]="getStatusPercent('COMPLETED')"
-                  title="Hoàn tất: {{ getStatusCount('COMPLETED') }} vé"
-                ></div>
-                <div
-                  class="progress-seg seg-progress"
-                  [style.width.%]="getStatusPercent('IN_PROGRESS')"
-                  title="Đang khám: {{ getStatusCount('IN_PROGRESS') }} vé"
-                ></div>
-                <div
-                  class="progress-seg seg-waiting"
-                  [style.width.%]="getStatusPercent('WAITING')"
-                  title="Đang chờ: {{ getStatusCount('WAITING') }} vé"
-                ></div>
-                <div
-                  class="progress-seg seg-called"
-                  [style.width.%]="getStatusPercent('CALLED')"
-                  title="Đang gọi: {{ getStatusCount('CALLED') }} vé"
-                ></div>
-                <div
-                  class="progress-seg seg-cancelled"
-                  [style.width.%]="getStatusPercent('CANCELLED') + getStatusPercent('SKIPPED')"
-                  title="Huỷ/Nhỡ: {{ getStatusCount('CANCELLED') + getStatusCount('SKIPPED') }} vé"
-                ></div>
-              </div>
-
-              <!-- Status Breakdown List -->
-              <div class="status-legend-list">
-                <div class="status-legend-item">
-                  <div class="item-left">
-                    <span class="dot dot-completed"></span>
-                    <span class="status-name">Khám hoàn tất (COMPLETED)</span>
-                  </div>
-                  <div class="item-right">
-                    <strong>{{ getStatusCount('COMPLETED') }}</strong> ca
-                    <span class="percent-tag">({{ getStatusPercent('COMPLETED') | number:'1.1-1' }}%)</span>
-                  </div>
-                </div>
-
-                <div class="status-legend-item">
-                  <div class="item-left">
-                    <span class="dot dot-progress"></span>
-                    <span class="status-name">Đang trong phòng khám (IN_PROGRESS)</span>
-                  </div>
-                  <div class="item-right">
-                    <strong>{{ getStatusCount('IN_PROGRESS') }}</strong> ca
-                    <span class="percent-tag">({{ getStatusPercent('IN_PROGRESS') | number:'1.1-1' }}%)</span>
-                  </div>
-                </div>
-
-                <div class="status-legend-item">
-                  <div class="item-left">
-                    <span class="dot dot-waiting"></span>
-                    <span class="status-name">Đang chờ gọi tên (WAITING)</span>
-                  </div>
-                  <div class="item-right">
-                    <strong>{{ getStatusCount('WAITING') }}</strong> ca
-                    <span class="percent-tag">({{ getStatusPercent('WAITING') | number:'1.1-1' }}%)</span>
-                  </div>
-                </div>
-
-                <div class="status-legend-item">
-                  <div class="item-left">
-                    <span class="dot dot-called"></span>
-                    <span class="status-name">Đang mời vào (CALLED)</span>
-                  </div>
-                  <div class="item-right">
-                    <strong>{{ getStatusCount('CALLED') }}</strong> ca
-                    <span class="percent-tag">({{ getStatusPercent('CALLED') | number:'1.1-1' }}%)</span>
-                  </div>
-                </div>
-
-                <div class="status-legend-item">
-                  <div class="item-left">
-                    <span class="dot dot-cancelled"></span>
-                    <span class="status-name">Nhỡ lượt hoặc Đã huỷ (SKIPPED / CANCELLED)</span>
-                  </div>
-                  <div class="item-right">
-                    <strong>{{ getStatusCount('CANCELLED') + getStatusCount('SKIPPED') }}</strong> ca
-                    <span class="percent-tag">({{ (getStatusPercent('CANCELLED') + getStatusPercent('SKIPPED')) | number:'1.1-1' }}%)</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Recommendation Note -->
-              <div class="kpi-recommendation-box">
-                <i class="bi bi-lightbulb-fill text-warning"></i>
-                <div class="rec-text">
-                  <strong>Khuyến nghị vận hành:</strong>
-                  @if ((data()?.avgWaitingMinutes ?? 0) > 25) {
-                    Thời gian chờ đang cao hơn mức khuyến nghị (>25p). Cần điều phối thêm bác sĩ hoặc tăng tốc khâu tiếp đón tại sảnh.
-                  } @else if ((data()?.cancellationRate ?? 0) > 15) {
-                    Tỷ lệ huỷ lịch hẹn ở mức cao (>15%). Nên kích hoạt hệ thống nhắc lịch hẹn qua Email/SMS trước 2 tiếng.
-                  } @else {
-                    Hiệu suất vận hành phòng khám đang ở trạng thái tốt. Thời gian chờ và tỷ lệ huỷ duy trì trong ngưỡng an toàn.
-                  }
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- Room Performance Table -->
-        <div class="card-box mt-4">
-          <div class="card-box-header">
-            <div class="card-box-title">
-              <i class="bi bi-door-open-fill text-primary"></i>
-              Hiệu Suất Tiếp Nhận &amp; Thời Gian Chờ Từng Phòng Khám
-            </div>
-            <span class="badge badge-primary">
-              {{ data()?.roomStats?.length || 0 }} phòng khám hoạt động
-            </span>
+        <!-- Hiệu suất phòng khám -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Hiệu suất phòng khám</h2>
+            <span class="text-muted panel-meta"><span class="mono">{{ data()?.roomStats?.length || 0 }}</span> phòng</span>
           </div>
-          <div class="card-box-body p-0">
-            <div class="table-responsive">
-              <table class="table data-table">
-                <thead>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 80px;">Phòng</th>
+                  <th style="min-width: 220px;">Tên phòng</th>
+                  <th style="width: 80px;">Tầng</th>
+                  <th style="min-width: 180px;">Bác sĩ phụ trách</th>
+                  <th class="num-col">Tổng vé</th>
+                  <th class="num-col">Đã khám</th>
+                  <th class="num-col">Đang chờ</th>
+                  <th class="num-col">Chờ TB</th>
+                  <th style="width: 170px;">Tỷ lệ hoàn thành</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of data()?.roomStats; track r.roomId) {
                   <tr>
-                    <th>Mã &amp; Phòng Khám</th>
-                    <th>Vị Trí</th>
-                    <th>Bác Sĩ Phụ Trách</th>
-                    <th class="text-center">Tổng Vé Cấp</th>
-                    <th class="text-center">Đã Khám Xong</th>
-                    <th class="text-center">Đang Chờ Hôm Nay</th>
-                    <th class="text-center">Thời Gian Chờ TB</th>
-                    <th>Tỷ Lệ Hoàn Thành</th>
+                    <td class="mono text-muted">{{ r.roomNumber }}</td>
+                    <td class="room-name">{{ r.roomName }}</td>
+                    <td class="mono">{{ r.floor }}</td>
+                    <td>{{ r.activeDoctorName }}</td>
+                    <td class="mono num-col">{{ r.totalTickets }}</td>
+                    <td class="mono num-col">{{ r.completedCount }}</td>
+                    <td class="mono num-col" [class.text-muted]="r.waitingCount === 0">{{ r.waitingCount }}</td>
+                    <td class="num-col">
+                      <span
+                        class="status mono"
+                        [class.success]="r.avgWaitingMinutes <= 15"
+                        [class.warning]="r.avgWaitingMinutes > 15 && r.avgWaitingMinutes <= 30"
+                        [class.danger]="r.avgWaitingMinutes > 30"
+                      >{{ r.avgWaitingMinutes }} phút</span>
+                    </td>
+                    <td>
+                      <div class="utilization-cell">
+                        <div class="util-track">
+                          <div class="util-fill" [style.width.%]="r.utilizationRate"></div>
+                        </div>
+                        <span class="util-percent mono">{{ r.utilizationRate }}%</span>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  @for (r of data()?.roomStats; track r.roomId) {
-                    <tr>
-                      <td>
-                        <div class="room-name-cell">
-                          <span class="room-badge">{{ r.roomNumber }}</span>
-                          <span class="room-fullname font-bold">{{ r.roomName }}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span class="text-muted">Tầng {{ r.floor }}</span>
-                      </td>
-                      <td>
-                        <div class="doc-cell">
-                          <i class="bi bi-person-badge text-primary"></i>
-                          <span>{{ r.activeDoctorName }}</span>
-                        </div>
-                      </td>
-                      <td class="text-center font-bold">
-                        {{ r.totalTickets }}
-                      </td>
-                      <td class="text-center font-bold text-success">
-                        {{ r.completedCount }}
-                      </td>
-                      <td class="text-center">
-                        @if (r.waitingCount > 0) {
-                          <span class="badge badge-warning">{{ r.waitingCount }} ca</span>
-                        } @else {
-                          <span class="badge badge-normal">0</span>
-                        }
-                      </td>
-                      <td class="text-center">
-                        <span
-                          class="wait-time-tag"
-                          [class.fast]="r.avgWaitingMinutes <= 15"
-                          [class.medium]="r.avgWaitingMinutes > 15 && r.avgWaitingMinutes <= 30"
-                          [class.slow]="r.avgWaitingMinutes > 30"
-                        >
-                          {{ r.avgWaitingMinutes }} phút
-                        </span>
-                      </td>
-                      <td>
-                        <div class="utilization-cell">
-                          <div class="progress-bar-wrap">
-                            <div
-                              class="progress-bar-fill"
-                              [style.width.%]="r.utilizationRate"
-                              [class.fill-high]="r.utilizationRate >= 70"
-                              [class.fill-mid]="r.utilizationRate >= 40 && r.utilizationRate < 70"
-                              [class.fill-low]="r.utilizationRate < 40"
-                            ></div>
-                          </div>
-                          <span class="util-percent font-bold">{{ r.utilizationRate }}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  }
-                  @if (!data()?.roomStats || data()?.roomStats?.length === 0) {
-                    <tr>
-                      <td colspan="8" class="text-center py-4 text-muted">
-                        Chưa có dữ liệu phòng khám
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+                }
+                @if (!data()?.roomStats || data()?.roomStats?.length === 0) {
+                  <tr>
+                    <td colspan="9" class="empty-row">Chưa có dữ liệu phòng khám</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
         </div>
       }
     </div>
   `,
   styles: [`
-    .dashboard-page {
-      padding: 1.5rem 1.5rem 3.5rem;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.75rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
+    /* Chọn khoảng thời gian */
+    .segmented {
       display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      background-color: var(--primary-50);
-      color: var(--primary-800);
-      font-size: 0.775rem;
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: 0.4rem;
-      border: 1px solid var(--primary-200);
-      letter-spacing: 0.04em;
-    }
-
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      background-color: var(--success-solid);
-      border-radius: 50%;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-
-    .page-title {
-      font-size: 1.85rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin: 0 0 0.25rem;
-      letter-spacing: -0.01em;
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-    }
-
-    .page-subtitle {
-      color: var(--text-muted);
-      margin: 0;
-      font-size: 0.925rem;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .period-toggle-group {
-      display: flex;
-      background: #f1f5f9;
-      border-radius: var(--radius-sm);
-      padding: 3px;
-      border: 1px solid var(--border-color);
-    }
-
-    .period-btn {
-      padding: 0.4rem 0.85rem;
-      border: none;
-      background: transparent;
-      font-size: 0.825rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      border-radius: var(--radius-xs);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .period-btn:hover {
-      color: var(--text-main);
-    }
-
-    .period-btn.active {
+      height: 36px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      overflow: hidden;
       background: #ffffff;
-      color: var(--primary-700);
-      font-weight: 700;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
 
-    /* KPI Cards Grid */
+    .segmented-btn {
+      padding: 0 12px;
+      border: none;
+      border-left: 1px solid var(--border-color);
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background-color 0.12s ease, color 0.12s ease;
+    }
+
+    .segmented-btn:first-child { border-left: none; }
+    .segmented-btn:hover { background: var(--bg-hover); }
+
+    .segmented-btn.active {
+      background: var(--primary-50);
+      color: var(--primary-700);
+      font-weight: 500;
+    }
+
+    /* Chỉ số chính */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 1.75rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
     }
 
     .kpi-card {
-      background: #ffffff;
-      border-radius: var(--radius-md);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-sm);
-      padding: 1.25rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1.15rem;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .kpi-card:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-
-    .kpi-icon-wrap {
-      width: 52px;
-      height: 52px;
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.6rem;
-      flex-shrink: 0;
-    }
-
-    .bg-blue-subtle { background: #e0f2fe; }
-    .text-blue { color: #0284c7; }
-
-    .bg-emerald-subtle { background: #dcfce7; }
-    .text-emerald { color: #16a34a; }
-
-    .bg-amber-subtle { background: #fef3c7; }
-    .text-amber { color: #d97706; }
-
-    .bg-rose-subtle { background: #ffe4e6; }
-    .text-rose { color: #e11d48; }
-
-    .bg-purple-subtle { background: #ede9fe; }
-    .text-purple { color: #7c3aed; }
-
-    .kpi-info {
-      flex: 1;
+      border-radius: var(--radius-lg);
+      padding: 16px;
       display: flex;
       flex-direction: column;
+      gap: 4px;
     }
 
     .kpi-label {
-      font-size: 0.75rem;
-      font-weight: 800;
+      font-size: 13px;
       color: var(--text-muted);
-      letter-spacing: 0.05em;
-      margin-bottom: 0.25rem;
     }
 
     .kpi-value-row {
       display: flex;
       align-items: baseline;
-      gap: 0.4rem;
-      margin-bottom: 0.5rem;
+      gap: 6px;
     }
 
     .kpi-value {
-      font-size: 2rem;
-      font-weight: 900;
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.25;
       color: var(--text-main);
-      line-height: 1;
-      letter-spacing: -0.02em;
     }
 
     .kpi-unit {
-      font-size: 0.825rem;
-      color: var(--text-secondary);
-      font-weight: 600;
-    }
-
-    .kpi-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .meta-note {
-      font-size: 0.75rem;
+      font-size: 13px;
       color: var(--text-muted);
     }
 
-    /* Analytics Grid */
+    .kpi-value-row .status {
+      align-self: center;
+      margin-left: auto;
+    }
+
+    .kpi-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Lưới biểu đồ */
     .analytics-grid {
       display: grid;
-      grid-template-columns: 1.6fr 1.2fr;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
     }
 
-    @media (max-width: 1080px) {
-      .analytics-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    .panel-meta { font-size: 13px; }
 
-    .card-box {
-      background: #ffffff;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-sm);
-      overflow: hidden;
-    }
-
-    .card-box-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.25rem;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .card-box-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .card-box-body {
-      padding: 1.25rem;
-    }
-
-    .date-range-badge {
-      font-size: 0.775rem;
-      font-weight: 700;
-      padding: 0.2rem 0.55rem;
-      background: #e2e8f0;
-      color: #334155;
-      border-radius: var(--radius-xs);
-    }
-
-    /* Bar Chart Representation */
     .chart-legend {
       display: flex;
-      gap: 1.25rem;
-      margin-bottom: 1.25rem;
-      font-size: 0.8rem;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--text-secondary);
     }
 
     .legend-item {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      color: var(--text-secondary);
-      font-weight: 600;
+      gap: 6px;
     }
 
-    .legend-box {
-      width: 12px;
-      height: 12px;
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      background: var(--primary-600);
+    }
+
+    /* Biểu đồ cột */
+    .chart-scroll-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+
+    .chart-scroll-wrapper::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .chart-scroll-wrapper::-webkit-scrollbar-track {
+      background: var(--bg-subtle, #f1f5f9);
       border-radius: 3px;
     }
 
-    .bar-color { background-color: var(--primary-600); }
-    .wait-color { background-color: #f59e0b; }
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
 
-    .bar-chart-container {
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .bar-chart {
+      position: relative;
       display: flex;
-      align-items: flex-end;
-      gap: 0.85rem;
-      height: 220px;
-      padding-top: 1.5rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border-color);
+      align-items: stretch;
+      height: 250px;
+      width: 100%;
+    }
+
+    .bar-chart.period-month {
+      min-width: 960px;
+    }
+
+    .chart-empty {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 35%;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
     .bar-column {
       flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      height: 100%;
-    }
-
-    .bar-metric-top {
-      height: 24px;
-      display: flex;
-      align-items: center;
-      margin-bottom: 0.35rem;
-    }
-
-    .wait-pill {
-      font-size: 0.7rem;
-      font-weight: 800;
-      background: #fef3c7;
-      color: #92400e;
-      padding: 0.1rem 0.35rem;
+      transition: background-color 0.15s ease;
       border-radius: 4px;
-      border: 1px solid #fde68a;
+    }
+
+    .bar-chart.period-month .bar-column {
+      flex: 1 0 32px;
+      min-width: 32px;
     }
 
     .bar-track {
+      padding: 0 2px;
       flex: 1;
-      width: 100%;
-      max-width: 44px;
       display: flex;
-      align-items: flex-end;
-      background: #f8fafc;
-      border-radius: 4px 4px 0 0;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      border-bottom: 1px solid var(--border-strong, #cbd5e1);
+    }
+
+    .bar-value {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .bar-value-zero {
+      opacity: 0.35;
+      font-weight: normal;
+    }
+
+    .bar-chart.period-month .bar-value {
+      font-size: 11px;
     }
 
     .bar-fill {
       width: 100%;
-      background: linear-gradient(180deg, var(--primary-500) 0%, var(--primary-700) 100%);
+      max-width: 32px;
+      background: var(--primary-600, #0284c7);
       border-radius: 4px 4px 0 0;
-      min-height: 10px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding-top: 0.3rem;
-      transition: height 0.3s ease;
-      position: relative;
+      transition: height 0.15s ease;
     }
 
-    .bar-val-inside {
-      font-size: 0.725rem;
-      font-weight: 800;
-      color: #ffffff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    .bar-chart.period-month .bar-fill {
+      max-width: 16px;
     }
 
-    .bar-label-group {
+    .bar-column:hover {
+      background: rgba(2, 132, 199, 0.05);
+    }
+
+    .bar-column:hover .bar-fill {
+      background: var(--primary-700, #0369a1);
+    }
+
+    .bar-labels {
       display: flex;
       flex-direction: column;
       align-items: center;
-      margin-top: 0.5rem;
+      padding-top: 6px;
+      line-height: 1.35;
     }
 
     .bar-dow {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--text-main);
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .bar-chart.period-month .bar-dow {
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
     .bar-date {
-      font-size: 0.7rem;
+      font-size: 11px;
       color: var(--text-muted);
+      white-space: nowrap;
     }
 
-    /* Distribution Progress Bar */
-    .multi-progress-bar {
-      height: 16px;
-      width: 100%;
-      background: #e2e8f0;
-      border-radius: var(--radius-full);
-      display: flex;
-      overflow: hidden;
-      margin-bottom: 1.25rem;
+    .bar-chart.period-month .bar-date {
+      font-size: 10px;
     }
 
-    .progress-seg {
-      height: 100%;
-      transition: width 0.3s ease;
-    }
-
-    .seg-completed { background: #10b981; }
-    .seg-progress { background: #3b82f6; }
-    .seg-waiting { background: #f59e0b; }
-    .seg-called { background: #06b6d4; }
-    .seg-cancelled { background: #ef4444; }
-
-    .status-legend-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-
-    .status-legend-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.4rem 0.5rem;
-      border-radius: var(--radius-xs);
-      font-size: 0.825rem;
-    }
-
-    .status-legend-item:hover {
-      background: #f8fafc;
-    }
-
-    .item-left {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .dot-completed { background: #10b981; }
-    .dot-progress { background: #3b82f6; }
-    .dot-waiting { background: #f59e0b; }
-    .dot-called { background: #06b6d4; }
-    .dot-cancelled { background: #ef4444; }
-
-    .percent-tag {
+    .bar-wait {
+      margin-top: 3px;
+      font-size: 11px;
       color: var(--text-muted);
-      font-size: 0.775rem;
-      margin-left: 0.25rem;
+      white-space: nowrap;
     }
 
-    .kpi-recommendation-box {
-      margin-top: 1.25rem;
-      padding: 0.85rem 1rem;
-      background: #fffbeb;
-      border: 1px solid #fde68a;
+    .bar-chart.period-month .bar-wait {
+      font-size: 10px;
+      margin-top: 2px;
+    }
+
+    /* Phân bổ trạng thái */
+    .stack-bar {
+      display: flex;
+      gap: 2px;
+      height: 12px;
       border-radius: var(--radius-sm);
-      display: flex;
-      align-items: flex-start;
-      gap: 0.65rem;
-      font-size: 0.8rem;
-      color: #92400e;
-      line-height: 1.45;
+      overflow: hidden;
+      background: var(--bg-subtle);
+      margin-bottom: 12px;
     }
 
-    /* Table Styles */
-    .table-responsive {
-      overflow-x: auto;
-    }
+    .stack-seg { height: 100%; }
 
-    .data-table {
+    .seg-completed { background: #1f5fb4; }
+    .seg-progress { background: #8db3e4; }
+    .seg-waiting { background: #d99a1e; }
+    .seg-called { background: #5b6578; }
+    .seg-cancelled { background: #c4c9d2; }
+
+    .legend-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.875rem;
+      font-size: 13px;
     }
 
-    .data-table th {
-      background: #f8fafc;
-      color: var(--text-secondary);
-      font-weight: 700;
-      padding: 0.75rem 1rem;
+    .legend-table td {
+      padding: 6px 0;
       border-bottom: 1px solid var(--border-color);
-      text-align: left;
-      font-size: 0.8rem;
-    }
-
-    .data-table td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid var(--border-color);
-      vertical-align: middle;
-    }
-
-    .room-name-cell {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .room-badge {
-      font-size: 0.8rem;
-      font-weight: 800;
-      color: var(--primary-800);
-      background: var(--primary-50);
-      padding: 0.15rem 0.5rem;
-      border-radius: var(--radius-xs);
-      border: 1px solid var(--primary-200);
-    }
-
-    .doc-cell {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.85rem;
       color: var(--text-main);
     }
 
-    .wait-time-tag {
-      font-size: 0.8rem;
-      font-weight: 800;
-      padding: 0.2rem 0.5rem;
-      border-radius: var(--radius-xs);
+    .legend-table tr:last-child td { border-bottom: none; }
+
+    .legend-table .num-col {
+      width: 64px;
+      text-align: right;
     }
 
-    .wait-time-tag.fast {
-      background: #dcfce7;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      margin-right: 6px;
     }
 
-    .wait-time-tag.medium {
-      background: #fef3c7;
-      color: #b45309;
-      border: 1px solid #fde68a;
+    .ops-note {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.45;
     }
 
-    .wait-time-tag.slow {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
+    /* Bảng phòng khám */
+    .table-responsive { overflow-x: auto; }
+
+    .data-table td.text-muted { color: var(--text-muted); }
+    .data-table td.mono { white-space: nowrap; }
+
+    .data-table .num-col {
+      text-align: right;
+      white-space: nowrap;
     }
+
+    .room-name { font-weight: 500; }
 
     .utilization-cell {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      min-width: 130px;
+      gap: 8px;
     }
 
-    .progress-bar-wrap {
+    .util-track {
       flex: 1;
-      height: 8px;
-      background: #e2e8f0;
-      border-radius: var(--radius-full);
+      height: 6px;
+      background: var(--bg-subtle);
+      border-radius: 3px;
       overflow: hidden;
     }
 
-    .progress-bar-fill {
+    .util-fill {
       height: 100%;
-      border-radius: var(--radius-full);
-      transition: width 0.3s ease;
+      background: var(--primary-600);
+      border-radius: 3px;
     }
-
-    .fill-high { background-color: #10b981; }
-    .fill-mid { background-color: #f59e0b; }
-    .fill-low { background-color: #94a3b8; }
 
     .util-percent {
-      font-size: 0.8rem;
-      min-width: 38px;
+      min-width: 36px;
       text-align: right;
+      font-size: 13px;
     }
 
-    .spin {
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
+    .empty-row {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 24px 12px;
     }
 
     .loading-state {
-      padding: 4rem 1rem;
+      padding: 48px 16px;
       text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
       color: var(--text-muted);
     }
 
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--primary-600);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .spin { animation: spin 0.8s linear infinite; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 1200px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 1080px) {
+      .analytics-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .page { padding: 16px; }
+      .kpi-grid { grid-template-columns: 1fr; }
     }
 
     @media print {
-      .header-actions, .period-toggle-group {
-        display: none !important;
-      }
-      .dashboard-page {
-        padding: 0;
-        max-width: 100%;
-      }
+      .page-actions { display: none !important; }
+      .page { padding: 0; max-width: 100%; }
     }
   `]
 })
@@ -1011,6 +686,30 @@ export class DashboardComponent implements OnInit {
   changePeriod(p: 'TODAY' | 'WEEK' | 'MONTH'): void {
     this.selectedPeriod.set(p);
     this.loadData();
+    if (p === 'MONTH') {
+      setTimeout(() => {
+        const el = document.querySelector('.chart-scroll-wrapper');
+        if (el) {
+          el.scrollLeft = el.scrollWidth;
+        }
+      }, 150);
+    }
+  }
+
+  formatDayOfWeek(dow: string | undefined): string {
+    if (!dow) return '';
+    if (this.selectedPeriod() !== 'MONTH') {
+      return dow;
+    }
+    const lower = dow.toLowerCase().trim();
+    if (lower.includes('chủ') || lower.includes('cn')) return 'CN';
+    if (lower.includes('2')) return 'T2';
+    if (lower.includes('3')) return 'T3';
+    if (lower.includes('4')) return 'T4';
+    if (lower.includes('5')) return 'T5';
+    if (lower.includes('6')) return 'T6';
+    if (lower.includes('7')) return 'T7';
+    return dow.substring(0, 2);
   }
 
   loadData(): void {

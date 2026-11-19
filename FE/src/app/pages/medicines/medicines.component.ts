@@ -14,219 +14,182 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="medicines-page">
-      <!-- Header Banner -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <i class="bi" [ngClass]="activeTab() === 'medicines' ? 'bi-capsule-pill' : 'bi-folder2-open'"></i> {{ activeTab() === 'medicines' ? 'Kho Thuốc & Biệt Dược Toàn Viện' : 'Phân Loại & Nhóm Dược Lý' }}
-          </div>
-          <h1 class="page-title">{{ activeTab() === 'medicines' ? 'Quản Lý Kho Thuốc & Biệt Dược' : 'Quản Lý Nhóm & Danh Mục Thuốc' }}</h1>
+        <div>
+          <h1 class="page-title">{{ activeTab() === 'categories' ? 'Nhóm thuốc' : (isAdmin() ? 'Danh mục thuốc' : 'Tra cứu thuốc') }}</h1>
           <p class="page-subtitle">
-            {{ activeTab() === 'medicines' ? 'Tra cứu biệt dược, hoạt chất, quy cách, đơn vị tính, đơn giá bán và định mức tồn kho khả dụng' : 'Cấu hình và phân loại hệ thống nhóm thuốc, tác dụng dược lý và danh mục điều trị' }}
+            @if (activeTab() === 'medicines') {
+              {{ totalMedicines() }} thuốc, {{ totalCategories() }} nhóm dược lý
+            } @else {
+              {{ totalCategories() }} nhóm, {{ totalMedicines() }} thuốc
+            }
           </p>
         </div>
         @if (isAdmin()) {
-          <div class="header-actions">
+          <div class="page-actions">
             @if (activeTab() === 'medicines') {
               <button class="btn btn-primary" (click)="openAddMedicineModal()">
-                <i class="bi bi-plus-circle-fill"></i> Thêm Thuốc Mới
+                <i class="bi bi-plus-lg"></i> Thêm thuốc
               </button>
             } @else {
               <button class="btn btn-primary" (click)="openAddCategoryModal()">
-                <i class="bi bi-folder-plus"></i> Thêm Nhóm Thuốc
+                <i class="bi bi-plus-lg"></i> Thêm nhóm thuốc
               </button>
             }
           </div>
         }
       </div>
 
-      <!-- Navigation Tabs & Stats Card -->
-      <div class="tab-controls-card">
-        <!-- Quick Stats Overview -->
-        <div class="stats-overview">
-          <div class="stat-pill">
-            <span class="stat-label">Tổng biệt dược:</span>
-            <strong class="stat-value text-primary">{{ totalMedicines() }}</strong>
-          </div>
-          <div class="stat-pill">
-            <span class="stat-label">Đang hoạt động:</span>
-            <strong class="stat-value text-success">{{ activeMedicines() }}</strong>
-          </div>
-          <div class="stat-pill">
-            <span class="stat-label">Cảnh báo tồn ít:</span>
-            <strong class="stat-value text-warning">{{ lowStockMedicines() }}</strong>
-          </div>
-          <div class="stat-pill">
-            <span class="stat-label">Nhóm dược lý:</span>
-            <strong class="stat-value text-info">{{ totalCategories() }}</strong>
-          </div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-label">Tổng số thuốc</span>
+          <strong class="stat-value mono">{{ totalMedicines() }}</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Đang hoạt động</span>
+          <strong class="stat-value mono">{{ activeMedicines() }}</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Tồn kho dưới 100</span>
+          <strong class="stat-value mono" [class.is-warning]="lowStockMedicines() > 0">{{ lowStockMedicines() }}</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Nhóm dược lý</span>
+          <strong class="stat-value mono">{{ totalCategories() }}</strong>
         </div>
       </div>
 
-      <!-- Feedback Alerts (Toast Notification) -->
       @if (alertMessage()) {
         <div class="toast-floating-container">
           <div class="toast-card" [ngClass]="alertType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
-            <div class="toast-icon">
-              <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-            </div>
             <div class="toast-content">
-              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo lỗi' }}</div>
+              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo' }}</div>
               <div class="toast-message">{{ alertMessage() }}</div>
             </div>
-            <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo">
+            <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo" aria-label="Đóng">
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
         </div>
       }
 
-      <!-- ==================== TAB 1: KHO THUỐC & BIỆT DƯỢC ==================== -->
+      <!-- Danh sách thuốc -->
       @if (activeTab() === 'medicines') {
-        <!-- Search & Filter Card -->
-        <div class="filter-card">
-          <div class="filter-inputs">
-            <!-- Search Box -->
+        <div class="panel">
+          <div class="toolbar">
             <div class="search-box">
-              <i class="bi bi-search search-icon"></i>
+              <i class="bi bi-search"></i>
               <input
                 type="text"
                 [ngModel]="medicineSearchKeyword()"
                 (ngModelChange)="medicineSearchKeyword.set($event); onFilterChange()"
-                placeholder="Tìm kiếm theo mã thuốc, tên biệt dược, hoạt chất..."
+                placeholder="Tìm theo mã thuốc, tên biệt dược, hoạt chất"
                 class="search-input"
               />
               @if (medicineSearchKeyword()) {
-                <button type="button" class="btn-clear-search" (click)="medicineSearchKeyword.set(''); onFilterChange()">
-                  <i class="bi bi-x-circle-fill"></i>
+                <button type="button" class="btn-clear-search" (click)="medicineSearchKeyword.set(''); onFilterChange()" aria-label="Xóa từ khóa">
+                  <i class="bi bi-x-lg"></i>
                 </button>
               }
             </div>
 
-            <!-- Category Filter -->
-            <div class="filter-select-group">
-              <label class="filter-label"><i class="bi bi-funnel-fill text-primary"></i> Nhóm thuốc:</label>
-              <select [ngModel]="selectedCategoryId()" (ngModelChange)="selectedCategoryId.set($event); onFilterChange()" class="form-select">
-                <option [ngValue]="null">-- Tất cả nhóm thuốc --</option>
-                @for (c of categories(); track c.id) {
-                  <option [ngValue]="c.id">{{ c.name }}</option>
-                }
-              </select>
-            </div>
+            <select [ngModel]="selectedCategoryId()" (ngModelChange)="selectedCategoryId.set($event); onFilterChange()" class="filter-select" aria-label="Lọc theo nhóm thuốc">
+              <option [ngValue]="null">Tất cả nhóm thuốc</option>
+              @for (c of categories(); track c.id) {
+                <option [ngValue]="c.id">{{ c.name }}</option>
+              }
+            </select>
 
-            <!-- Status Filter -->
-            <div class="filter-select-group">
-              <label class="filter-label"><i class="bi bi-activity text-primary"></i> Trạng thái:</label>
-              <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); onFilterChange()" class="form-select">
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="ACTIVE">Đang hoạt động</option>
-                <option value="INACTIVE">Tạm ngừng sử dụng</option>
-              </select>
-            </div>
+            <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); onFilterChange()" class="filter-select" aria-label="Lọc theo trạng thái">
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Tạm ngừng</option>
+            </select>
 
             @if (medicineSearchKeyword() || selectedCategoryId() !== null || statusFilter() !== 'ALL') {
-              <button class="btn-reset-filters" (click)="resetMedicineFilters()" title="Đặt lại toàn bộ bộ lọc">
-                <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+              <button class="btn-reset-filters" (click)="resetMedicineFilters()" title="Đặt lại bộ lọc">
+                Đặt lại
               </button>
             }
           </div>
-        </div>
 
-        <!-- Medicine Table & Pagination Container -->
-        <div class="table-card">
           @if (loading()) {
             <div class="loading-state">
               <div class="spinner"></div>
-              <p>Đang tải dữ liệu danh mục thuốc...</p>
+              <p>Đang tải danh mục thuốc...</p>
             </div>
           } @else if (filteredMedicines().length === 0) {
             <div class="empty-state">
-              <i class="bi bi-capsule text-muted"></i>
-              <h3>Không tìm thấy loại thuốc nào phù hợp</h3>
-              <p>Hãy thử thay đổi từ khóa tìm kiếm hoặc nhấn nút "Thêm Thuốc Mới" để tạo mới.</p>
+              <h3>Không có thuốc phù hợp</h3>
+              <p>Thử đổi từ khóa hoặc bộ lọc.</p>
             </div>
           } @else {
             <div class="table-responsive">
-              <table class="clinical-table">
+              <table class="data-table">
                 <thead>
                   <tr>
-                    <th style="width: 100px;">Mã thuốc</th>
+                    <th style="width: 100px;">Mã</th>
                     <th style="min-width: 220px;">Tên biệt dược</th>
-                    <th style="min-width: 200px;">Hoạt chất chính</th>
+                    <th style="min-width: 200px;">Hoạt chất</th>
                     <th style="min-width: 170px;">Nhóm dược lý</th>
-                    <th style="width: 90px; text-align: center;">Đơn vị</th>
-                    <th style="width: 120px; text-align: right;">Đơn giá</th>
-                    <th style="width: 100px; text-align: center;">Tồn kho</th>
-                    <th style="width: 120px; text-align: center;">Trạng thái</th>
-                    <th style="width: 110px; text-align: center;">Thao tác</th>
+                    <th style="width: 80px;">Đơn vị</th>
+                    <th style="width: 110px; text-align: right;">Đơn giá (đ)</th>
+                    <th style="width: 90px; text-align: right;">Tồn kho</th>
+                    <th style="width: 120px;">Trạng thái</th>
+                    <th style="width: 80px;"></th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (item of paginatedMedicines(); track item.id) {
-                    <tr class="table-row">
+                    <tr>
+                      <td class="mono text-muted code-cell">{{ item.code || 'MED-' + item.id }}</td>
                       <td>
-                        <span class="code-badge">{{ item.code || 'MED-' + item.id }}</span>
-                      </td>
-                      <td>
-                        <div class="med-name-cell">
-                          <strong class="med-title">{{ item.name }}</strong>
-                          <span class="med-sub">
-                            <i class="bi bi-box-seam"></i> {{ item.dosageForm || 'Chưa rõ dạng' }}
-                            @if (item.packaging) {
-                              • {{ item.packaging }}
-                            }
+                        <div class="name-cell">
+                          <strong class="name-main">{{ item.name }}</strong>
+                          <span class="name-sub">
+                            {{ item.dosageForm || 'Chưa rõ dạng' }}@if (item.packaging) { · {{ item.packaging }} }
                           </span>
                         </div>
                       </td>
                       <td>
-                        <div class="med-ingredient" [title]="item.activeIngredient || ''">
-                          {{ item.activeIngredient || '--' }}
+                        <div class="clamp-2" [title]="item.activeIngredient || ''">
+                          {{ item.activeIngredient || '—' }}
                         </div>
                       </td>
                       <td>
                         @if (item.categoryName) {
-                          <span class="category-badge">
-                            <i class="bi bi-tag-fill"></i> {{ item.categoryName }}
-                          </span>
+                          {{ item.categoryName }}
                         } @else {
-                          <span class="text-muted-tag">Chưa phân loại</span>
+                          <span class="text-muted">Chưa phân loại</span>
                         }
                       </td>
-                      <td style="text-align: center;">
-                        <span class="unit-badge">{{ item.unit || 'Viên' }}</span>
-                      </td>
-                      <td style="text-align: right;">
-                        <span class="price-text">{{ (item.price || 0) | number:'1.0-0' }} đ</span>
-                      </td>
-                      <td style="text-align: center;">
+                      <td>{{ item.unit || 'Viên' }}</td>
+                      <td class="mono" style="text-align: right;">{{ (item.price || 0) | number:'1.0-0' }}</td>
+                      <td class="mono" style="text-align: right;">
                         <span
-                          class="stock-badge"
+                          class="stock-val"
                           [ngClass]="(item.stockQuantity || 0) < 100 ? 'stock-low' : 'stock-ok'"
-                          [title]="(item.stockQuantity || 0) < 100 ? 'Cảnh báo: Tồn kho dưới 100 đơn vị' : 'Tồn kho khả dụng'"
-                        >
-                          <i class="bi" [ngClass]="(item.stockQuantity || 0) < 100 ? 'bi-exclamation-triangle-fill' : 'bi-check2'"></i>
-                          {{ item.stockQuantity || 0 }}
-                        </span>
+                          [title]="(item.stockQuantity || 0) < 100 ? 'Tồn kho dưới 100 đơn vị' : 'Tồn kho khả dụng'"
+                        >{{ item.stockQuantity || 0 }}</span>
                       </td>
-                      <td style="text-align: center;">
-                        <span class="status-pill" [class.status-active]="item.isActive" [class.status-inactive]="!item.isActive">
-                          <span class="status-dot"></span>
+                      <td>
+                        <span class="status" [class.success]="item.isActive">
                           {{ item.isActive ? 'Hoạt động' : 'Tạm ngừng' }}
                         </span>
                       </td>
-                      <td style="text-align: center;">
-                        <div class="action-buttons-cell">
+                      <td>
+                        <div class="row-actions">
                           @if (isAdmin()) {
-                            <button class="btn-action btn-action-edit" (click)="openEditMedicineModal(item)" title="Chỉnh sửa thông tin">
-                              <i class="bi bi-pencil-fill"></i>
+                            <button class="icon-btn" (click)="openEditMedicineModal(item)" title="Chỉnh sửa" aria-label="Chỉnh sửa">
+                              <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn-action btn-action-delete" (click)="confirmDeleteMedicine(item)" title="Xóa thuốc khỏi danh mục">
-                              <i class="bi bi-trash3-fill"></i>
+                            <button class="icon-btn danger" (click)="confirmDeleteMedicine(item)" title="Xóa" aria-label="Xóa">
+                              <i class="bi bi-trash3"></i>
                             </button>
                           } @else {
-                            <button class="btn-action btn-action-edit" (click)="openEditMedicineModal(item)" title="Xem thông tin chi tiết thuốc">
-                              <i class="bi bi-eye-fill"></i>
+                            <button class="icon-btn" (click)="openEditMedicineModal(item)" title="Xem chi tiết" aria-label="Xem chi tiết">
+                              <i class="bi bi-eye"></i>
                             </button>
                           }
                         </div>
@@ -237,14 +200,11 @@ import { AuthService } from '../../services/auth.service';
               </table>
             </div>
 
-            <!-- CLEAR & POWERFUL PAGINATION BAR -->
             <div class="pagination-footer">
               <div class="pagination-info">
-                <span>
-                  Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredMedicines().length }}</strong> loại thuốc
-                </span>
+                <span>{{ startIndex() }}–{{ endIndex() }} / {{ filteredMedicines().length }}</span>
                 <div class="page-size-selector">
-                  <label for="pageSizeSelect">Số dòng/trang:</label>
+                  <label for="pageSizeSelect">Số dòng</label>
                   <select
                     id="pageSizeSelect"
                     [ngModel]="pageSize()"
@@ -258,54 +218,20 @@ import { AuthService } from '../../services/auth.service';
                 </div>
               </div>
 
-              <!-- Pagination Navigation Buttons -->
               <div class="pagination-controls">
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="currentPage() === 1"
-                  (click)="goToPage(1)"
-                  title="Về trang đầu tiên"
-                >
+                <button class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Trang đầu">
                   <i class="bi bi-chevron-double-left"></i>
                 </button>
-
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="currentPage() === 1"
-                  (click)="prevPage()"
-                  title="Trang trước"
-                >
-                  <i class="bi bi-chevron-left"></i> Trước
+                <button class="btn-page" [disabled]="currentPage() === 1" (click)="prevPage()" title="Trang trước">
+                  <i class="bi bi-chevron-left"></i>
                 </button>
-
-                <!-- Page Number Pills -->
-                <div class="page-numbers-group">
-                  @for (p of pagesList(); track p) {
-                    <button
-                      class="btn-page btn-page-num"
-                      [class.active]="currentPage() === p"
-                      (click)="goToPage(p)"
-                    >
-                      {{ p }}
-                    </button>
-                  }
-                </div>
-
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="currentPage() === totalPages()"
-                  (click)="nextPage()"
-                  title="Trang sau"
-                >
-                  Sau <i class="bi bi-chevron-right"></i>
+                @for (p of pagesList(); track p) {
+                  <button class="btn-page" [class.active]="currentPage() === p" (click)="goToPage(p)">{{ p }}</button>
+                }
+                <button class="btn-page" [disabled]="currentPage() === totalPages()" (click)="nextPage()" title="Trang sau">
+                  <i class="bi bi-chevron-right"></i>
                 </button>
-
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="currentPage() === totalPages()"
-                  (click)="goToPage(totalPages())"
-                  title="Đến trang cuối cùng"
-                >
+                <button class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Trang cuối">
                   <i class="bi bi-chevron-double-right"></i>
                 </button>
               </div>
@@ -314,119 +240,96 @@ import { AuthService } from '../../services/auth.service';
         </div>
       }
 
-      <!-- ==================== TAB 2: NHÓM & DANH MỤC THUỐC ==================== -->
+      <!-- Nhóm thuốc -->
       @if (activeTab() === 'categories') {
-        <div class="filter-card">
-          <div class="filter-inputs">
+        <div class="panel">
+          <div class="toolbar">
             <div class="search-box">
-              <i class="bi bi-search search-icon"></i>
+              <i class="bi bi-search"></i>
               <input
                 type="text"
                 [ngModel]="categorySearchKeyword()"
                 (ngModelChange)="categorySearchKeyword.set($event); onCategoryFilterChange()"
-                placeholder="Tìm kiếm theo mã nhóm, tên nhóm thuốc hoặc công dụng điều trị..."
+                placeholder="Tìm theo mã nhóm, tên nhóm hoặc mô tả"
                 class="search-input"
               />
               @if (categorySearchKeyword()) {
-                <button type="button" class="btn-clear-search" (click)="categorySearchKeyword.set(''); onCategoryFilterChange()" title="Xóa từ khóa tìm kiếm">
-                  <i class="bi bi-x-circle-fill"></i>
+                <button type="button" class="btn-clear-search" (click)="categorySearchKeyword.set(''); onCategoryFilterChange()" title="Xóa từ khóa" aria-label="Xóa từ khóa">
+                  <i class="bi bi-x-lg"></i>
                 </button>
               }
             </div>
 
-            <!-- Status Filter for Category -->
-            <div class="filter-select-group">
-              <label class="filter-label"><i class="bi bi-activity text-primary"></i> Trạng thái:</label>
-              <select
-                [ngModel]="categoryStatusFilter()"
-                (ngModelChange)="categoryStatusFilter.set($event); onCategoryFilterChange()"
-                class="form-select"
-              >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="ACTIVE">Đang hoạt động</option>
-                <option value="INACTIVE">Tạm ngừng sử dụng</option>
-              </select>
-            </div>
+            <select
+              [ngModel]="categoryStatusFilter()"
+              (ngModelChange)="categoryStatusFilter.set($event); onCategoryFilterChange()"
+              class="filter-select"
+              aria-label="Lọc theo trạng thái"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Tạm ngừng</option>
+            </select>
 
             @if (categorySearchKeyword() || categoryStatusFilter() !== 'ALL') {
-              <button type="button" class="btn-reset-filters" (click)="resetCategoryFilters()" title="Đặt lại toàn bộ bộ lọc">
-                <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+              <button type="button" class="btn-reset-filters" (click)="resetCategoryFilters()" title="Đặt lại bộ lọc">
+                Đặt lại
               </button>
             }
           </div>
-        </div>
 
-        @if (loading()) {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Đang tải danh mục nhóm thuốc...</p>
-          </div>
-        } @else if (filteredCategories().length === 0) {
-          <div class="empty-state">
-            <i class="bi bi-folder-x text-muted"></i>
-            <h3>Không tìm thấy nhóm thuốc nào</h3>
-            <p>Nhấn nút "Thêm Nhóm Thuốc" để tạo phân loại dược lý mới.</p>
-          </div>
-        } @else {
-          <!-- Category Table & Pagination Container -->
-          <div class="table-card">
+          @if (loading()) {
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Đang tải nhóm thuốc...</p>
+            </div>
+          } @else if (filteredCategories().length === 0) {
+            <div class="empty-state">
+              <h3>Không có nhóm thuốc phù hợp</h3>
+              <p>Thử đổi từ khóa hoặc thêm nhóm thuốc mới.</p>
+            </div>
+          } @else {
             <div class="table-responsive">
-              <table class="clinical-table">
+              <table class="data-table">
                 <thead>
                   <tr>
-                    <th style="width: 110px; text-align: center;">Mã nhóm</th>
-                    <th style="min-width: 250px;">Tên nhóm thuốc</th>
-                    <th style="min-width: 320px;">Mô tả &amp; Phạm vi điều trị</th>
-                    <th style="width: 140px; text-align: center;">Số lượng thuốc</th>
-                    <th style="width: 90px; text-align: center;">Thứ tự</th>
-                    <th style="width: 130px; text-align: center;">Trạng thái</th>
-                    <th style="width: 110px; text-align: center;">Thao tác</th>
+                    <th style="width: 100px;">Mã</th>
+                    <th style="min-width: 240px;">Tên nhóm thuốc</th>
+                    <th style="min-width: 320px;">Mô tả</th>
+                    <th style="width: 110px; text-align: right;">Số thuốc</th>
+                    <th style="width: 80px; text-align: right;">Thứ tự</th>
+                    <th style="width: 120px;">Trạng thái</th>
+                    <th style="width: 80px;"></th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (cat of paginatedCategories(); track cat.id) {
-                    <tr class="table-row">
-                      <td style="text-align: center;">
-                        <span class="code-badge">
-                          {{ cat.code || 'CAT-' + cat.id }}
-                        </span>
-                      </td>
+                    <tr>
+                      <td class="mono text-muted code-cell">{{ cat.code || 'CAT-' + cat.id }}</td>
+                      <td><strong class="name-main">{{ cat.name }}</strong></td>
                       <td>
-                        <div class="cat-name-cell">
-                          <strong class="cat-table-title">{{ cat.name }}</strong>
-                          <span class="cat-table-sub">
-                            <i class="bi bi-folder2-open"></i> Phân loại dược lý
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <p class="cat-table-desc" [title]="cat.description || ''">
-                          {{ cat.description || 'Chưa có thông tin mô tả chi tiết cho nhóm thuốc này.' }}
+                        <p class="clamp-2 text-secondary" [title]="cat.description || ''">
+                          {{ cat.description || '—' }}
                         </p>
                       </td>
-                      <td style="text-align: center;">
-                        <button class="badge-count btn-link-badge" (click)="filterMedicinesByCategory(cat.id)" title="Bấm để lọc danh sách thuốc thuộc nhóm này">
-                          <i class="bi bi-capsule"></i>
-                          <span>{{ cat.medicineCount || 0 }} thuốc</span>
-                          <i class="bi bi-chevron-right" style="font-size: 0.75rem;"></i>
+                      <td style="text-align: right;">
+                        <button class="link-btn mono" (click)="filterMedicinesByCategory(cat.id)" title="Xem các thuốc thuộc nhóm này">
+                          {{ cat.medicineCount || 0 }} thuốc
                         </button>
                       </td>
-                      <td style="text-align: center;">
-                        <span class="order-badge">#{{ cat.displayOrder || 0 }}</span>
-                      </td>
-                      <td style="text-align: center;">
-                        <span class="status-pill" [class.status-active]="cat.isActive" [class.status-inactive]="!cat.isActive">
-                          <span class="status-dot"></span>
+                      <td class="mono text-muted" style="text-align: right;">{{ cat.displayOrder || 0 }}</td>
+                      <td>
+                        <span class="status" [class.success]="cat.isActive">
                           {{ cat.isActive ? 'Hoạt động' : 'Tạm ngừng' }}
                         </span>
                       </td>
-                      <td style="text-align: center;">
-                        <div class="action-buttons-cell">
-                          <button class="btn-action btn-action-edit" (click)="openEditCategoryModal(cat)" title="Chỉnh sửa thông tin nhóm">
-                            <i class="bi bi-pencil-fill"></i>
+                      <td>
+                        <div class="row-actions">
+                          <button class="icon-btn" (click)="openEditCategoryModal(cat)" title="Chỉnh sửa" aria-label="Chỉnh sửa">
+                            <i class="bi bi-pencil"></i>
                           </button>
-                          <button class="btn-action btn-action-delete" (click)="confirmDeleteCategory(cat)" title="Xóa nhóm thuốc">
-                            <i class="bi bi-trash3-fill"></i>
+                          <button class="icon-btn danger" (click)="confirmDeleteCategory(cat)" title="Xóa" aria-label="Xóa">
+                            <i class="bi bi-trash3"></i>
                           </button>
                         </div>
                       </td>
@@ -436,14 +339,11 @@ import { AuthService } from '../../services/auth.service';
               </table>
             </div>
 
-            <!-- Category Pagination Bar -->
             <div class="pagination-footer">
               <div class="pagination-info">
-                <span>
-                  Hiển thị <strong>{{ categoryStartIndex() }} - {{ categoryEndIndex() }}</strong> trên tổng số <strong>{{ filteredCategories().length }}</strong> nhóm thuốc
-                </span>
+                <span>{{ categoryStartIndex() }}–{{ categoryEndIndex() }} / {{ filteredCategories().length }}</span>
                 <div class="page-size-selector">
-                  <label for="catPageSizeSelect">Số nhóm/trang:</label>
+                  <label for="catPageSizeSelect">Số dòng</label>
                   <select
                     id="catPageSizeSelect"
                     [ngModel]="categoryPageSize()"
@@ -457,92 +357,57 @@ import { AuthService } from '../../services/auth.service';
                 </div>
               </div>
 
-              <!-- Pagination Navigation Buttons -->
               <div class="pagination-controls">
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="categoryCurrentPage() === 1"
-                  (click)="goToCategoryPage(1)"
-                  title="Về trang đầu tiên"
-                >
+                <button class="btn-page" [disabled]="categoryCurrentPage() === 1" (click)="goToCategoryPage(1)" title="Trang đầu">
                   <i class="bi bi-chevron-double-left"></i>
                 </button>
-
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="categoryCurrentPage() === 1"
-                  (click)="prevCategoryPage()"
-                  title="Trang trước"
-                >
-                  <i class="bi bi-chevron-left"></i> Trước
+                <button class="btn-page" [disabled]="categoryCurrentPage() === 1" (click)="prevCategoryPage()" title="Trang trước">
+                  <i class="bi bi-chevron-left"></i>
                 </button>
-
-                <!-- Page Number Pills -->
-                <div class="page-numbers-group">
-                  @for (p of categoryPagesList(); track p) {
-                    <button
-                      class="btn-page btn-page-num"
-                      [class.active]="categoryCurrentPage() === p"
-                      (click)="goToCategoryPage(p)"
-                    >
-                      {{ p }}
-                    </button>
-                  }
-                </div>
-
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="categoryCurrentPage() === categoryTotalPages()"
-                  (click)="nextCategoryPage()"
-                  title="Trang sau"
-                >
-                  Sau <i class="bi bi-chevron-right"></i>
+                @for (p of categoryPagesList(); track p) {
+                  <button class="btn-page" [class.active]="categoryCurrentPage() === p" (click)="goToCategoryPage(p)">{{ p }}</button>
+                }
+                <button class="btn-page" [disabled]="categoryCurrentPage() === categoryTotalPages()" (click)="nextCategoryPage()" title="Trang sau">
+                  <i class="bi bi-chevron-right"></i>
                 </button>
-
-                <button
-                  class="btn-page btn-page-nav"
-                  [disabled]="categoryCurrentPage() === categoryTotalPages()"
-                  (click)="goToCategoryPage(categoryTotalPages())"
-                  title="Đến trang cuối cùng"
-                >
+                <button class="btn-page" [disabled]="categoryCurrentPage() === categoryTotalPages()" (click)="goToCategoryPage(categoryTotalPages())" title="Trang cuối">
                   <i class="bi bi-chevron-double-right"></i>
                 </button>
               </div>
             </div>
-          </div>
-        }
+          }
+        </div>
       }
 
-      <!-- ==================== MODAL: THÊM / CẬP NHẬT THUỐC ==================== -->
+      <!-- Modal thêm / sửa thuốc -->
       @if (showMedicineModal()) {
         <div class="modal-backdrop" (click)="closeMedicineModal()">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">
-                <i class="bi bi-capsule text-primary"></i>
-                {{ isEditingMedicine() ? 'Cập Nhật Thông Tin Thuốc' : 'Thêm Mới Thuốc Vào Danh Mục' }}
+                {{ isEditingMedicine() ? (isAdmin() ? 'Sửa thông tin thuốc' : 'Thông tin thuốc') : 'Thêm thuốc' }}
               </h2>
-              <button class="modal-close-btn" (click)="closeMedicineModal()">×</button>
+              <button class="modal-close-btn" (click)="closeMedicineModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
-              <div class="form-grid-2">
+              <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label required">Tên biệt dược</label>
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.name"
-                    placeholder="Ví dụ: Panadol Extra 500mg, Augmentin 1g..."
+                    placeholder="vd: Panadol Extra 500mg"
                     class="form-control"
                     required
                   />
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Mã định danh thuốc</label>
+                  <label class="form-label">Mã thuốc</label>
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.code"
-                    placeholder="Ví dụ: MED-001, PARA500..."
+                    placeholder="vd: MED-001"
                     class="form-control"
                   />
                 </div>
@@ -558,11 +423,11 @@ import { AuthService } from '../../services/auth.service';
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Hoạt chất chính & Hàm lượng</label>
+                  <label class="form-label">Hoạt chất, hàm lượng</label>
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.activeIngredient"
-                    placeholder="Ví dụ: Paracetamol 500mg + Caffeine 65mg"
+                    placeholder="vd: Paracetamol 500mg + Caffeine 65mg"
                     class="form-control"
                   />
                 </div>
@@ -572,7 +437,7 @@ import { AuthService } from '../../services/auth.service';
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.dosageForm"
-                    placeholder="Ví dụ: Viên nén, Viên bao phim, Siro, Hỗn dịch..."
+                    placeholder="vd: Viên nén, Siro, Hỗn dịch"
                     class="form-control"
                   />
                 </div>
@@ -582,27 +447,27 @@ import { AuthService } from '../../services/auth.service';
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.unit"
-                    placeholder="Ví dụ: Viên, Gói, Chai, Lọ, Ống, Tuýp..."
+                    placeholder="vd: Viên, Gói, Chai, Ống"
                     class="form-control"
                   />
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Đơn giá kê đơn (VNĐ)</label>
+                  <label class="form-label">Đơn giá (đ)</label>
                   <input
                     type="number"
                     [(ngModel)]="medicineFormData.price"
-                    placeholder="Ví dụ: 2500"
+                    placeholder="vd: 2500"
                     class="form-control"
                   />
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Tồn kho khả dụng</label>
+                  <label class="form-label">Tồn kho</label>
                   <input
                     type="number"
                     [(ngModel)]="medicineFormData.stockQuantity"
-                    placeholder="Ví dụ: 500"
+                    placeholder="vd: 500"
                     class="form-control"
                   />
                 </div>
@@ -612,7 +477,7 @@ import { AuthService } from '../../services/auth.service';
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.routeOfAdministration"
-                    placeholder="Ví dụ: Đường uống, Bôi ngoài da, Nhỏ mắt..."
+                    placeholder="vd: Uống, Bôi ngoài da, Nhỏ mắt"
                     class="form-control"
                   />
                 </div>
@@ -622,61 +487,57 @@ import { AuthService } from '../../services/auth.service';
                   <input
                     type="text"
                     [(ngModel)]="medicineFormData.packaging"
-                    placeholder="Ví dụ: Hộp 10 vỉ x 10 viên"
+                    placeholder="vd: Hộp 10 vỉ x 10 viên"
                     class="form-control"
                   />
                 </div>
-              </div>
 
-              <div class="form-group mt-3">
-                <label class="form-label">Hướng dẫn sử dụng mặc định</label>
-                <textarea
-                  [(ngModel)]="medicineFormData.defaultUsageInstructions"
-                  rows="2"
-                  placeholder="Ví dụ: Uống 1 viên khi sốt > 38.5 độ C, cách 4-6 giờ sau ăn"
-                  class="form-control"
-                ></textarea>
-              </div>
+                <div class="form-group form-group-full">
+                  <label class="form-label">Hướng dẫn sử dụng mặc định</label>
+                  <textarea
+                    [(ngModel)]="medicineFormData.defaultUsageInstructions"
+                    rows="2"
+                    placeholder="vd: Uống 1 viên khi sốt trên 38,5°C, cách 4–6 giờ, sau ăn"
+                    class="form-control"
+                  ></textarea>
+                </div>
 
-              <div class="form-group mt-3">
-                <label class="form-label">Chống chỉ định & Cảnh báo an toàn</label>
-                <textarea
-                  [(ngModel)]="medicineFormData.contraindications"
-                  rows="2"
-                  placeholder="Ví dụ: Người mẫn cảm với Paracetamol, bệnh nhân suy gan thận nặng..."
-                  class="form-control"
-                ></textarea>
-              </div>
+                <div class="form-group form-group-full">
+                  <label class="form-label">Chống chỉ định, cảnh báo</label>
+                  <textarea
+                    [(ngModel)]="medicineFormData.contraindications"
+                    rows="2"
+                    placeholder="vd: Mẫn cảm với Paracetamol, suy gan thận nặng"
+                    class="form-control"
+                  ></textarea>
+                </div>
 
-              <div class="form-group checkbox-group mt-3">
-                <label class="checkbox-label">
-                  <input type="checkbox" [(ngModel)]="medicineFormData.isActive" />
-                  <span>Kích hoạt thuốc sẵn sàng kê đơn</span>
-                </label>
+                <div class="form-group form-group-full">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [(ngModel)]="medicineFormData.isActive" />
+                    <span>Cho phép kê đơn</span>
+                  </label>
+                </div>
               </div>
             </div>
 
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeMedicineModal()">Hủy bỏ</button>
+              <button class="btn btn-secondary" (click)="closeMedicineModal()">Hủy</button>
               <button class="btn btn-primary" [disabled]="submitting()" (click)="saveMedicine()">
-                <i class="bi bi-check-circle-fill"></i>
-                {{ submitting() ? 'Đang lưu...' : (isEditingMedicine() ? 'Lưu Thay Đổi' : 'Thêm Thuốc') }}
+                {{ submitting() ? 'Đang lưu...' : (isEditingMedicine() ? 'Lưu thay đổi' : 'Thêm thuốc') }}
               </button>
             </div>
           </div>
         </div>
       }
 
-      <!-- ==================== MODAL: THÊM / CẬP NHẬT NHÓM THUỐC ==================== -->
+      <!-- Modal thêm / sửa nhóm thuốc -->
       @if (showCategoryModal()) {
         <div class="modal-backdrop" (click)="closeCategoryModal()">
           <div class="modal-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi bi-folder-fill text-primary"></i>
-                {{ isEditingCategory() ? 'Cập Nhật Nhóm Thuốc' : 'Thêm Nhóm Thuốc Mới' }}
-              </h2>
-              <button class="modal-close-btn" (click)="closeCategoryModal()">×</button>
+              <h2 class="modal-title">{{ isEditingCategory() ? 'Sửa nhóm thuốc' : 'Thêm nhóm thuốc' }}</h2>
+              <button class="modal-close-btn" (click)="closeCategoryModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               <div class="form-group">
@@ -684,79 +545,77 @@ import { AuthService } from '../../services/auth.service';
                 <input
                   type="text"
                   [(ngModel)]="categoryFormData.name"
-                  placeholder="Ví dụ: Nhóm Kháng Sinh & Kháng Khuẩn..."
+                  placeholder="vd: Kháng sinh & kháng khuẩn"
                   class="form-control"
                   required
                 />
               </div>
 
-              <div class="form-group mt-3">
-                <label class="form-label">Mã nhóm thuốc</label>
-                <input
-                  type="text"
-                  [(ngModel)]="categoryFormData.code"
-                  placeholder="Ví dụ: KS, GD-HS, TH-DD..."
-                  class="form-control"
-                />
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Mã nhóm</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="categoryFormData.code"
+                    placeholder="vd: KS, GD-HS"
+                    class="form-control"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Thứ tự hiển thị</label>
+                  <input
+                    type="number"
+                    [(ngModel)]="categoryFormData.displayOrder"
+                    class="form-control"
+                  />
+                </div>
               </div>
 
-              <div class="form-group mt-3">
-                <label class="form-label">Mô tả tác dụng điều trị</label>
+              <div class="form-group">
+                <label class="form-label">Mô tả</label>
                 <textarea
                   [(ngModel)]="categoryFormData.description"
                   rows="3"
-                  placeholder="Mô tả công dụng và các lưu ý chung của nhóm thuốc..."
+                  placeholder="Công dụng và lưu ý chung của nhóm thuốc"
                   class="form-control"
                 ></textarea>
               </div>
 
-              <div class="form-group mt-3">
-                <label class="form-label">Thứ tự hiển thị ưu tiên</label>
-                <input
-                  type="number"
-                  [(ngModel)]="categoryFormData.displayOrder"
-                  class="form-control"
-                />
-              </div>
-
-              <div class="form-group checkbox-group mt-3">
+              <div class="form-group">
                 <label class="checkbox-label">
                   <input type="checkbox" [(ngModel)]="categoryFormData.isActive" />
-                  <span>Kích hoạt nhóm thuốc</span>
+                  <span>Đang hoạt động</span>
                 </label>
               </div>
             </div>
 
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeCategoryModal()">Hủy bỏ</button>
+              <button class="btn btn-secondary" (click)="closeCategoryModal()">Hủy</button>
               <button class="btn btn-primary" [disabled]="submitting()" (click)="saveCategory()">
-                <i class="bi bi-check-circle-fill"></i>
-                {{ submitting() ? 'Đang lưu...' : (isEditingCategory() ? 'Lưu Thay Đổi' : 'Tạo Nhóm') }}
+                {{ submitting() ? 'Đang lưu...' : (isEditingCategory() ? 'Lưu thay đổi' : 'Thêm nhóm') }}
               </button>
             </div>
           </div>
         </div>
       }
 
-      <!-- ==================== MODAL: XÁC NHẬN XÓA ==================== -->
+      <!-- Modal xác nhận xóa -->
       @if (showDeleteConfirm()) {
         <div class="modal-backdrop" (click)="showDeleteConfirm.set(false)">
           <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
-            <div class="modal-header danger-header">
-              <h2 class="modal-title">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i> Xác Nhận Xóa
-              </h2>
-              <button class="modal-close-btn" (click)="showDeleteConfirm.set(false)">×</button>
+            <div class="modal-header">
+              <h2 class="modal-title">Xác nhận xóa</h2>
+              <button class="modal-close-btn" (click)="showDeleteConfirm.set(false)" aria-label="Đóng">×</button>
             </div>
-            <div class="modal-body text-center py-4">
-              <p class="mb-2">Bạn có chắc chắn muốn xóa:</p>
-              <h4 class="text-danger font-weight-bold">{{ deleteTarget()?.name }}</h4>
-              <p class="text-muted small mt-2">Hành động này không thể hoàn tác nếu không có ràng buộc dữ liệu bảo vệ.</p>
+            <div class="modal-body">
+              <p class="confirm-text">Xóa <strong>{{ deleteTarget()?.name }}</strong>?</p>
+              <p class="confirm-note">Không thể hoàn tác thao tác này.</p>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="showDeleteConfirm.set(false)">Hủy</button>
+              <button class="btn btn-secondary" (click)="showDeleteConfirm.set(false)">Hủy</button>
               <button class="btn btn-danger" [disabled]="submitting()" (click)="executeDelete()">
-                {{ submitting() ? 'Đang xóa...' : 'Đồng Ý Xóa' }}
+                {{ submitting() ? 'Đang xóa...' : 'Xóa' }}
               </button>
             </div>
           </div>
@@ -765,1021 +624,279 @@ import { AuthService } from '../../services/auth.service';
     </div>
   `,
   styles: [`
-    /* ==========================================================================
-       Clinical Light Design System - High Legibility & Ergonomics
-       ========================================================================== */
-    .medicines-page {
-      padding: 1.5rem 2rem 3rem;
-      max-width: 1440px;
-      margin: 0 auto;
-      background-color: #f8fafc;
-      color: #0f172a;
+    /* Thẻ thống kê */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
-    /* Page Header */
-    .page-header {
+    .stat-card {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.25rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #0284c7;
-      background: #e0f2fe;
-      border: 1px solid #bae6fd;
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
-      margin-bottom: 0.4rem;
-    }
-
-    .page-title {
-      font-size: 1.85rem;
-      font-weight: 800;
-      color: #0f172a;
-      letter-spacing: -0.02em;
-      margin: 0 0 0.3rem;
-    }
-
-    .page-subtitle {
-      font-size: 0.95rem;
-      color: #64748b;
-      margin: 0;
-      max-width: 800px;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.65rem 1.25rem;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
-    }
-
-    .btn-primary:hover {
-      box-shadow: 0 6px 18px rgba(2, 132, 199, 0.5);
-      transform: translateY(-1px);
-    }
-
-    .btn-outline {
-      background: #ffffff;
-      color: #334155;
-      border: 1px solid #cbd5e1;
-    }
-
-    .btn-outline:hover {
-      background: #f1f5f9;
-      border-color: #94a3b8;
-    }
-
-    .btn-danger {
-      background: #ef4444;
-      color: #ffffff;
-    }
-
-    .btn-danger:hover {
-      background: #dc2626;
-    }
-
-    .btn-outline-primary {
-      background: #f0f9ff;
-      color: #0284c7;
-      border: 1px solid #bae6fd;
-    }
-
-    .btn-outline-primary:hover {
-      background: #0284c7;
-      color: #ffffff;
-    }
-
-    .btn-outline-danger {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .btn-outline-danger:hover {
-      background: #dc2626;
-      color: #ffffff;
-    }
-
-    /* Tab Controls Card */
-    .tab-controls-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 0.75rem 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
-
-    .nav-tabs-wrapper {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .tab-btn {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      color: #64748b;
-      padding: 0.65rem 1.25rem;
-      font-size: 0.95rem;
-      font-weight: 700;
-      border-radius: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      transition: all 0.2s;
-    }
-
-    .tab-btn:hover {
-      color: #0284c7;
-      background: #f0f9ff;
-      border-color: #bae6fd;
-    }
-
-    .tab-btn.active {
-      color: #ffffff;
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      border-color: #0284c7;
-      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
-    }
-
-    .tab-count-badge {
-      background: #ffffff;
-      color: #0284c7;
-      font-size: 0.75rem;
-      font-weight: 800;
-      padding: 0.15rem 0.5rem;
-      border-radius: 999px;
-    }
-
-    .tab-btn:not(.active) .tab-count-badge {
-      background: #e2e8f0;
-      color: #475569;
-    }
-
-    .stats-overview {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .stat-pill {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      padding: 0.4rem 0.85rem;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.85rem;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
     }
 
     .stat-label {
-      color: #64748b;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
     .stat-value {
-      font-weight: 800;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.2;
     }
 
-    .text-primary { color: #0284c7 !important; }
-    .text-success { color: #16a34a !important; }
-    .text-warning { color: #d97706 !important; }
-    .text-info { color: #0284c7 !important; }
-    .text-danger { color: #dc2626 !important; }
+    .stat-value.is-warning { color: var(--warning-text); }
 
-    /* Filter Card */
-    .filter-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 1.25rem;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
-
-    .filter-inputs {
-      display: flex;
-      gap: 1.25rem;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .search-box {
-      flex: 1;
-      min-width: 280px;
-      display: flex;
-      align-items: center;
-      background: #ffffff;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 0.55rem 0.85rem;
-      gap: 0.6rem;
+    /* Thanh lọc */
+    .toolbar .search-box {
       position: relative;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      flex: 1 1 280px;
+      max-width: 420px;
     }
 
-    .search-box:focus-within {
-      border-color: #0284c7;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+    .search-box > i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 14px;
     }
 
-    .search-icon {
-      color: #64748b;
-      font-size: 1rem;
+    .search-input,
+    .filter-select {
+      height: 34px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #ffffff;
+      outline: none;
     }
 
     .search-input {
-      background: transparent;
-      border: none;
-      color: #0f172a;
-      outline: none;
       width: 100%;
-      font-size: 0.92rem;
-      font-weight: 500;
+      padding: 0 30px 0 32px;
     }
 
-    .search-input::placeholder {
-      color: #94a3b8;
+    .filter-select {
+      padding: 0 8px;
+      min-width: 170px;
+      max-width: 240px;
+    }
+
+    .search-input:focus,
+    .filter-select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
     .btn-clear-search {
-      background: transparent;
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
       border: none;
-      color: #94a3b8;
+      background: none;
+      color: var(--text-light);
       cursor: pointer;
-      padding: 0;
-      font-size: 1rem;
+      font-size: 12px;
+      padding: 4px;
     }
 
-    .btn-clear-search:hover { color: #ef4444; }
-
-    .filter-select-group {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .filter-label {
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: #334155;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-      white-space: nowrap;
-    }
-
-    .form-select, .form-select-sm, .form-control {
-      background: #ffffff;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 10px;
-      color: #0f172a;
-      padding: 0.55rem 0.85rem;
-      font-size: 0.88rem;
-      font-weight: 500;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .form-select:focus, .form-control:focus {
-      border-color: #0284c7;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
+    .btn-clear-search:hover { color: var(--text-main); }
 
     .btn-reset-filters {
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      padding: 0.55rem 0.95rem;
-      border-radius: 10px;
-      font-size: 0.88rem;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
+      height: 34px;
+      padding: 0 8px;
+      border: none;
+      background: none;
+      color: var(--primary-600);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
     }
 
-    .btn-reset-filters:hover {
-      background: #e2e8f0;
-      color: #0f172a;
-      border-color: #94a3b8;
-    }
+    .btn-reset-filters:hover { text-decoration: underline; }
 
-    /* Table Card */
-    .table-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
-      overflow: hidden;
-    }
+    /* Bảng */
+    .table-responsive { overflow-x: auto; }
 
-    .table-responsive {
-      overflow-x: auto;
-    }
+    .code-cell { font-size: 13px; white-space: nowrap; }
+    td.text-muted { color: var(--text-muted); }
 
-    .clinical-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.9rem;
-    }
-
-    .clinical-table thead th {
-      background: #f8fafc;
-      color: #475569;
-      font-weight: 800;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 0.95rem 1rem;
-      border-bottom: 2px solid #e2e8f0;
-      white-space: nowrap;
-    }
-
-    .clinical-table tbody tr {
-      border-bottom: 1px solid #f1f5f9;
-      transition: background 0.15s;
-    }
-
-    .clinical-table tbody tr:hover {
-      background: #f8fafc;
-    }
-
-    .clinical-table td {
-      padding: 0.9rem 1rem;
-      vertical-align: middle;
-      color: #1e293b;
-    }
-
-    /* Badge & Cell Styles */
-    .code-badge {
-      background: #f5f3ff;
-      color: #6d28d9;
-      border: 1px solid #ddd6fe;
-      padding: 0.25rem 0.55rem;
-      border-radius: 6px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 800;
-      font-size: 0.8rem;
-    }
-
-    .med-name-cell {
+    .name-cell {
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      line-height: 1.35;
     }
 
-    .med-title {
-      color: #0f172a;
-      font-weight: 800;
-      font-size: 0.95rem;
+    .name-main { font-weight: 500; }
+
+    .name-sub {
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
-    .med-sub {
-      font-size: 0.8rem;
-      color: #64748b;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .med-ingredient {
-      color: #334155;
-      font-weight: 500;
-      line-height: 1.4;
+    .clamp-2 {
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+      margin: 0;
+      line-height: 1.45;
     }
 
-    .category-badge {
-      background: #e0f2fe;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
-      padding: 0.25rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .text-muted-tag {
-      color: #94a3b8;
-      font-style: italic;
-      font-size: 0.82rem;
-    }
-
-    .unit-badge {
-      background: #f1f5f9;
-      color: #334155;
-      border: 1px solid #e2e8f0;
-      padding: 0.2rem 0.55rem;
-      border-radius: 6px;
-      font-size: 0.82rem;
-      font-weight: 600;
-    }
-
-    .price-text {
-      color: #059669;
-      font-weight: 800;
-      font-size: 0.95rem;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .stock-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      padding: 0.22rem 0.65rem;
-      border-radius: 999px;
-      font-weight: 800;
-      font-size: 0.82rem;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .stock-ok {
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-    }
+    .text-secondary { color: var(--text-secondary); font-size: 13px; }
 
     .stock-low {
-      background: #fffbeb;
-      color: #b45309;
-      border: 1px solid #fde68a;
+      color: var(--warning-text);
+      font-weight: 600;
     }
 
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 0.25rem 0.65rem;
-      border-radius: 999px;
-    }
-
-    .status-active {
-      background: #ecfdf5;
-      color: #059669;
-      border: 1px solid #a7f3d0;
-    }
-
-    .status-inactive {
-      background: #f1f5f9;
-      color: #64748b;
-      border: 1px solid #e2e8f0;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-    }
-
-    .status-active .status-dot { background: #16a34a; }
-    .status-inactive .status-dot { background: #94a3b8; }
-
-    .action-buttons-cell {
-      display: flex;
-      justify-content: center;
-      gap: 0.45rem;
-    }
-
-    .btn-action {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s;
-    }
-
-    .btn-action-edit {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      color: #0284c7;
-    }
-
-    .btn-action-edit:hover {
-      background: #0284c7;
-      color: #ffffff;
-      border-color: #0284c7;
-    }
-
-    .btn-action-delete {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #dc2626;
-    }
-
-    .btn-action-delete:hover {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
-
-    /* ==================== PAGINATION BAR ==================== */
-    .pagination-footer {
-      padding: 0.9rem 1.25rem;
-      background: #ffffff;
-      border-top: 1.5px solid #f1f5f9;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .pagination-info {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      font-size: 0.88rem;
-      color: #475569;
-    }
-
-    .pagination-info strong {
-      color: #0f172a;
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-    }
-
-    .form-select-sm {
-      padding: 0.3rem 0.65rem;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 6px;
-      color: #0f172a;
-      font-weight: 700;
-      background: #ffffff;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .btn-page {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 0.5rem;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #334155;
-      font-weight: 700;
-      font-size: 0.85rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
-
-    .btn-page:hover:not(:disabled) {
-      background: #f0f9ff;
-      border-color: #0284c7;
-      color: #0284c7;
-    }
-
-    .btn-page.active {
-      background: #0284c7;
-      border-color: #0284c7;
-      color: #ffffff;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-    }
-
-    .btn-page:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      background: #f8fafc;
-      border-color: #e2e8f0;
-    }
-
-    .btn-page-nav {
-      gap: 0.25rem;
-      padding: 0 0.75rem;
-    }
-
-    .page-numbers-group {
-      display: flex;
-      gap: 0.3rem;
-    }
-
-    /* Categories Grid */
-    .categories-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 1.25rem;
-    }
-
-    .category-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-    }
-
-    .category-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
-      border-color: #bae6fd;
-    }
-
-    .cat-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .cat-code-badge {
-      font-family: monospace;
-      font-weight: 800;
-      color: #0284c7;
-      background: #e0f2fe;
-      border: 1px solid #bae6fd;
-      padding: 0.25rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .cat-meta-right {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .badge-count {
-      background: #f1f5f9;
-      color: #334155;
-      border: 1px solid #e2e8f0;
-      padding: 0.25rem 0.6rem;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 700;
-    }
-
-    .btn-link-badge {
-      background: #f0f9ff;
-      color: #0284c7;
-      border: 1px solid #bae6fd;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-link-badge:hover {
-      background: #0284c7;
-      color: #ffffff;
-      border-color: #0284c7;
-      transform: translateY(-1px);
-    }
-
-    .mt-4 {
-      margin-top: 1.5rem !important;
-    }
-
-    .cat-title {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0;
-    }
-
-    .cat-desc {
-      font-size: 0.88rem;
-      color: #64748b;
-      margin: 0;
-      flex: 1;
-      line-height: 1.5;
-    }
-
-    .cat-card-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px solid #f1f5f9;
-      padding-top: 0.75rem;
-      font-size: 0.82rem;
-      color: #64748b;
-    }
-
-    .cat-actions {
-      display: flex;
-      gap: 0.4rem;
-    }
-
-    .cat-name-cell {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-
-    .cat-table-title {
-      color: #0f172a;
-      font-weight: 800;
-      font-size: 0.95rem;
-    }
-
-    .cat-table-sub {
-      font-size: 0.8rem;
-      color: #64748b;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .cat-table-desc {
-      color: #475569;
-      font-size: 0.88rem;
-      line-height: 1.45;
-      margin: 0;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .order-badge {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #e2e8f0;
-      padding: 0.2rem 0.55rem;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 0.82rem;
-    }
-
-    /* Modal Backdrop & Dialog (Clean Light Styling) */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      z-index: 1050;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
-      width: 100%;
-      max-width: 550px;
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      animation: modalFadeIn 0.2s ease-out;
-      border: 1px solid #e2e8f0;
-    }
-
-    .modal-lg { max-width: 780px; }
-    .modal-sm { max-width: 420px; }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .modal-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f8fafc;
-      border-top-left-radius: 16px;
-      border-top-right-radius: 16px;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .danger-header .modal-title { color: #dc2626; }
-
-    .modal-close-btn {
-      background: transparent;
+    .link-btn {
       border: none;
-      color: #64748b;
-      font-size: 1.5rem;
-      line-height: 1;
+      background: none;
+      padding: 0;
+      color: var(--primary-600);
+      font: inherit;
+      font-size: 14px;
       cursor: pointer;
     }
 
-    .modal-close-btn:hover { color: #0f172a; }
+    .link-btn:hover { text-decoration: underline; }
 
-    .modal-body {
-      padding: 1.5rem;
-      overflow-y: auto;
-      flex: 1;
-    }
-
-    .modal-footer {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid #e2e8f0;
+    .row-actions {
       display: flex;
       justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
-      border-bottom-left-radius: 16px;
-      border-bottom-right-radius: 16px;
+      gap: 2px;
     }
 
-    .form-grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    @media (max-width: 640px) {
-      .form-grid-2 { grid-template-columns: 1fr; }
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    .form-label {
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: #334155;
-    }
-
-    .form-label.required::after {
-      content: ' *';
-      color: #ef4444;
-    }
-
-    .checkbox-group { margin-top: 0.5rem; }
-
-    .checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: #0f172a;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    /* Floating Toast Alerts */
-    .toast-floating-container {
-      position: fixed;
-      top: 24px;
-      right: 24px;
-      z-index: 2000;
-      animation: slideInRight 0.3s ease-out;
-    }
-
-    @keyframes slideInRight {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-
-    .toast-card {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      padding: 0.9rem 1.25rem;
-      border-radius: 12px;
-      background: #ffffff;
-      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.15);
-      border: 1px solid transparent;
-      min-width: 320px;
-    }
-
-    .toast-success {
-      border-color: #a7f3d0;
-      background: #f0fdf4;
-    }
-
-    .toast-danger {
-      border-color: #fecaca;
-      background: #fef2f2;
-    }
-
-    .toast-icon { font-size: 1.4rem; }
-    .toast-success .toast-icon { color: #16a34a; }
-    .toast-danger .toast-icon { color: #dc2626; }
-
-    .toast-content { flex: 1; }
-
-    .toast-title {
-      font-weight: 800;
-      font-size: 0.92rem;
-      color: #0f172a;
-    }
-
-    .toast-message {
-      font-size: 0.84rem;
-      color: #475569;
-    }
-
-    .btn-close-toast {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      cursor: pointer;
-    }
-
-    .btn-close-toast:hover { color: #0f172a; }
-
-    /* Empty & Loading States */
-    .loading-state, .empty-state {
-      padding: 4rem 2rem;
+    .loading-state,
+    .empty-state {
+      padding: 48px 16px;
       text-align: center;
-      color: #64748b;
-    }
-
-    .empty-state i {
-      font-size: 3.5rem;
-      color: #cbd5e1;
-      margin-bottom: 0.75rem;
-      display: inline-block;
+      color: var(--text-muted);
     }
 
     .empty-state h3 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #1e293b;
-      margin: 0.5rem 0 0.25rem;
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
     }
 
-    .spinner {
-      width: 44px;
-      height: 44px;
-      border: 3.5px solid #e2e8f0;
-      border-top-color: #0284c7;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 1rem;
+    /* Phân trang */
+    .pagination-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .pagination-info,
+    .page-size-selector,
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pagination-info { gap: 16px; }
+    .pagination-controls { gap: 4px; }
+
+    .form-select-sm {
+      height: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 6px;
+      background: #ffffff;
+    }
+
+    .btn-page {
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-page.active {
+      background: var(--primary-600);
+      border-color: var(--primary-600);
+      color: #ffffff;
+    }
+
+    /* Modal */
+    .modal-lg { max-width: 760px; width: 100%; }
+    .modal-sm { max-width: 420px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 16px;
+    }
+
+    .form-group-full { grid-column: 1 / -1; }
+
+    textarea.form-control { resize: vertical; }
+
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .checkbox-label input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary-600);
+    }
+
+    .confirm-text {
+      font-size: 14px;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .confirm-note {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
     }
   `]
 })

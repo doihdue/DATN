@@ -9,40 +9,26 @@ import { AuthService } from '../../services/auth.service';
   imports: [CommonModule, RouterLink],
   template: `
     <header class="app-topbar">
-      <div class="topbar-left">
-        <div class="clinic-badge">
-          <i class="bi bi-hospital text-primary"></i>
-          <span class="clinic-name">MedQueue Clinic</span>
-        </div>
-        <div class="live-status-pill">
-          <span class="live-dot"></span>
-          <span class="live-text">Hệ Thống Trực Tuyến</span>
-        </div>
-      </div>
+      <div class="clinic-name">Phòng khám MedQueue</div>
 
       <div class="topbar-right">
-        <!-- Nút mở Màn hình TV sảnh nhanh -->
-        <a routerLink="/queue" target="_blank" class="tv-link-btn" title="Mở bảng gọi số TV sảnh chờ ở tab mới">
+        <a routerLink="/queue" target="_blank" class="topbar-link" title="Mở bảng gọi số ở tab mới">
           <i class="bi bi-display"></i>
-          <span>Màn hình TV</span>
+          <span>Màn hình gọi số</span>
         </a>
 
-        <!-- User Summary Pill / Link to Profile -->
-        <a routerLink="/profile" class="user-profile-badge" title="Xem hồ sơ cá nhân & Đổi mật khẩu">
-          <div class="user-avatar-small">
-            <i class="bi" [ngClass]="getRoleIconClass()"></i>
-          </div>
-          <div class="user-info-text">
-            <span class="user-fullname">{{ authService.currentUser()?.fullName }}</span>
-            <span class="user-role-label">{{ getPrimaryRoleDisplayName() }}</span>
-          </div>
-          <i class="bi bi-chevron-right text-muted small ms-1"></i>
+        <span class="divider"></span>
+
+        <a routerLink="/profile" class="user" title="Hồ sơ cá nhân">
+          <span class="avatar">{{ initials() }}</span>
+          <span class="user-text">
+            <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
+            <span class="user-role">{{ getPrimaryRoleDisplayName() }}</span>
+          </span>
         </a>
 
-        <!-- Logout Action Button duy nhất chuẩn mực -->
-        <button (click)="logout()" class="btn-logout" title="Đăng xuất khỏi hệ thống">
+        <button type="button" class="icon-btn" (click)="logout()" title="Đăng xuất">
           <i class="bi bi-box-arrow-right"></i>
-          <span>Đăng xuất</span>
         </button>
       </div>
     </header>
@@ -57,155 +43,72 @@ import { AuthService } from '../../services/auth.service';
     }
 
     .app-topbar {
-      height: 64px;
+      height: var(--topbar-height);
       background: #ffffff;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 1.5rem;
-      width: 100%;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      padding: 0 20px 0 28px;
     }
 
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      margin-left: 0.25rem;
-    }
-
-    .clinic-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: #0f172a;
-    }
-
-    .live-status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.75rem;
-      border-radius: 9999px;
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #047857;
-    }
-
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      animation: pulseDot 2s infinite;
-    }
-
-    @keyframes pulseDot {
-      0% { transform: scale(0.95); opacity: 0.8; }
-      50% { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(0.95); opacity: 0.8; }
+    .clinic-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
     }
 
     .topbar-right {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
+      gap: 8px;
     }
 
-    .tv-link-btn {
+    .topbar-link {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.4rem 0.85rem;
-      border-radius: 8px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      font-size: 0.84rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.15s;
-    }
-
-    .tv-link-btn:hover {
-      background: #f1f5f9;
-      color: #0284c7;
-      border-color: #0284c7;
-    }
-
-    .user-profile-badge {
-      display: flex;
-      align-items: center;
-      gap: 0.55rem;
-      padding: 0.3rem 0.75rem;
-      border-radius: 10px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      text-decoration: none;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .user-profile-badge:hover {
-      background: #f1f5f9;
-      border-color: #0284c7;
-      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);
-    }
-
-    .user-avatar-small {
-      width: 32px;
+      gap: 6px;
       height: 32px;
-      border-radius: 50%;
-      background: #e0f2fe;
-      color: #0284c7;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      font-weight: 700;
+      padding: 0 10px;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-size: 13px;
     }
 
-    .user-info-text {
+    .topbar-link:hover {
+      background: var(--bg-hover);
+      color: var(--text-main);
+    }
+
+    .divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border-color);
+      margin: 0 4px;
+    }
+
+    .user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px;
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+    }
+
+    .user:hover { background: var(--bg-hover); color: var(--text-main); }
+
+    .user-text {
       display: flex;
       flex-direction: column;
-      line-height: 1.2;
+      line-height: 1.25;
     }
 
-    .user-fullname {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #0f172a;
-    }
+    .user-name { font-size: 13px; font-weight: 500; }
+    .user-role { font-size: 12px; color: var(--text-muted); }
 
-    .user-role-label {
-      font-size: 0.72rem;
-      color: #64748b;
-    }
-
-    .btn-logout {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.4rem 0.85rem;
-      border-radius: 8px;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #dc2626;
-      font-size: 0.84rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn-logout:hover {
-      background: #fee2e2;
-      border-color: #ef4444;
-      transform: translateY(-1px);
+    @media (max-width: 640px) {
+      .topbar-link span, .user-text { display: none; }
     }
   `]
 })
@@ -216,18 +119,19 @@ export class TopbarComponent {
     this.authService.logout();
   }
 
-  getRoleIconClass(): string {
-    if (this.authService.isAdmin()) return 'bi-shield-check';
-    if (this.authService.isDoctor()) return 'bi-heart-pulse-fill';
-    if (this.authService.isLabTech()) return 'bi-eyedropper';
-    return 'bi-person-badge';
+  initials(): string {
+    const name = (this.authService.currentUser()?.fullName || '').trim();
+    if (!name) return '?';
+    const parts = name.split(/\s+/);
+    const first = parts.length > 1 ? parts[parts.length - 2][0] : '';
+    return (first + parts[parts.length - 1][0]).toUpperCase();
   }
 
   getPrimaryRoleDisplayName(): string {
     if (this.authService.isAdmin()) return 'Quản trị viên';
-    if (this.authService.isDoctor()) return 'Bác sĩ điều trị';
-    if (this.authService.isLabTech()) return 'Kỹ thuật viên xét nghiệm';
-    if (this.authService.isStaff()) return 'Lễ tân tiếp đón';
-    return 'Nhân viên y tế';
+    if (this.authService.isDoctor()) return 'Bác sĩ';
+    if (this.authService.isLabTech()) return 'Kỹ thuật viên';
+    if (this.authService.isStaff()) return 'Lễ tân';
+    return 'Nhân viên';
   }
 }

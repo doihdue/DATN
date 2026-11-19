@@ -9,34 +9,28 @@ import { Staff, StaffRequest } from '../../models/staff.model';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="staff-page">
-      <!-- Header Banner -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <i class="bi bi-people-fill"></i> Nhân Sự Tiếp Đón
-          </div>
-          <h1 class="page-title">Quản Lý Lễ Tân</h1>
-          <p class="page-subtitle">
-            Thêm mới nhân viên lễ tân, cấp tài khoản bàn tiếp đón & điều phối hàng đợi, quản lý trạng thái hoạt động
-          </p>
+        <div>
+          <h1 class="page-title">Lễ tân</h1>
+          <p class="page-subtitle">{{ staffList().length }} lễ tân, {{ activeCount() }} đang hoạt động</p>
         </div>
-        <div class="header-actions">
+        <div class="page-actions">
           <button class="btn btn-primary" (click)="openAddModal()">
-            <i class="bi bi-person-plus-fill"></i> Thêm Lễ Tân Mới
+            <i class="bi bi-plus-lg"></i> Thêm lễ tân
           </button>
         </div>
       </div>
 
-      <!-- Filter & Search Bar -->
-      <div class="search-filter-card">
+      <div class="panel">
+      <div class="toolbar">
         <div class="search-box">
           <i class="bi bi-search"></i>
           <input
             type="text"
             [(ngModel)]="searchKeyword"
             (ngModelChange)="applyFilters()"
-            placeholder="Tìm theo tên, mã nhân viên, tài khoản, email, số điện thoại..."
+            placeholder="Tìm theo tên, mã, tài khoản, email, số điện thoại"
             class="search-input"
           />
         </div>
@@ -45,14 +39,6 @@ import { Staff, StaffRequest } from '../../models/staff.model';
           <option value="ACTIVE">Đang hoạt động</option>
           <option value="LOCKED">Đã khóa</option>
         </select>
-        <div class="stats-summary">
-          <span class="stat-pill">
-            Tổng cộng: <strong>{{ staffList().length }}</strong> lễ tân
-          </span>
-          <span class="stat-pill stat-pill-highlight">
-            Hoạt động: <strong>{{ activeCount() }}</strong>
-          </span>
-        </div>
       </div>
 
       <!-- Feedback Alerts (Top-Right Floating Toast) -->
@@ -73,8 +59,7 @@ import { Staff, StaffRequest } from '../../models/staff.model';
         </div>
       }
 
-      <!-- Table List of Staff & Pagination -->
-      <div class="table-card">
+      <div>
         @if (loading()) {
           <div class="loading-state">
             <div class="spinner"></div>
@@ -82,75 +67,66 @@ import { Staff, StaffRequest } from '../../models/staff.model';
           </div>
         } @else if (filteredStaff().length === 0) {
           <div class="empty-state">
-            <i class="bi bi-person-x-fill"></i>
-            <h3>Không tìm thấy lễ tân nào</h3>
-            <p>Thử thay đổi bộ lọc hoặc nhấn "Thêm Lễ Tân Mới" để tạo hồ sơ.</p>
+            <h3>Không có lễ tân phù hợp</h3>
+            <p>Thử đổi từ khoá hoặc bộ lọc.</p>
           </div>
         } @else {
           <div class="table-responsive">
-            <table class="clinical-table">
+            <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 100px; text-align: center;">Mã NV</th>
+                  <th style="width: 90px;">Mã</th>
                   <th style="min-width: 240px;">Lễ tân</th>
                   <th style="min-width: 190px;">Chức vụ</th>
                   <th style="min-width: 200px;">Liên hệ</th>
-                  <th style="width: 120px; text-align: center;">Ngày vào làm</th>
-                  <th style="width: 140px; text-align: center;">Trạng thái</th>
-                  <th style="width: 170px; text-align: center;">Thao tác</th>
+                  <th style="width: 120px;">Ngày vào làm</th>
+                  <th style="width: 120px;">Trạng thái</th>
+                  <th style="width: 140px;"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (item of paginatedStaff(); track item.id) {
-                  <tr class="table-row">
-                    <td style="text-align: center;">
-                      <span class="code-badge">{{ item.employeeCode || ('STF' + item.id) }}</span>
-                    </td>
+                  <tr>
+                    <td class="mono text-muted">{{ item.employeeCode || ('STF' + item.id) }}</td>
                     <td>
-                      <div class="staff-cell">
-                        <div class="staff-avatar">{{ initials(item.fullName) }}</div>
-                        <div class="staff-meta">
-                          <strong class="staff-name">{{ item.fullName }}</strong>
-                          <span class="staff-sub">{{ '@' + (item.username || '—') }}</span>
+                      <div class="person-cell">
+                        <div class="avatar">{{ initials(item.fullName) }}</div>
+                        <div class="person-meta">
+                          <strong class="person-name">{{ item.fullName }}</strong>
+                          <span class="person-sub">{{ item.username || '—' }}</span>
                         </div>
                       </div>
                     </td>
-                    <td>
-                      <span class="badge-position"><i class="bi bi-person-workspace"></i> {{ item.position || 'Nhân viên Tiếp đón & Lễ tân' }}</span>
-                    </td>
+                    <td>{{ item.position || 'Nhân viên tiếp đón & lễ tân' }}</td>
                     <td>
                       <div class="contact-cell">
-                        <span><i class="bi bi-envelope"></i> {{ item.email || '—' }}</span>
-                        <span><i class="bi bi-telephone"></i> {{ item.phoneNumber || '—' }}</span>
+                        <span>{{ item.email || '—' }}</span>
+                        <span class="text-muted">{{ item.phoneNumber || '—' }}</span>
                       </div>
                     </td>
-                    <td style="text-align: center;">{{ item.hireDate ? (item.hireDate | date:'dd/MM/yyyy') : '—' }}</td>
-                    <td style="text-align: center;">
+                    <td class="mono">{{ item.hireDate ? (item.hireDate | date:'dd/MM/yyyy') : '—' }}</td>
+                    <td>
                       @if (item.status === 'LOCKED') {
-                        <span class="status-badge status-locked"><i class="bi bi-lock-fill"></i> Đã khóa</span>
+                        <span class="status danger">Đã khóa</span>
                       } @else {
-                        <span class="status-badge status-active"><i class="bi bi-check-circle-fill"></i> Hoạt động</span>
+                        <span class="status success">Hoạt động</span>
                       }
                     </td>
-                    <td style="text-align: center;">
-                      <div class="action-buttons-cell">
-                        <button class="btn-action btn-action-view" (click)="viewDetail(item)" title="Xem hồ sơ" aria-label="Xem hồ sơ">
-                          <i class="bi bi-eye-fill"></i>
+                    <td>
+                      <div class="row-actions">
+                        <button class="icon-btn" (click)="viewDetail(item)" title="Xem hồ sơ" aria-label="Xem hồ sơ">
+                          <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn-action btn-action-edit" (click)="openEditModal(item)" title="Chỉnh sửa thông tin" aria-label="Chỉnh sửa">
-                          <i class="bi bi-pencil-fill"></i>
+                        <button class="icon-btn" (click)="openEditModal(item)" title="Chỉnh sửa" aria-label="Chỉnh sửa">
+                          <i class="bi bi-pencil"></i>
                         </button>
-                        @if (item.status === 'LOCKED') {
-                          <button class="btn-action btn-action-unlock" (click)="toggleStatus(item)" title="Mở khóa tài khoản" aria-label="Mở khóa">
-                            <i class="bi bi-unlock-fill"></i>
-                          </button>
-                        } @else {
-                          <button class="btn-action btn-action-lock" (click)="toggleStatus(item)" title="Khóa tài khoản" aria-label="Khóa">
-                            <i class="bi bi-lock-fill"></i>
-                          </button>
-                        }
-                        <button class="btn-action btn-action-delete" (click)="confirmDelete(item)" title="Xóa lễ tân" aria-label="Xóa">
-                          <i class="bi bi-trash3-fill"></i>
+                        <button class="icon-btn" (click)="toggleStatus(item)"
+                                [title]="item.status === 'LOCKED' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'"
+                                [attr.aria-label]="item.status === 'LOCKED' ? 'Mở khóa' : 'Khóa'">
+                          <i class="bi" [ngClass]="item.status === 'LOCKED' ? 'bi-unlock' : 'bi-lock'"></i>
+                        </button>
+                        <button class="icon-btn danger" (click)="confirmDelete(item)" title="Xóa" aria-label="Xóa">
+                          <i class="bi bi-trash3"></i>
                         </button>
                       </div>
                     </td>
@@ -163,11 +139,9 @@ import { Staff, StaffRequest } from '../../models/staff.model';
           <!-- Pagination Bar -->
           <div class="pagination-footer">
             <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredStaff().length }}</strong> lễ tân
-              </span>
+              <span>{{ startIndex() }}–{{ endIndex() }} / {{ filteredStaff().length }}</span>
               <div class="page-size-selector">
-                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <label for="pageSizeSelect">Số dòng</label>
                 <select
                   id="pageSizeSelect"
                   [ngModel]="pageSize()"
@@ -186,7 +160,7 @@ import { Staff, StaffRequest } from '../../models/staff.model';
                 <i class="bi bi-chevron-double-left"></i>
               </button>
               <button class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Trang trước">
-                <i class="bi bi-chevron-left"></i> Trước
+                <i class="bi bi-chevron-left"></i>
               </button>
               <div class="page-numbers-group">
                 @for (p of pagesList(); track p) {
@@ -196,7 +170,7 @@ import { Staff, StaffRequest } from '../../models/staff.model';
                 }
               </div>
               <button class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Trang sau">
-                Sau <i class="bi bi-chevron-right"></i>
+                <i class="bi bi-chevron-right"></i>
               </button>
               <button class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Đến trang cuối cùng">
                 <i class="bi bi-chevron-double-right"></i>
@@ -206,24 +180,23 @@ import { Staff, StaffRequest } from '../../models/staff.model';
         }
       </div>
 
-      <!-- Modal Thêm / Chỉnh Sửa Lễ Tân -->
+      </div>
+
+      <!-- Modal thêm / sửa lễ tân -->
       @if (showModal()) {
         <div class="modal-backdrop" (click)="closeModal()">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi" [ngClass]="isEditing() ? 'bi-pencil-square' : 'bi-person-plus-fill'"></i>
-                {{ isEditing() ? 'Cập Nhật Hồ Sơ Lễ Tân' : 'Thêm Lễ Tân Mới' }}
-              </h2>
+              <h2 class="modal-title">{{ isEditing() ? 'Sửa thông tin lễ tân' : 'Thêm lễ tân' }}</h2>
               <button class="modal-close-btn" (click)="closeModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               @if (formError()) {
-                <div class="form-error"><i class="bi bi-exclamation-circle-fill"></i> {{ formError() }}</div>
+                <div class="form-error">{{ formError() }}</div>
               }
 
               <!-- Tài khoản -->
-              <h3 class="form-section-title"><i class="bi bi-shield-lock"></i> Tài khoản đăng nhập</h3>
+              <h3 class="form-section-title">Tài khoản đăng nhập</h3>
               <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label" [class.required]="!isEditing()">Tên đăng nhập</label>
@@ -247,7 +220,7 @@ import { Staff, StaffRequest } from '../../models/staff.model';
               </div>
 
               <!-- Thông tin cá nhân -->
-              <h3 class="form-section-title"><i class="bi bi-person-vcard"></i> Thông tin cá nhân</h3>
+              <h3 class="form-section-title">Thông tin cá nhân</h3>
               <div class="form-grid">
                 <div class="form-group form-group-full">
                   <label class="form-label required">Họ và tên</label>
@@ -277,7 +250,7 @@ import { Staff, StaffRequest } from '../../models/staff.model';
               </div>
 
               <!-- Nhân sự -->
-              <h3 class="form-section-title"><i class="bi bi-briefcase"></i> Thông tin nhân sự</h3>
+              <h3 class="form-section-title">Thông tin nhân sự</h3>
               <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label">Mã nhân viên</label>
@@ -289,7 +262,7 @@ import { Staff, StaffRequest } from '../../models/staff.model';
                 </div>
                 <div class="form-group form-group-full">
                   <label class="form-label">Chức vụ</label>
-                  <input type="text" [(ngModel)]="formData.position" class="form-control" list="positionOptions" placeholder="Nhân viên Tiếp đón & Lễ tân" />
+                  <input type="text" [(ngModel)]="formData.position" class="form-control" list="positionOptions" placeholder="Nhân viên tiếp đón & lễ tân" />
                   <datalist id="positionOptions">
                     @for (p of positionOptions; track p) {
                       <option [value]="p"></option>
@@ -299,12 +272,12 @@ import { Staff, StaffRequest } from '../../models/staff.model';
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
+              <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
               <button class="btn btn-primary" [disabled]="submitting()" (click)="saveStaff()">
                 @if (submitting()) {
                   <span class="spinner-sm"></span> Đang lưu...
                 } @else {
-                  <i class="bi bi-check2-circle"></i> {{ isEditing() ? 'Lưu Thay Đổi' : 'Tạo Lễ Tân' }}
+                  {{ isEditing() ? 'Lưu thay đổi' : 'Thêm lễ tân' }}
                 }
               </button>
             </div>
@@ -312,26 +285,26 @@ import { Staff, StaffRequest } from '../../models/staff.model';
         </div>
       }
 
-      <!-- Modal Chi Tiết Hồ Sơ Lễ Tân -->
+      <!-- Modal hồ sơ lễ tân -->
       @if (selectedStaff(); as st) {
         <div class="modal-backdrop" (click)="selectedStaff.set(null)">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title"><i class="bi bi-person-badge"></i> Hồ sơ lễ tân</h2>
+              <h2 class="modal-title">Hồ sơ lễ tân</h2>
               <button class="modal-close-btn" (click)="selectedStaff.set(null)" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               <div class="detail-head">
-                <div class="staff-avatar staff-avatar-lg">{{ initials(st.fullName) }}</div>
+                <div class="avatar avatar-lg">{{ initials(st.fullName) }}</div>
                 <div>
                   <h3 class="detail-name">{{ st.fullName }}</h3>
                   <div class="detail-tags">
-                    <span class="code-badge">{{ st.employeeCode || ('STF' + st.id) }}</span>
-                    <span class="badge-position"><i class="bi bi-person-workspace"></i> {{ st.position || 'Nhân viên Tiếp đón & Lễ tân' }}</span>
+                    <span class="mono text-muted">{{ st.employeeCode || ('STF' + st.id) }}</span>
+                    <span>{{ st.position || 'Nhân viên tiếp đón & lễ tân' }}</span>
                     @if (st.status === 'LOCKED') {
-                      <span class="status-badge status-locked"><i class="bi bi-lock-fill"></i> Đã khóa</span>
+                      <span class="status danger">Đã khóa</span>
                     } @else {
-                      <span class="status-badge status-active"><i class="bi bi-check-circle-fill"></i> Hoạt động</span>
+                      <span class="status success">Hoạt động</span>
                     }
                   </div>
                 </div>
@@ -349,8 +322,8 @@ import { Staff, StaffRequest } from '../../models/staff.model';
               </dl>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="selectedStaff.set(null)">Đóng</button>
-              <button class="btn btn-primary" (click)="editFromDetail(st)"><i class="bi bi-pencil-fill"></i> Chỉnh sửa</button>
+              <button class="btn btn-secondary" (click)="selectedStaff.set(null)">Đóng</button>
+              <button class="btn btn-primary" (click)="editFromDetail(st)">Chỉnh sửa</button>
             </div>
           </div>
         </div>
@@ -358,669 +331,244 @@ import { Staff, StaffRequest } from '../../models/staff.model';
     </div>
   `,
   styles: [`
-    .staff-page {
-      padding: 1.5rem 0 3rem;
-      max-width: 1300px;
-      margin: 0 auto;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      background: var(--primary-100);
-      color: var(--primary-800);
-      font-size: 0.8rem;
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: 0.5rem;
-    }
-
-    .page-title {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin: 0 0 0.4rem;
-      letter-spacing: -0.02em;
-    }
-
-    .page-subtitle {
-      color: var(--text-muted);
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    .search-filter-card {
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-color);
-      padding: 1rem 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 4px 15px -3px rgba(15, 23, 42, 0.04);
-      flex-wrap: wrap;
-    }
-
-    .search-box {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex: 1;
-      min-width: 260px;
-      background: #f8fafc;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      padding: 0.5rem 1rem;
+    .toolbar .search-box {
+      position: relative;
+      flex: 1 1 280px;
+      max-width: 420px;
     }
 
     .search-box i {
-      color: var(--text-muted);
-      font-size: 1.1rem;
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 14px;
+    }
+
+    .search-input,
+    .filter-select {
+      height: 34px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #ffffff;
+      outline: none;
     }
 
     .search-input {
-      border: none;
-      background: transparent;
-      outline: none;
       width: 100%;
-      font-size: 0.95rem;
-      color: var(--text-main);
+      padding: 0 10px 0 32px;
     }
 
     .filter-select {
-      padding: 0.55rem 0.85rem;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      background: #ffffff;
-      font-size: 0.9rem;
-      color: var(--text-main);
+      padding: 0 8px;
       min-width: 170px;
     }
 
-    .stats-summary {
-      display: flex;
-      gap: 0.75rem;
-      margin-left: auto;
+    .search-input:focus,
+    .filter-select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
-    .stat-pill {
-      background: #f1f5f9;
-      padding: 0.4rem 0.85rem;
-      border-radius: var(--radius-full);
-      font-size: 0.85rem;
-      color: var(--text-main);
-      white-space: nowrap;
-    }
+    .table-responsive { overflow-x: auto; }
+    .data-table td.text-muted { color: var(--text-muted); }
+    .data-table td.mono { white-space: nowrap; }
 
-    .stat-pill-highlight {
-      background: var(--primary-50);
-      color: var(--primary-800);
-      border: 1px solid var(--primary-200);
-    }
-
-    /* Table Card & Responsive */
-    .table-card {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      border: 1px solid var(--border-color);
-      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
-      overflow: hidden;
-      animation: modalFadeIn 0.25s ease-out;
-    }
-
-    .table-responsive {
-      overflow-x: auto;
-    }
-
-    .clinical-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.92rem;
-    }
-
-    .clinical-table thead th {
-      background: #f8fafc;
-      color: #475569;
-      font-weight: 800;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 1rem 1.15rem;
-      border-bottom: 2px solid #e2e8f0;
-      white-space: nowrap;
-    }
-
-    .clinical-table tbody tr {
-      border-bottom: 1px solid #f1f5f9;
-      transition: background 0.15s;
-    }
-
-    .clinical-table tbody tr:hover {
-      background: #f8fafc;
-    }
-
-    .clinical-table td {
-      padding: 1rem 1.15rem;
-      vertical-align: middle;
-      color: #1e293b;
-    }
-
-    /* Doctor Cell */
-    .staff-cell {
+    .person-cell {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
+      gap: 10px;
     }
 
-    .staff-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 0.95rem;
-      flex-shrink: 0;
-      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
-    }
-
-    .staff-avatar-lg {
-      width: 64px;
-      height: 64px;
-      font-size: 1.35rem;
-    }
-
-    .staff-meta {
+    .person-meta {
       display: flex;
       flex-direction: column;
+      line-height: 1.35;
     }
 
-    .staff-name {
-      color: #0f172a;
-      font-size: 0.98rem;
-      font-weight: 800;
-    }
+    .person-name { font-weight: 500; }
 
-    .staff-sub {
-      color: #64748b;
-      font-size: 0.78rem;
-      font-weight: 600;
-    }
-
-    .code-badge {
-      background: #f5f3ff;
-      color: #6d28d9;
-      border: 1px solid #ddd6fe;
-      padding: 0.25rem 0.55rem;
-      border-radius: 6px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 800;
-      font-size: 0.8rem;
-      display: inline-block;
-    }
-
-    .badge-position {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: #eff6ff;
-      color: var(--primary-700);
-      border: 1px solid #bfdbfe;
-      padding: 0.25rem 0.6rem;
-      border-radius: 9999px;
-      font-size: 0.82rem;
-      font-weight: 700;
-    }
-
-    .text-muted-sm {
-      color: #94a3b8;
-      font-size: 0.85rem;
-      font-style: italic;
+    .person-sub {
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
     .contact-cell {
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
-      font-size: 0.85rem;
-      color: #475569;
+      font-size: 13px;
+      line-height: 1.45;
     }
 
-    .contact-cell i {
-      color: #94a3b8;
-      margin-right: 0.25rem;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.3rem 0.7rem;
-      border-radius: 9999px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .status-active {
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-    }
-
-    .status-locked {
-      background: #fef2f2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-    }
-
-    /* Action Buttons in Cell */
-    .action-buttons-cell {
+    .row-actions {
       display: flex;
-      justify-content: center;
-      gap: 0.4rem;
+      justify-content: flex-end;
+      gap: 2px;
     }
 
-    .btn-action {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 0.88rem;
-      transition: all 0.2s;
+    .loading-state,
+    .empty-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-muted);
     }
 
-    .btn-action-view {
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      color: #475569;
+    .empty-state h3 {
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
     }
 
-    .btn-action-view:hover {
-      background: #475569;
-      color: #ffffff;
-      border-color: #475569;
-    }
-
-    .btn-action-edit {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
-      color: #0284c7;
-    }
-
-    .btn-action-edit:hover {
-      background: #0284c7;
-      color: #ffffff;
-      border-color: #0284c7;
-    }
-
-    .btn-action-lock {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      color: #b45309;
-    }
-
-    .btn-action-lock:hover {
-      background: #d97706;
-      color: #ffffff;
-      border-color: #d97706;
-    }
-
-    .btn-action-unlock {
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      color: #047857;
-    }
-
-    .btn-action-unlock:hover {
-      background: #059669;
-      color: #ffffff;
-      border-color: #059669;
-    }
-
-    .btn-action-delete {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #dc2626;
-    }
-
-    .btn-action-delete:hover {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
-
-    /* ==================== PAGINATION BAR ==================== */
     .pagination-footer {
-      padding: 1rem 1.35rem;
-      background: #ffffff;
-      border-top: 1.5px solid #f1f5f9;
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
+      gap: 12px;
       flex-wrap: wrap;
-      gap: 1rem;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .pagination-info {
+    .pagination-info,
+    .page-size-selector,
+    .pagination-controls,
+    .page-numbers-group {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
-      font-size: 0.88rem;
-      color: #475569;
+      gap: 8px;
     }
 
-    .pagination-info strong {
-      color: #0f172a;
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-    }
+    .pagination-info { gap: 16px; }
+    .pagination-controls, .page-numbers-group { gap: 4px; }
 
     .form-select-sm {
-      padding: 0.35rem 0.65rem;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 6px;
-      color: #0f172a;
-      font-weight: 700;
+      height: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 6px;
       background: #ffffff;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
     }
 
     .btn-page {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 0.5rem;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
       background: #ffffff;
-      color: #334155;
-      font-weight: 700;
-      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
     }
 
-    .btn-page:hover:not(:disabled) {
-      background: #f0f9ff;
-      border-color: #0284c7;
-      color: #0284c7;
-    }
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
 
     .btn-page.active {
-      background: #0284c7;
-      border-color: #0284c7;
+      background: var(--primary-600);
+      border-color: var(--primary-600);
       color: #ffffff;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
     }
 
-    .btn-page:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      background: #f8fafc;
-      border-color: #e2e8f0;
-    }
+    /* Modal */
+    .modal-lg { max-width: 760px; width: 100%; }
 
-    .btn-page-nav {
-      gap: 0.25rem;
-      padding: 0 0.75rem;
-    }
-
-    .page-numbers-group {
-      display: flex;
-      gap: 0.3rem;
-    }
-
-    /* Modal Styles */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1050;
-      padding: 1rem;
-    }
-
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      width: 100%;
-      max-width: 540px;
-      overflow: hidden;
-      animation: modalFadeIn 0.2s ease-out;
-    }
-
-    .modal-lg {
-      max-width: 820px;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .modal-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .modal-close-btn {
-      background: none;
-      border: none;
-      font-size: 1.75rem;
-      line-height: 1;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-
-    .modal-footer {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
-    }
-
-    /* Form */
     .form-section-title {
-      font-size: 0.85rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--primary-700);
-      margin: 0.5rem 0 0.85rem;
-      padding-bottom: 0.4rem;
-      border-bottom: 1px dashed var(--border-color);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin: 20px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
     }
+
+    .form-section-title:first-of-type { margin-top: 0; }
 
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 1rem;
+      gap: 0 16px;
     }
 
-    .form-group-full {
-      grid-column: 1 / -1;
-    }
-
-    @media (max-width: 640px) {
-      .form-grid {
-        grid-template-columns: 1fr;
-      }
-      .stats-summary {
-        margin-left: 0;
-      }
-    }
-
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    .form-label {
-      display: block;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 0.4rem;
-    }
-
-    .form-label.required::after {
-      content: ' *';
-      color: var(--rose-600);
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      font-size: 0.95rem;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-      transition: all 0.2s;
-      background: #ffffff;
-    }
+    .form-group-full { grid-column: 1 / -1; }
 
     .form-control:disabled {
-      background: #f1f5f9;
-      color: #64748b;
-    }
-
-    .form-control:focus {
-      outline: none;
-      border-color: var(--primary-600);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
-
-    .form-hint {
-      font-size: 0.8rem;
+      background: var(--bg-subtle);
       color: var(--text-muted);
-      margin-top: 0.25rem;
-      display: block;
     }
 
     .form-error {
-      background: #fff1f2;
-      color: #9f1239;
-      border: 1px solid #fecdd3;
-      padding: 0.75rem 1rem;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--danger-border);
+      background: var(--danger-bg);
+      color: var(--danger-text);
       border-radius: var(--radius-md);
-      margin-bottom: 1rem;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      font-size: 13px;
     }
 
-    /* Detail */
     .detail-head {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .avatar-lg {
+      width: 48px;
+      height: 48px;
+      font-size: 16px;
     }
 
     .detail-name {
-      font-size: 1.2rem;
-      font-weight: 800;
-      margin: 0 0 0.4rem;
-      color: #0f172a;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
     }
 
     .detail-tags {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
       align-items: center;
+      gap: 10px;
+      font-size: 13px;
     }
 
     .detail-grid {
       display: grid;
-      grid-template-columns: 170px 1fr;
-      gap: 0.55rem 1rem;
-      margin: 0 0 1.25rem;
-      font-size: 0.92rem;
-    }
-
-    .detail-grid dt {
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .detail-grid dd {
+      grid-template-columns: 160px 1fr 160px 1fr;
+      gap: 8px 16px;
+      font-size: 14px;
       margin: 0;
-      color: var(--text-main);
-      font-weight: 600;
     }
 
+    .detail-grid dt { color: var(--text-muted); }
+    .detail-grid dd { margin: 0; }
 
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px dashed var(--border-color);
+    .detail-bio {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+      font-size: 14px;
     }
 
-    .empty-state i {
-      font-size: 3rem;
-      color: var(--text-muted);
+    .detail-bio p {
+      margin-top: 4px;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 768px) {
+      .page { padding: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 120px 1fr; }
     }
   `]
 })

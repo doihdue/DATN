@@ -13,39 +13,31 @@ import { RouterLink } from '@angular/router';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="queue-control-page">
-      <!-- Top Control Header -->
-      <div class="control-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <span class="live-dot"></span> {{ isDoctor() ? 'Bàn Gọi Khám & Điều Phối Bác Sĩ' : 'Bàn Điều Phối Hàng Đợi & Cân Bằng Tải' }}
-          </div>
-          <h1 class="page-title">{{ isDoctor() ? 'Bàn Gọi Khám Phòng Khám' : 'Điều Phối Hàng Đợi Các Phòng Khám' }}</h1>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">{{ isDoctor() ? 'Gọi khám' : 'Điều phối hàng đợi' }}</h1>
           <p class="page-subtitle">
-            {{ isDoctor() ? 'Gọi số khám, mời bệnh nhân vào phòng và bắt đầu ca khám bệnh' : 'Giám sát hàng đợi các phòng khám, điều chuyển phòng khi quá tải, xử lý ưu tiên và người bệnh nhỡ lượt' }}
+            {{ isDoctor() ? 'Gọi số, mời bệnh nhân vào phòng và bắt đầu khám' : 'Theo dõi hàng đợi từng phòng, chuyển phòng, xử lý ưu tiên và nhỡ lượt' }}
           </p>
         </div>
         @if (!isDoctor()) {
-          <div class="header-right">
-            <a routerLink="/staff/check-in" class="btn btn-primary">
-              <i class="bi bi-person-check-fill"></i> Sang Quầy Tiếp Đón &amp; Cấp Số
-            </a>
-            <a routerLink="/queue" target="_blank" class="btn btn-outline">
-              <i class="bi bi-display"></i> TV Sảnh Chờ
+          <div class="page-actions">
+            <a routerLink="/staff/check-in" class="btn btn-secondary">Tiếp đón &amp; cấp số</a>
+            <a routerLink="/queue" target="_blank" class="btn btn-secondary">
+              <i class="bi bi-box-arrow-up-right"></i> Màn hình sảnh chờ
             </a>
           </div>
         }
       </div>
 
-      <!-- Clean Simple Room Filter Bar -->
-      <div class="room-filter-bar">
+      <!-- Chọn phòng -->
+      <div class="panel room-filter-bar">
         <div class="room-filter-left">
-          <label for="roomSelectControl" class="room-filter-label">
-            <i class="bi bi-hospital text-primary"></i> Phòng khám:
-          </label>
+          <label for="roomSelectControl" class="room-filter-label">Phòng khám</label>
           @if (isDoctor()) {
             <!-- Bác sĩ chỉ được gọi số tại phòng mình có ca trực hôm nay -->
-            <span class="room-filter-select">
+            <span class="room-filter-static">
               @if (overview(); as ov) {
                 {{ ov.roomNumber }} - {{ ov.roomName }}
               } @else {
@@ -60,7 +52,7 @@ import { RouterLink } from '@angular/router';
               (ngModelChange)="selectRoom($event)"
             >
               @for (floor of availableFloors(); track floor) {
-                <optgroup [label]="'🏢 Tầng ' + floor">
+                <optgroup [label]="'Tầng ' + floor">
                   @for (room of getRoomsByFloor(floor); track room.id) {
                     <option [ngValue]="room.id">
                       {{ room.roomNumber }} - {{ room.roomName }}
@@ -74,10 +66,8 @@ import { RouterLink } from '@angular/router';
 
         @if (isDoctor() ? overview() : selectedRoom()) {
           <div class="room-filter-right">
-            <span class="room-stat-badge">
-              <i class="bi bi-people-fill text-primary"></i> Đang chờ: <strong>{{ currentRoomWaitingCount() }}</strong> ca
-            </span>
-            <button type="button" class="btn-refresh-simple" (click)="fetchOverview(true)" title="Làm mới">
+            <span class="room-stat">Đang chờ <strong class="mono">{{ currentRoomWaitingCount() }}</strong></span>
+            <button type="button" class="icon-btn" (click)="fetchOverview(true)" title="Làm mới" aria-label="Làm mới">
               <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i>
             </button>
           </div>
@@ -103,159 +93,143 @@ import { RouterLink } from '@angular/router';
       }
 
       @if (loading()) {
-        <div class="loading-state">
+        <div class="panel loading-state">
           <div class="spinner"></div>
-          <p>Đang tải dữ liệu hàng đợi phòng khám...</p>
+          <p>Đang tải hàng đợi...</p>
         </div>
       } @else if (myRoomError()) {
-        <div class="loading-state">
-          <i class="bi bi-calendar-x text-muted" style="font-size: 2rem;"></i>
+        <div class="panel loading-state">
           <p>{{ myRoomError() }}</p>
         </div>
       } @else if (overview()) {
-        <!-- Main Console Layout -->
         <div class="console-grid">
-          <!-- Left Column: Primary Calling & Examining Operations -->
-          <div class="active-stage-card medical-card">
-            <!-- Stage Header Info -->
+          <!-- Cột trái: đang gọi / đang khám -->
+          <div class="active-stage-card panel">
             <div class="stage-header">
               <div class="doctor-badge">
-                <i class="bi bi-person-badge-fill text-primary"></i>
-                <span>Bác sĩ trực: <strong>{{ overview()?.doctorName || 'Đang cập nhật' }}</strong></span>
-                <span class="specialty-sub">({{ overview()?.specialtyName }})</span>
+                <span class="text-muted">Bác sĩ trực</span>
+                <strong>{{ overview()?.doctorName || 'Chưa cập nhật' }}</strong>
+                @if (overview()?.specialtyName) {
+                  <span class="specialty-sub">{{ overview()?.specialtyName }}</span>
+                }
               </div>
-              <div class="queue-quick-stats">
-                <span class="stat-tag"><i class="bi bi-people-fill"></i> Đang chờ: <strong class="num">{{ overview()?.totalWaitingCount }}</strong></span>
-                <span class="stat-tag"><i class="bi bi-clock-history"></i> Ước tính: <strong class="num">{{ overview()?.estimatedWaitMinutes }} phút</strong></span>
-              </div>
+              <dl class="queue-quick-stats">
+                <div><dt>Đang chờ</dt><dd class="mono">{{ overview()?.totalWaitingCount }}</dd></div>
+                <div><dt>Ước tính chờ</dt><dd class="mono">{{ overview()?.estimatedWaitMinutes }} phút</dd></div>
+              </dl>
             </div>
 
-            <!-- Central Call Control: chỉ bác sĩ trực phòng mới gọi số vào phòng khám -->
+            <!-- Chỉ bác sĩ trực phòng mới gọi số vào phòng khám -->
             @if (isDoctor()) {
-            <div class="call-action-box">
-              <button
-                class="btn-call-next"
-                [disabled]="calling() || overview()!.waitingTickets.length === 0"
-                (click)="callNext()"
-              >
-                <div class="call-btn-content">
-                  <i class="bi bi-megaphone-fill call-icon"></i>
-                  <div class="call-text">
-                    <span class="call-title">GỌI SỐ TIẾP THEO</span>
-                    <span class="call-subtitle">
-                      @if (overview()!.waitingTickets.length > 0) {
-                        Số kế tiếp: {{ overview()!.waitingTickets[0].ticketNumber }} — {{ overview()!.waitingTickets[0].patientName }}
-                      } @else {
-                        Hiện không có bệnh nhân nào trong hàng chờ
-                      }
-                    </span>
-                  </div>
+              <div class="call-action-box">
+                <button
+                  class="btn btn-primary btn-lg btn-call-next"
+                  [disabled]="calling() || overview()!.waitingTickets.length === 0"
+                  (click)="callNext()"
+                >
+                  <i class="bi bi-megaphone"></i> Gọi số tiếp theo
+                </button>
+                <div class="call-subtitle">
+                  @if (overview()!.waitingTickets.length > 0) {
+                    Kế tiếp: <strong class="mono">{{ overview()!.waitingTickets[0].ticketNumber }}</strong> · {{ overview()!.waitingTickets[0].patientName }}
+                  } @else {
+                    Không có bệnh nhân trong hàng chờ
+                  }
                 </div>
-              </button>
-            </div>
+              </div>
             } @else {
               <div class="call-action-box">
-                <p class="text-muted small mb-0">
-                  <i class="bi bi-info-circle"></i> Bác sĩ trực phòng sẽ gọi số mời bệnh nhân vào khám.
-                  Quầy điều phối theo dõi hàng đợi, chuyển phòng, ưu tiên và xử lý người bệnh nhỡ lượt.
+                <p class="call-note">
+                  Bác sĩ trực phòng gọi số mời bệnh nhân vào khám. Quầy điều phối chuyển phòng, đánh dấu ưu tiên và xử lý nhỡ lượt.
                 </p>
               </div>
             }
 
-            <!-- Current States Panels -->
             <div class="status-panels-row">
-              <!-- Panel 1: Đang Được Gọi (CALLED) -->
+              <!-- Đang gọi (CALLED) -->
               <div class="ticket-status-panel panel-called">
                 <div class="panel-header">
-                  <span class="panel-title"><i class="bi bi-bell-fill"></i> Đang Gọi Vào Phòng</span>
+                  <span class="panel-title">Đang gọi vào phòng</span>
                   @if (overview()?.currentCalledTicket) {
-                    <span class="badge badge-calling">Mời vào</span>
+                    <span class="status info">Mời vào</span>
                   }
                 </div>
                 <div class="panel-body">
                   @if (overview()?.currentCalledTicket) {
                     <div class="ticket-highlight">
-                      <div class="ticket-num num">{{ overview()!.currentCalledTicket!.ticketNumber }}</div>
+                      <div class="ticket-num mono">{{ overview()!.currentCalledTicket!.ticketNumber }}</div>
                       <div class="patient-name">{{ overview()!.currentCalledTicket!.patientName }}</div>
                       <div class="patient-info-sub">
-                        <span>SĐT: {{ overview()!.currentCalledTicket!.patientPhone }}</span>
+                        <span class="mono">{{ overview()!.currentCalledTicket!.patientPhone }}</span>
                         @if (overview()!.currentCalledTicket!.patientDob) {
-                          <span> • Ngày sinh: {{ overview()!.currentCalledTicket!.patientDob | date:'dd/MM/yyyy' }}</span>
+                          <span> · NS {{ overview()!.currentCalledTicket!.patientDob | date:'dd/MM/yyyy' }}</span>
                         } @else if (overview()!.currentCalledTicket!.patientYearOfBirth) {
-                          <span> • Năm sinh: {{ overview()!.currentCalledTicket!.patientYearOfBirth }}</span>
+                          <span> · NS {{ overview()!.currentCalledTicket!.patientYearOfBirth }}</span>
                         }
                       </div>
                       @if (isDoctor()) {
                         <div class="panel-actions">
-                          <button class="btn btn-success btn-sm" (click)="startExam(overview()!.currentCalledTicket!.id)">
-                            <i class="bi bi-play-circle-fill"></i> Vào Khám
+                          <button class="btn btn-primary btn-sm" (click)="startExam(overview()!.currentCalledTicket!.id)">
+                            Bắt đầu khám
                           </button>
-                          <button class="btn btn-outline-danger btn-sm" (click)="skipTicket(overview()!.currentCalledTicket!.id)">
-                            <i class="bi bi-skip-forward-fill"></i> Bỏ Qua (Vắng mặt)
+                          <button class="btn btn-secondary btn-sm" (click)="skipTicket(overview()!.currentCalledTicket!.id)">
+                            Bỏ qua (vắng mặt)
                           </button>
                         </div>
                       }
                     </div>
                   } @else {
-                    <div class="panel-empty">
-                      <i class="bi bi-bell-slash"></i>
-                      <p>Chưa có số nào đang gọi</p>
-                    </div>
+                    <div class="panel-empty">Chưa có số nào đang gọi</div>
                   }
                 </div>
               </div>
 
-              <!-- Panel 2: Đang Khám (IN_PROGRESS) -->
+              <!-- Đang khám (IN_PROGRESS) -->
               <div class="ticket-status-panel panel-examining">
                 <div class="panel-header">
-                  <span class="panel-title"><i class="bi bi-heart-pulse-fill"></i> Đang Khám Bệnh</span>
+                  <span class="panel-title">Đang khám</span>
                   @if (overview()?.currentExaminingTicket) {
-                    <span class="badge badge-examining">Đang khám</span>
+                    <span class="status success">Đang khám</span>
                   }
                 </div>
                 <div class="panel-body">
                   @if (overview()?.currentExaminingTicket) {
                     <div class="ticket-highlight">
-                      <div class="ticket-num text-success num">{{ overview()!.currentExaminingTicket!.ticketNumber }}</div>
+                      <div class="ticket-num mono">{{ overview()!.currentExaminingTicket!.ticketNumber }}</div>
                       <div class="patient-name">{{ overview()!.currentExaminingTicket!.patientName }}</div>
                       <div class="patient-info-sub">
-                        <span>Bắt đầu lúc: {{ overview()!.currentExaminingTicket!.startTime }}</span>
+                        <span>Bắt đầu <span class="mono">{{ overview()!.currentExaminingTicket!.startTime }}</span></span>
                       </div>
                       @if (isDoctor()) {
                         <div class="panel-actions">
-                          <a [routerLink]="['/doctor/examination', overview()!.currentExaminingTicket!.id]" 
+                          <a [routerLink]="['/doctor/examination', overview()!.currentExaminingTicket!.id]"
                              [state]="{ ticket: overview()!.currentExaminingTicket }"
-                             (click)="onOpenExamination(overview()!.currentExaminingTicket!)" 
+                             (click)="onOpenExamination(overview()!.currentExaminingTicket!)"
                              class="btn btn-primary btn-sm">
-                            <i class="bi bi-file-earmark-medical-fill"></i> Bàn Khám &amp; Kê Đơn
+                            Mở phiếu khám
                           </a>
                         </div>
                       }
                     </div>
                   } @else {
-                    <div class="panel-empty">
-                      <i class="bi bi-door-open"></i>
-                      <p>Phòng khám đang trống</p>
-                    </div>
+                    <div class="panel-empty">Phòng đang trống</div>
                   }
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Right Column: Queue Waiting & Skipped Lists -->
-          <div class="queue-list-card medical-card">
-            <!-- Tabs Bar -->
-            <div class="queue-tabs">
+          <!-- Cột phải: danh sách hàng đợi -->
+          <div class="queue-list-card panel">
+            <div class="queue-tabs" role="tablist">
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'RESULTS_READY'"
                 (click)="activeTab = 'RESULTS_READY'"
-                title="Bệnh nhân đã có kết quả cận lâm sàng / xét nghiệm"
+                title="Bệnh nhân đã có kết quả cận lâm sàng"
               >
-                <i class="bi bi-file-earmark-check-fill text-success"></i>
-                <span class="tab-text">Có KQ CLS</span>
-                <span class="tab-count count-results-ready num">{{ overview()?.resultsReadyTickets?.length || 0 }}</span>
+                <span class="tab-text">Có kết quả CLS</span>
+                <span class="tab-count mono">{{ overview()?.resultsReadyTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
@@ -263,9 +237,8 @@ import { RouterLink } from '@angular/router';
                 (click)="activeTab = 'WAITING'"
                 title="Bệnh nhân chờ khám lần đầu"
               >
-                <i class="bi bi-hourglass-split text-primary"></i>
                 <span class="tab-text">Chờ khám</span>
-                <span class="tab-count count-waiting num">{{ overview()?.waitingTickets?.length || 0 }}</span>
+                <span class="tab-count mono">{{ overview()?.waitingTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
@@ -273,86 +246,81 @@ import { RouterLink } from '@angular/router';
                 (click)="activeTab = 'WAITING_FOR_RESULTS'"
                 title="Bệnh nhân đang làm xét nghiệm cận lâm sàng"
               >
-                <i class="bi bi-clock-history text-warning"></i>
                 <span class="tab-text">Đang làm XN</span>
-                <span class="tab-count count-waiting-lab num">{{ overview()?.waitingForResultsTickets?.length || 0 }}</span>
+                <span class="tab-count mono">{{ overview()?.waitingForResultsTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'SKIPPED'"
                 (click)="activeTab = 'SKIPPED'"
-                title="Bệnh nhân bị nhỡ lượt gọi"
+                title="Bệnh nhân nhỡ lượt gọi"
               >
-                <i class="bi bi-arrow-repeat text-danger"></i>
                 <span class="tab-text">Nhỡ lượt</span>
-                <span class="tab-count count-skipped num">{{ overview()?.skippedTickets?.length || 0 }}</span>
+                <span class="tab-count mono">{{ overview()?.skippedTickets?.length || 0 }}</span>
               </button>
               <button
                 class="tab-btn"
                 [class.active]="activeTab === 'COMPLETED'"
                 (click)="activeTab = 'COMPLETED'"
-                title="Bệnh nhân đã hoàn tất khám"
+                title="Bệnh nhân đã khám xong"
               >
-                <i class="bi bi-check2-all text-secondary"></i>
                 <span class="tab-text">Đã khám</span>
-                <span class="tab-count count-completed num">{{ overview()?.completedTickets?.length || 0 }}</span>
+                <span class="tab-count mono">{{ overview()?.completedTickets?.length || 0 }}</span>
               </button>
             </div>
 
-            <!-- Quick Filter Bar -->
             <div class="list-search-bar">
               <div class="search-field-sm">
                 <i class="bi bi-search"></i>
                 <input
                   type="text"
                   [(ngModel)]="listSearchQuery"
-                  placeholder="Lọc theo mã số hoặc tên người bệnh..."
+                  placeholder="Lọc theo số phiếu hoặc tên bệnh nhân"
                   class="search-input-sm"
                 />
                 @if (listSearchQuery) {
-                  <button class="clear-sm" (click)="listSearchQuery = ''">×</button>
+                  <button class="clear-sm" (click)="listSearchQuery = ''" title="Xoá bộ lọc" aria-label="Xoá bộ lọc">×</button>
                 }
               </div>
             </div>
 
-            <!-- Tab Content 0: RESULTS_READY (Ưu tiên số 1) -->
+            <!-- Có kết quả CLS -->
             @if (activeTab === 'RESULTS_READY') {
               <div class="tab-content-list">
                 @if (filteredResultsReadyTickets().length === 0) {
                   <div class="empty-list-state">
-                    <i class="bi bi-file-earmark-medical text-muted"></i>
-                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện chưa có bệnh nhân nào có kết quả cận lâm sàng' }}</p>
+                    <p>{{ listSearchQuery ? 'Không có bệnh nhân khớp bộ lọc' : 'Chưa có bệnh nhân nào có kết quả CLS' }}</p>
                   </div>
                 } @else {
                   @for (t of filteredResultsReadyTickets(); track t.id; let idx = $index) {
-                    <div class="ticket-row-card results-ready-row">
+                    <div class="ticket-row-card results-ready-row" [class.emergency-row]="t.isEmergency">
                       <div class="row-order">
-                        <span class="order-idx num">#{{ idx + 1 }}</span>
-                        <span class="row-ticket-num num text-success">{{ t.ticketNumber }}</span>
+                        <span class="order-idx mono">{{ idx + 1 }}</span>
+                        <span class="row-ticket-num mono">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
                           <strong>{{ t.patientName }}</strong>
-                          <span class="badge badge-results-ready"><i class="bi bi-check2-circle"></i> ĐÃ CÓ KẾT QUẢ CLS</span>
+                          <span class="status success">Đã có kết quả CLS</span>
                           @if (t.isEmergency) {
-                            <span class="badge badge-emergency"><i class="bi bi-exclamation-octagon-fill"></i> CẤP CỨU</span>
+                            <span class="status danger">Cấp cứu</span>
                           }
                         </div>
                         <div class="row-patient-meta">
-                          <span>SĐT: {{ t.patientPhone }}</span>
+                          <span class="mono">{{ t.patientPhone }}</span>
                           @if (t.patientDob) {
-                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                            <span>NS {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
                           }
-                          <span class="text-success font-semibold">• Sẵn sàng đọc kết quả &amp; kê đơn</span>
+                          <span>Chờ đọc kết quả và kê đơn</span>
                         </div>
                       </div>
                       <div class="row-actions">
                         @if (isDoctor()) {
-                          <button class="btn btn-sm btn-success" (click)="startExam(t.id)" title="Mời bệnh nhân vào phòng khám tiếp">
-                            <i class="bi bi-play-circle-fill"></i> Vào Khám (Đọc KQ)
+                          <button class="btn btn-sm btn-primary" (click)="startExam(t.id)" title="Mời bệnh nhân vào phòng đọc kết quả">
+                            Mời vào đọc KQ
                           </button>
                         } @else {
-                          <span class="text-xs text-muted">Chờ bác sĩ mời vào đọc kết quả</span>
+                          <span class="row-hint">Chờ bác sĩ mời vào</span>
                         }
                       </div>
                     </div>
@@ -361,61 +329,56 @@ import { RouterLink } from '@angular/router';
               </div>
             }
 
-            <!-- Tab Content 1: WAITING -->
+            <!-- Chờ khám -->
             @if (activeTab === 'WAITING') {
               <div class="tab-content-list">
                 @if (filteredWaitingTickets().length === 0) {
                   <div class="empty-list-state">
-                    <i class="bi bi-check-circle text-success"></i>
-                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện không có bệnh nhân nào đang chờ' }}</p>
+                    <p>{{ listSearchQuery ? 'Không có bệnh nhân khớp bộ lọc' : 'Không có bệnh nhân đang chờ' }}</p>
                   </div>
                 } @else {
                   @for (t of filteredWaitingTickets(); track t.id; let idx = $index) {
                     <div class="ticket-row-card" [class.emergency-row]="t.isEmergency">
                       <div class="row-order">
-                        <span class="order-idx num">#{{ idx + 1 }}</span>
-                        <span class="row-ticket-num num">{{ t.ticketNumber }}</span>
+                        <span class="order-idx mono">{{ idx + 1 }}</span>
+                        <span class="row-ticket-num mono">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
                           <strong>{{ t.patientName }}</strong>
                           @if (t.isEmergency) {
-                            <span class="badge badge-emergency"><i class="bi bi-exclamation-octagon-fill"></i> CẤP CỨU</span>
+                            <span class="status danger">Cấp cứu</span>
                           }
                           @if (t.priorityScore >= 30 && !t.isEmergency) {
-                            <span class="badge badge-priority"><i class="bi bi-star-fill"></i> Ưu tiên</span>
+                            <span class="status warning">Ưu tiên</span>
                           }
                           @if (t.hasAppointment) {
-                            <span class="badge badge-booked"><i class="bi bi-calendar-check"></i> Đặt trước</span>
+                            <span class="status info">Đặt trước</span>
                           }
                         </div>
                         <div class="row-patient-meta">
-                          <span>SĐT: {{ t.patientPhone }}</span>
+                          <span class="mono">{{ t.patientPhone }}</span>
                           @if (t.patientDob) {
-                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                            <span>NS {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
                           }
-                          <span>• Giờ lấy số: {{ t.checkInTime }}</span>
-                          <span>• Điểm: <strong class="num">{{ t.priorityScore }}</strong></span>
+                          <span>Lấy số <span class="mono">{{ t.checkInTime | slice:0:5 }}</span></span>
+                          <span>Điểm <span class="mono">{{ t.priorityScore }}</span></span>
                         </div>
                         @if (t.notes) {
-                          <div class="row-patient-note">
-                            <i class="bi bi-info-circle"></i> {{ t.notes }}
-                          </div>
+                          <div class="row-patient-note">{{ t.notes }}</div>
                         }
                       </div>
                       <div class="row-actions">
                         @if (!t.isEmergency) {
-                          <button class="btn btn-sm btn-outline-danger" (click)="openEmergencyModal(t)" title="Gắn cờ ưu tiên cấp cứu">
-                            <i class="bi bi-lightning-fill"></i> Khẩn cấp
+                          <button class="btn btn-sm btn-secondary" (click)="openEmergencyModal(t)" title="Đánh dấu ưu tiên cấp cứu">
+                            Cấp cứu
                           </button>
                         }
-                        <!-- Chuyển phòng khám (Điều phối tải) -->
-                        <button class="btn btn-sm btn-outline-primary" (click)="openTransferModal(t)" title="Chuyển sang phòng khám khác để giảm tải">
-                          <i class="bi bi-arrow-left-right"></i> Chuyển phòng
+                        <button class="btn btn-sm btn-secondary" (click)="openTransferModal(t)" title="Chuyển sang phòng khác để giảm tải">
+                          Chuyển phòng
                         </button>
-                        <!-- Hủy lượt khám -->
-                        <button class="btn btn-sm btn-outline-muted" (click)="openCancelModal(t)" title="Hủy số khám nếu người bệnh xin về">
-                          <i class="bi bi-x-circle"></i> Hủy
+                        <button class="icon-btn danger" (click)="openCancelModal(t)" title="Hủy số khám" aria-label="Hủy số khám">
+                          <i class="bi bi-x-circle"></i>
                         </button>
                       </div>
                     </div>
@@ -424,36 +387,35 @@ import { RouterLink } from '@angular/router';
               </div>
             }
 
-            <!-- Tab Content: WAITING_FOR_RESULTS (Đang làm xét nghiệm) -->
+            <!-- Đang làm xét nghiệm -->
             @if (activeTab === 'WAITING_FOR_RESULTS') {
               <div class="tab-content-list">
                 @if (filteredWaitingForResultsTickets().length === 0) {
                   <div class="empty-list-state">
-                    <i class="bi bi-hourglass-bottom text-muted"></i>
-                    <p>{{ listSearchQuery ? 'Không tìm thấy bệnh nhân khớp bộ lọc' : 'Hiện không có bệnh nhân nào đang làm xét nghiệm' }}</p>
+                    <p>{{ listSearchQuery ? 'Không có bệnh nhân khớp bộ lọc' : 'Không có bệnh nhân đang làm xét nghiệm' }}</p>
                   </div>
                 } @else {
                   @for (t of filteredWaitingForResultsTickets(); track t.id; let idx = $index) {
                     <div class="ticket-row-card waiting-lab-row">
                       <div class="row-order">
-                        <span class="order-idx num">#{{ idx + 1 }}</span>
-                        <span class="row-ticket-num num text-warning">{{ t.ticketNumber }}</span>
+                        <span class="order-idx mono">{{ idx + 1 }}</span>
+                        <span class="row-ticket-num mono">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
                           <strong>{{ t.patientName }}</strong>
-                          <span class="badge badge-waiting-lab"><i class="bi bi-clock-history"></i> ĐANG CHỜ PHÒNG LAB</span>
+                          <span class="status warning">Chờ kết quả XN</span>
                         </div>
                         <div class="row-patient-meta">
-                          <span>SĐT: {{ t.patientPhone }}</span>
+                          <span class="mono">{{ t.patientPhone }}</span>
                           @if (t.patientDob) {
-                            <span>• NS: {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
+                            <span>NS {{ t.patientDob | date:'dd/MM/yyyy' }}</span>
                           }
-                          <span class="text-warning">• Bệnh nhân đang di chuyển sang phòng xét nghiệm</span>
+                          <span>Đang làm xét nghiệm</span>
                         </div>
                       </div>
                       <div class="row-actions">
-                        <span class="text-xs text-muted">Đang xử lý kết quả</span>
+                        <span class="row-hint">Đang xử lý kết quả</span>
                       </div>
                     </div>
                   }
@@ -461,50 +423,47 @@ import { RouterLink } from '@angular/router';
               </div>
             }
 
-            <!-- Tab Content 2: SKIPPED -->
+            <!-- Nhỡ lượt -->
             @if (activeTab === 'SKIPPED') {
               <div class="tab-content-list">
                 @if (filteredSkippedTickets().length === 0) {
                   <div class="empty-list-state">
-                    <i class="bi bi-person-check text-muted"></i>
-                    <p>{{ listSearchQuery ? 'Không tìm thấy lượt nhỡ khớp bộ lọc' : 'Không có lượt khám nào bị nhỡ' }}</p>
+                    <p>{{ listSearchQuery ? 'Không có lượt nhỡ khớp bộ lọc' : 'Không có lượt nhỡ' }}</p>
                   </div>
                 } @else {
                   @for (t of filteredSkippedTickets(); track t.id) {
                     <div class="ticket-row-card skipped-row">
                       <div class="row-order">
-                        <span class="row-ticket-num text-danger num">{{ t.ticketNumber }}</span>
+                        <span class="row-ticket-num mono">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
                           <strong>{{ t.patientName }}</strong>
-                          <span class="badge badge-skipped">Vắng mặt</span>
+                          <span class="status">Vắng mặt</span>
                         </div>
                         <div class="row-patient-meta">
-                          <span>SĐT: {{ t.patientPhone }}</span>
-                          <span>• Giờ lấy số: {{ t.checkInTime }}</span>
+                          <span class="mono">{{ t.patientPhone }}</span>
+                          <span>Lấy số <span class="mono">{{ t.checkInTime | slice:0:5 }}</span></span>
                         </div>
                         @if (t.notes) {
-                          <div class="row-patient-note">
-                            <i class="bi bi-info-circle"></i> {{ t.notes }}
-                          </div>
+                          <div class="row-patient-note">{{ t.notes }}</div>
                         }
                       </div>
                       <div class="row-actions">
                         @if (isDoctor()) {
-                          <button class="btn btn-sm btn-outline" (click)="recallTicket(t.id)" title="Gọi lại số này">
-                            <i class="bi bi-arrow-counterclockwise"></i> Gọi lại
+                          <button class="btn btn-sm btn-secondary" (click)="recallTicket(t.id)" title="Gọi lại số này">
+                            Gọi lại
                           </button>
                         } @else {
-                          <button class="btn btn-sm btn-outline" (click)="requeueTicket(t.id)" title="Người bệnh đã quay lại: xếp lên đầu hàng chờ để bác sĩ gọi lượt tiếp theo">
-                            <i class="bi bi-arrow-counterclockwise"></i> Đưa lại hàng đợi
+                          <button class="btn btn-sm btn-secondary" (click)="requeueTicket(t.id)" title="Bệnh nhân đã quay lại: xếp lên đầu hàng chờ">
+                            Đưa lại hàng đợi
                           </button>
                         }
-                        <button class="btn btn-sm btn-outline-primary" (click)="openTransferModal(t)" title="Chuyển sang phòng khác">
-                          <i class="bi bi-arrow-left-right"></i> Chuyển phòng
+                        <button class="btn btn-sm btn-secondary" (click)="openTransferModal(t)" title="Chuyển sang phòng khác">
+                          Chuyển phòng
                         </button>
-                        <button class="btn btn-sm btn-outline-muted" (click)="openCancelModal(t)" title="Hủy số khám">
-                          <i class="bi bi-x-circle"></i> Hủy
+                        <button class="icon-btn danger" (click)="openCancelModal(t)" title="Hủy số khám" aria-label="Hủy số khám">
+                          <i class="bi bi-x-circle"></i>
                         </button>
                       </div>
                     </div>
@@ -513,31 +472,30 @@ import { RouterLink } from '@angular/router';
               </div>
             }
 
-            <!-- Tab Content 3: COMPLETED -->
+            <!-- Đã khám -->
             @if (activeTab === 'COMPLETED') {
               <div class="tab-content-list">
                 @if (filteredCompletedTickets().length === 0) {
                   <div class="empty-list-state">
-                    <i class="bi bi-clipboard-pulse text-muted"></i>
                     <p>Chưa có lượt khám nào hoàn thành hôm nay</p>
                   </div>
                 } @else {
                   @for (t of filteredCompletedTickets(); track t.id) {
                     <div class="ticket-row-card completed-row">
                       <div class="row-order">
-                        <span class="row-ticket-num text-muted num">{{ t.ticketNumber }}</span>
+                        <span class="row-ticket-num mono">{{ t.ticketNumber }}</span>
                       </div>
                       <div class="row-patient-details">
                         <div class="row-patient-name">
                           <strong>{{ t.patientName }}</strong>
                         </div>
                         <div class="row-patient-meta">
-                          <span>Bắt đầu: {{ t.startTime }}</span>
-                          <span> • Xong: {{ t.endTime }}</span>
+                          <span>Bắt đầu <span class="mono">{{ t.startTime }}</span></span>
+                          <span>Xong <span class="mono">{{ t.endTime }}</span></span>
                         </div>
                       </div>
                       <div class="row-status">
-                        <span class="badge badge-success"><i class="bi bi-check2"></i> Đã hoàn tất</span>
+                        <span class="status success">Hoàn tất</span>
                       </div>
                     </div>
                   }
@@ -548,55 +506,51 @@ import { RouterLink } from '@angular/router';
         </div>
       }
 
-      <!-- Modal Điều Phối: Chuyển Phòng Khám (Transfer Ticket Modal) -->
+      <!-- Modal chuyển phòng -->
       @if (showTransferModal() && activeTransferTicket()) {
         <div class="modal-backdrop" (click)="closeTransferModal()">
           <div class="modal-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi bi-arrow-left-right text-primary"></i> Điều Phối Chuyển Phòng Khám
-              </h2>
-              <button class="modal-close-btn" (click)="closeTransferModal()">×</button>
+              <h2 class="modal-title">Chuyển phòng khám</h2>
+              <button class="modal-close-btn" (click)="closeTransferModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               <div class="ticket-info-summary">
-                <div class="summary-num num">{{ activeTransferTicket()?.ticketNumber }}</div>
+                <div class="summary-num mono">{{ activeTransferTicket()?.ticketNumber }}</div>
                 <div class="summary-details">
-                  <div class="summary-name">Bệnh nhân: <strong>{{ activeTransferTicket()?.patientName }}</strong></div>
+                  <div class="summary-name">{{ activeTransferTicket()?.patientName }}</div>
                   <div class="summary-sub">
-                    Phòng hiện tại: <strong>{{ activeTransferTicket()?.roomNumber }} - {{ activeTransferTicket()?.roomName }}</strong>
+                    Phòng hiện tại: {{ activeTransferTicket()?.roomNumber }} - {{ activeTransferTicket()?.roomName }}
                   </div>
                 </div>
               </div>
 
-              <div class="form-group mt-3">
-                <label class="form-label required">Chọn phòng khám chuyển đến:</label>
+              <div class="form-group">
+                <label class="form-label required">Phòng chuyển đến</label>
                 <select [(ngModel)]="targetRoomId" class="form-control" required>
                   @for (r of rooms(); track r.id) {
                     @if (r.id !== activeTransferTicket()?.examinationRoomId) {
                       <option [ngValue]="r.id">
-                        {{ r.roomNumber }} - {{ r.roomName }} (Đang chờ: {{ getRoomWaitingCount(r.id) }} người)
+                        {{ r.roomNumber }} - {{ r.roomName }} (đang chờ {{ getRoomWaitingCount(r.id) }})
                       </option>
                     }
                   }
                 </select>
-                <small class="form-hint">
-                  Nên chọn phòng có ít bệnh nhân đang chờ để cân bằng thời gian chờ giữa các phòng
-                </small>
+                <small class="form-hint">Nên chọn phòng ít người chờ để cân bằng thời gian chờ.</small>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Lý do điều chuyển:</label>
+                <label class="form-label">Lý do</label>
                 <input
                   type="text"
                   [(ngModel)]="transferReason"
-                  placeholder="Ví dụ: Giảm tải phòng khám, Đúng chuyên khoa, Bác sĩ yêu cầu..."
+                  placeholder="Ví dụ: giảm tải, đúng chuyên khoa, bác sĩ yêu cầu"
                   class="form-control"
                 />
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeTransferModal()">Hủy Bỏ</button>
+              <button class="btn btn-secondary" (click)="closeTransferModal()">Hủy</button>
               <button
                 class="btn btn-primary"
                 [disabled]="submittingTransfer() || !targetRoomId"
@@ -605,7 +559,7 @@ import { RouterLink } from '@angular/router';
                 @if (submittingTransfer()) {
                   <span class="spinner-sm"></span> Đang chuyển...
                 } @else {
-                  <i class="bi bi-check-circle-fill"></i> Xác Nhận Chuyển Phòng
+                  Chuyển phòng
                 }
               </button>
             </div>
@@ -613,32 +567,30 @@ import { RouterLink } from '@angular/router';
         </div>
       }
 
-      <!-- Modal Hủy Lượt Khám (Cancel Ticket Modal) -->
+      <!-- Modal hủy lượt khám -->
       @if (showCancelModal() && activeCancelTicket()) {
         <div class="modal-backdrop" (click)="closeCancelModal()">
           <div class="modal-dialog modal-sm-custom" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title text-danger">
-                <i class="bi bi-exclamation-triangle-fill"></i> Xác Nhận Hủy Lượt Khám
-              </h2>
-              <button class="modal-close-btn" (click)="closeCancelModal()">×</button>
+              <h2 class="modal-title">Hủy lượt khám</h2>
+              <button class="modal-close-btn" (click)="closeCancelModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               <p class="cancel-prompt">
-                Bạn có chắc chắn muốn hủy lượt số <strong>{{ activeCancelTicket()?.ticketNumber }}</strong> của bệnh nhân <strong>{{ activeCancelTicket()?.patientName }}</strong>?
+                Hủy số <strong class="mono">{{ activeCancelTicket()?.ticketNumber }}</strong> của bệnh nhân <strong>{{ activeCancelTicket()?.patientName }}</strong>?
               </p>
               <div class="form-group">
-                <label class="form-label">Lý do hủy số:</label>
+                <label class="form-label">Lý do hủy</label>
                 <input
                   type="text"
                   [(ngModel)]="cancelReason"
-                  placeholder="Ví dụ: Người bệnh xin về, Trùng số, Không khám nữa..."
+                  placeholder="Ví dụ: bệnh nhân xin về, trùng số"
                   class="form-control"
                 />
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeCancelModal()">Quay Lại</button>
+              <button class="btn btn-secondary" (click)="closeCancelModal()">Quay lại</button>
               <button
                 class="btn btn-danger"
                 [disabled]="submittingCancel()"
@@ -647,7 +599,7 @@ import { RouterLink } from '@angular/router';
                 @if (submittingCancel()) {
                   <span class="spinner-sm"></span> Đang hủy...
                 } @else {
-                  <i class="bi bi-trash-fill"></i> Hủy Lượt Khám
+                  Hủy lượt khám
                 }
               </button>
             </div>
@@ -655,68 +607,50 @@ import { RouterLink } from '@angular/router';
         </div>
       }
 
-      <!-- Modal Kích Hoạt Ưu Tiên Cấp Cứu (Emergency Priority Modal) -->
+      <!-- Modal ưu tiên cấp cứu -->
       @if (showEmergencyModal() && activeEmergencyTicket()) {
         <div class="modal-backdrop" (click)="closeEmergencyModal()">
           <div class="modal-dialog modal-emergency-custom" (click)="$event.stopPropagation()">
-            <div class="modal-header modal-header-emergency">
-              <div class="modal-emergency-title-box">
-                <div class="emergency-icon-circle">
-                  <i class="bi bi-exclamation-octagon-fill"></i>
-                </div>
-                <div>
-                  <h2 class="modal-title text-danger">Kích Hoạt Ưu Tiên Cấp Cứu</h2>
-                  <span class="emergency-subtitle">Đưa người bệnh lên vị trí số 1 trong hàng đợi</span>
-                </div>
-              </div>
-              <button class="modal-close-btn" (click)="closeEmergencyModal()">×</button>
+            <div class="modal-header">
+              <h2 class="modal-title">Ưu tiên cấp cứu</h2>
+              <button class="modal-close-btn" (click)="closeEmergencyModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
-              <!-- Thông tin người bệnh tóm tắt -->
-              <div class="ticket-info-summary emergency-summary">
-                <div class="summary-num num text-danger">{{ activeEmergencyTicket()?.ticketNumber }}</div>
+              <div class="ticket-info-summary">
+                <div class="summary-num mono">{{ activeEmergencyTicket()?.ticketNumber }}</div>
                 <div class="summary-details">
-                  <div class="summary-name">Bệnh nhân: <strong>{{ activeEmergencyTicket()?.patientName }}</strong></div>
+                  <div class="summary-name">{{ activeEmergencyTicket()?.patientName }}</div>
                   <div class="summary-sub">
-                    SĐT: <strong>{{ activeEmergencyTicket()?.patientPhone }}</strong>
+                    <span class="mono">{{ activeEmergencyTicket()?.patientPhone }}</span>
                     @if (activeEmergencyTicket()?.patientDob) {
-                      <span> • Ngày sinh: <strong>{{ activeEmergencyTicket()?.patientDob | date:'dd/MM/yyyy' }}</strong></span>
+                      <span> · NS {{ activeEmergencyTicket()?.patientDob | date:'dd/MM/yyyy' }}</span>
                     }
                   </div>
                   <div class="summary-sub">
-                    Phòng khám: <strong>{{ activeEmergencyTicket()?.roomNumber }} - {{ activeEmergencyTicket()?.roomName }}</strong>
+                    Phòng {{ activeEmergencyTicket()?.roomNumber }} - {{ activeEmergencyTicket()?.roomName }}
                   </div>
                 </div>
               </div>
 
-              <!-- Hộp cảnh báo y tế tác động đến hàng đợi -->
               <div class="emergency-warning-box">
-                <div class="warning-header">
-                  <i class="bi bi-shield-exclamation text-danger"></i>
-                  <strong>Tác động đến thứ tự hàng đợi:</strong>
-                </div>
                 <ul class="warning-list">
-                  <li>Cộng thêm <strong>+100 điểm ưu tiên</strong>, đưa bệnh nhân lên <strong>đầu danh sách chờ (vị trí gọi số tiếp theo)</strong>.</li>
-                  <li>Hiển thị cờ đỏ cảnh báo <strong>[CẤP CỨU]</strong> trên màn hình gọi số của bác sĩ và bảng TV sảnh chờ.</li>
-                  <li>Lượt khám tiếp theo sẽ ưu tiên mời bệnh nhân này vào phòng khám ngay lập tức.</li>
+                  <li>Cộng 100 điểm ưu tiên, đưa bệnh nhân lên đầu danh sách chờ.</li>
+                  <li>Hiển thị nhãn "Cấp cứu" trên màn hình gọi số của bác sĩ và TV sảnh chờ.</li>
+                  <li>Bác sĩ sẽ gọi bệnh nhân này ở lượt kế tiếp.</li>
                 </ul>
               </div>
-
-              <p class="emergency-confirm-question">
-                Bạn có chắc chắn muốn xác nhận ưu tiên cấp cứu cho bệnh nhân này?
-              </p>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closeEmergencyModal()">Hủy Bỏ</button>
+              <button class="btn btn-secondary" (click)="closeEmergencyModal()">Hủy</button>
               <button
-                class="btn btn-danger btn-lg-emergency"
+                class="btn btn-danger"
                 [disabled]="submittingEmergency()"
                 (click)="confirmEmergency()"
               >
                 @if (submittingEmergency()) {
-                  <span class="spinner-sm"></span> Đang kích hoạt...
+                  <span class="spinner-sm"></span> Đang xử lý...
                 } @else {
-                  <i class="bi bi-lightning-fill"></i> Xác Nhận Cấp Cứu
+                  Xác nhận cấp cứu
                 }
               </button>
             </div>
@@ -726,917 +660,465 @@ import { RouterLink } from '@angular/router';
     </div>
   `,
   styles: [`
-    .queue-control-page {
-      padding: 1.5rem 1.5rem 3.5rem;
-      max-width: 1360px;
-      margin: 0 auto;
-    }
-
-    .control-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.25rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.2rem 0.65rem;
-      background-color: var(--primary-50);
-      color: var(--primary-800);
-      font-size: 0.775rem;
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: 0.35rem;
-      border: 1px solid var(--primary-200);
-    }
-
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      background-color: var(--success-solid);
-      border-radius: 50%;
-    }
-
-    .page-title {
-      font-size: 1.75rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin: 0 0 0.25rem;
-      letter-spacing: -0.01em;
-    }
-
-    .page-subtitle {
-      color: var(--text-muted);
-      margin: 0;
-      font-size: 0.925rem;
-    }
-
-    .header-right {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-    }
-
-    /* Clean Simple Room Filter Bar */
+    /* Chọn phòng */
     .room-filter-bar {
-      background-color: #ffffff;
-      border-radius: 10px;
-      border: 1px solid #e2e8f0;
-      padding: 0.6rem 1rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      margin-bottom: 16px;
     }
 
-    .room-filter-left {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex: 1;
-    }
-
-    .room-filter-label {
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: #334155;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      white-space: nowrap;
-      margin: 0;
-    }
-
-    .room-filter-select {
-      max-width: 420px;
-      width: 100%;
-      height: 38px;
-      padding: 0 0.85rem;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #0f172a;
-      background-color: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      outline: none;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .room-filter-select:hover {
-      background-color: #ffffff;
-      border-color: #94a3b8;
-    }
-
-    .room-filter-select:focus {
-      background-color: #ffffff;
-      border-color: #0284c7;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
-
+    .room-filter-left,
     .room-filter-right {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 10px;
     }
 
-    .room-stat-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.35rem 0.75rem;
-      background: #f1f5f9;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      color: #334155;
-      font-weight: 500;
+    .room-filter-label {
+      font-size: 13px;
+      color: var(--text-muted);
       white-space: nowrap;
     }
 
-    .room-stat-badge strong {
-      color: #0284c7;
-      font-weight: 700;
-    }
-
-    .btn-refresh-simple {
-      width: 36px;
-      height: 36px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+    .room-filter-select {
+      height: 34px;
+      min-width: 320px;
+      padding: 0 8px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
       background: #ffffff;
-      color: #64748b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      font-size: 0.9rem;
+      outline: none;
     }
 
-    .btn-refresh-simple:hover {
-      background: #f0f9ff;
-      border-color: #0284c7;
-      color: #0284c7;
+    .room-filter-select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
+    }
+
+    .room-filter-static {
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    .room-stat {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .room-stat strong {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
     .spin-active {
+      display: inline-block;
       animation: spin 0.8s linear infinite;
     }
 
     @keyframes spin {
-      from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
 
-
-    /* Console Grid */
+    /* Bố cục chính */
     .console-grid {
       display: grid;
-      grid-template-columns: 1fr 480px;
-      gap: 1.25rem;
+      grid-template-columns: 380px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
     }
 
-    @media (max-width: 1100px) {
-      .console-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .medical-card {
-      background: #ffffff;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-sm);
-    }
-
-    /* Stage Card */
-    .active-stage-card {
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
+    .active-stage-card { overflow: hidden; }
 
     .stage-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 0.85rem;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border-color);
-      flex-wrap: wrap;
-      gap: 0.75rem;
     }
 
     .doctor-badge {
       display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.95rem;
-      color: var(--text-main);
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 14px;
     }
 
+    .doctor-badge .text-muted { font-size: 13px; }
+    .doctor-badge strong { font-weight: 600; }
+
     .specialty-sub {
+      font-size: 13px;
       color: var(--text-muted);
-      font-size: 0.85rem;
     }
 
     .queue-quick-stats {
       display: flex;
-      gap: 0.75rem;
+      gap: 24px;
+      margin: 10px 0 0;
     }
 
-    .stat-tag {
-      font-size: 0.825rem;
-      color: var(--text-secondary);
-      background-color: var(--bg-subtle);
-      padding: 0.25rem 0.65rem;
-      border-radius: var(--radius-xs);
-      border: 1px solid var(--border-color);
+    .queue-quick-stats dt {
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
-    .call-action-box {
-      width: 100%;
-    }
-
-    .btn-call-next {
-      width: 100%;
-      background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
-      color: #ffffff;
-      border: none;
-      border-radius: var(--radius-md);
-      padding: 1.35rem 1.5rem;
-      cursor: pointer;
-      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
-      transition: all 0.2s ease;
-      text-align: left;
-    }
-
-    .btn-call-next:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
-      background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
-    }
-
-    .btn-call-next:disabled {
-      background: #94a3b8;
-      box-shadow: none;
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-
-    .call-btn-content {
-      display: flex;
-      align-items: center;
-      gap: 1.25rem;
-    }
-
-    .call-icon {
-      font-size: 2.2rem;
-      color: #fef08a;
-    }
-
-    .call-text {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-
-    .call-title {
-      font-size: 1.25rem;
-      font-weight: 900;
-      letter-spacing: 0.05em;
-    }
-
-    .call-subtitle {
-      font-size: 0.85rem;
-      opacity: 0.9;
-    }
-
-    .status-panels-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    @media (max-width: 680px) {
-      .status-panels-row {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .ticket-status-panel {
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      overflow: hidden;
-      background: #ffffff;
-    }
-
-    .panel-called {
-      border-top: 3px solid #0284c7;
-    }
-
-    .panel-examining {
-      border-top: 3px solid #16a34a;
-    }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.65rem 0.85rem;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .panel-title {
-      font-size: 0.825rem;
-      font-weight: 700;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .badge-calling {
-      background: #e0f2fe;
-      color: #0369a1;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.1rem 0.45rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .badge-examining {
-      background: #dcfce7;
-      color: #15803d;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.1rem 0.45rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .panel-body {
-      padding: 1rem 0.85rem;
-      min-height: 140px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-
-    .ticket-highlight {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .ticket-num {
-      font-size: 1.85rem;
-      font-weight: 900;
-      color: var(--primary-700);
-      line-height: 1;
-    }
-
-    .patient-name {
-      font-size: 1rem;
-      font-weight: 700;
+    .queue-quick-stats dd {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
       color: var(--text-main);
     }
 
-    .patient-info-sub {
-      font-size: 0.775rem;
+    .call-action-box {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .btn-call-next { width: 100%; }
+
+    .call-subtitle {
+      margin-top: 8px;
+      font-size: 13px;
       color: var(--text-muted);
+      text-align: center;
+    }
+
+    .call-subtitle strong { color: var(--text-main); font-weight: 600; }
+
+    .call-note {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .status-panels-row {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ticket-status-panel + .ticket-status-panel {
+      border-top: 1px solid var(--border-color);
+    }
+
+    .ticket-status-panel .panel-header {
+      padding: 10px 16px;
+      background: var(--bg-subtle);
+    }
+
+    .ticket-status-panel .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .ticket-status-panel .panel-body { padding: 14px 16px; }
+
+    .ticket-num {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .patient-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-main);
+      margin-top: 2px;
+    }
+
+    .patient-info-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     .panel-actions {
       display: flex;
-      gap: 0.5rem;
-      margin-top: 0.65rem;
+      gap: 8px;
       flex-wrap: wrap;
+      margin-top: 12px;
     }
 
     .panel-empty {
-      text-align: center;
+      padding: 12px 0;
+      font-size: 13px;
       color: var(--text-muted);
-      padding: 1.5rem 0;
     }
 
-    .panel-empty i {
-      font-size: 1.8rem;
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-
-    /* Queue Tabs */
+    /* Danh sách hàng đợi */
     .queue-list-card {
       display: flex;
       flex-direction: column;
+      min-height: 420px;
       overflow: hidden;
     }
 
     .queue-tabs {
       display: flex;
-      background: #f1f5f9;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 0.35rem;
-      gap: 0.35rem;
+      gap: 4px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border-color);
       overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .queue-tabs::-webkit-scrollbar {
-      display: none;
     }
 
     .tab-btn {
-      flex: 1 0 auto;
-      white-space: nowrap;
-      padding: 0.45rem 0.65rem;
-      background: transparent;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #64748b;
-      cursor: pointer;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      user-select: none;
+      gap: 6px;
+      padding: 12px 8px 10px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.12s ease, border-color 0.12s ease;
     }
 
-    .tab-btn:hover:not(.active) {
-      background: rgba(255, 255, 255, 0.7);
-      color: #1e293b;
-    }
+    .tab-btn:hover { color: var(--text-main); }
 
     .tab-btn.active {
-      background: #ffffff;
-      color: #0f172a;
-      font-weight: 700;
-      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
-    }
-
-    .tab-text {
-      white-space: nowrap;
+      color: var(--primary-600);
+      border-bottom-color: var(--primary-600);
+      font-weight: 500;
     }
 
     .tab-count {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 18px;
-      height: 18px;
-      padding: 0 0.35rem;
-      border-radius: 9999px;
-      font-size: 0.72rem;
-      font-weight: 800;
-      line-height: 1;
-      background: #e2e8f0;
-      color: #475569;
+      min-width: 20px;
+      padding: 0 6px;
+      border-radius: var(--radius-full);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 18px;
+      text-align: center;
     }
 
-    .tab-count.count-results-ready {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    .tab-btn.active .tab-count.count-results-ready {
-      background: #16a34a;
-      color: #ffffff;
-    }
-
-    .tab-count.count-waiting {
-      background: #e0f2fe;
-      color: #0369a1;
-    }
-
-    .tab-btn.active .tab-count.count-waiting {
-      background: #0284c7;
-      color: #ffffff;
-    }
-
-    .tab-count.count-waiting-lab {
-      background: #fef3c7;
-      color: #b45309;
-    }
-
-    .tab-btn.active .tab-count.count-waiting-lab {
-      background: #f59e0b;
-      color: #ffffff;
-    }
-
-    .tab-count.count-skipped {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-
-    .tab-btn.active .tab-count.count-skipped {
-      background: #ef4444;
-      color: #ffffff;
-    }
-
-    .tab-count.count-completed {
-      background: #f1f5f9;
-      color: #64748b;
+    .tab-btn.active .tab-count {
+      background: var(--primary-50);
+      color: var(--primary-700);
     }
 
     .list-search-bar {
-      padding: 0.65rem 0.85rem;
-      background: #ffffff;
-      border-bottom: 1px solid var(--border-subtle);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .search-field-sm {
       position: relative;
-      display: flex;
-      align-items: center;
+      max-width: 360px;
     }
 
     .search-field-sm i {
       position: absolute;
-      left: 0.65rem;
-      color: var(--text-muted);
-      font-size: 0.8rem;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 13px;
     }
 
     .search-input-sm {
       width: 100%;
-      padding: 0.35rem 1.8rem 0.35rem 2rem;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      font-size: 0.825rem;
+      height: 32px;
+      padding: 0 28px 0 30px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search-input-sm:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
     .clear-sm {
       position: absolute;
-      right: 0.5rem;
-      background: none;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
       border: none;
+      background: transparent;
       color: var(--text-muted);
+      font-size: 16px;
+      line-height: 1;
       cursor: pointer;
-      font-size: 1rem;
     }
 
     .tab-content-list {
-      max-height: 580px;
+      flex: 1;
       overflow-y: auto;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
+      max-height: calc(100vh - 300px);
+    }
+
+    .empty-list-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
     }
 
     .ticket-row-card {
-      padding: 0.75rem 0.85rem;
-      background: #ffffff;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
       display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      transition: all 0.15s;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      transition: background-color 0.12s ease;
     }
 
-    .ticket-row-card:hover {
-      border-color: var(--primary-300);
-      box-shadow: var(--shadow-xs);
-    }
-
-    .ticket-row-card.emergency-row {
-      border-left: 4px solid var(--danger-solid);
-      background: #fffaf0;
-    }
+    .ticket-row-card:hover { background: var(--bg-hover); }
+    .ticket-row-card:last-child { border-bottom: none; }
+    .ticket-row-card.emergency-row { box-shadow: inset 3px 0 0 var(--danger-solid); }
 
     .row-order {
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 110px;
     }
 
     .order-idx {
-      font-size: 0.775rem;
-      color: var(--text-muted);
-      font-weight: 700;
+      width: 20px;
+      font-size: 12px;
+      color: var(--text-light);
+      text-align: right;
     }
 
     .row-ticket-num {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: var(--primary-800);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
+    .skipped-row .row-ticket-num,
+    .completed-row .row-ticket-num { color: var(--text-muted); }
+
     .row-patient-details {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
+      flex: 1;
+      min-width: 0;
     }
 
     .row-patient-name {
       display: flex;
       align-items: center;
-      gap: 0.45rem;
-      font-size: 0.9rem;
-      color: var(--text-main);
+      gap: 6px;
       flex-wrap: wrap;
     }
 
-    .badge-emergency {
-      background: #fee2e2;
-      color: #991b1b;
-      font-size: 0.7rem;
-      font-weight: 800;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .badge-results-ready {
-      background: #dcfce7;
-      color: #15803d;
-      font-size: 0.7rem;
-      font-weight: 800;
-      padding: 0.15rem 0.5rem;
-      border-radius: var(--radius-xs);
-      border: 1px solid #86efac;
-      animation: pulseGlow 2s infinite ease-in-out;
-    }
-
-    @keyframes pulseGlow {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-      50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-    }
-
-    .badge-waiting-lab {
-      background: #fef3c7;
-      color: #b45309;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.15rem 0.45rem;
-      border-radius: var(--radius-xs);
-      border: 1px solid #fde68a;
-    }
-
-    .results-ready-row {
-      border-left: 4px solid #16a34a !important;
-      background: #f0fdf4 !important;
-    }
-
-    .waiting-lab-row {
-      border-left: 4px solid #f59e0b !important;
-      background: #fffbeb !important;
-    }
-
-    .count-results-ready {
-      background: #16a34a !important;
-      color: #ffffff !important;
-    }
-
-    .count-waiting-lab {
-      background: #f59e0b !important;
-      color: #ffffff !important;
-    }
-
-    .badge-priority {
-      background: #fef3c7;
-      color: #92400e;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .badge-booked {
-      background: #e0e7ff;
-      color: #3730a3;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .badge-skipped {
-      background: #fee2e2;
-      color: #b91c1c;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-    }
+    .row-patient-name strong { font-weight: 500; }
 
     .row-patient-meta {
-      font-size: 0.75rem;
-      color: var(--text-muted);
       display: flex;
-      gap: 0.65rem;
+      gap: 12px;
       flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     .row-patient-note {
-      font-size: 0.75rem;
-      color: var(--primary-800);
-      background: var(--primary-50);
-      padding: 0.2rem 0.5rem;
-      border-radius: var(--radius-xs);
-      margin-top: 0.15rem;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .row-actions {
       display: flex;
-      gap: 0.45rem;
-      justify-content: flex-end;
-      margin-top: 0.25rem;
-      padding-top: 0.35rem;
-      border-top: 1px dashed var(--border-subtle);
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
-    .btn-outline-muted {
-      background: transparent;
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: var(--radius-xs);
-      cursor: pointer;
-    }
-
-    .btn-outline-muted:hover {
-      background: #fee2e2;
-      color: #b91c1c;
-      border-color: #fca5a5;
-    }
-
-    .btn-outline-primary {
-      background: transparent;
-      border: 1px solid var(--primary-300);
-      color: var(--primary-700);
-      font-size: 0.75rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: var(--radius-xs);
-      cursor: pointer;
-    }
-
-    .btn-outline-primary:hover {
-      background: var(--primary-50);
-      border-color: var(--primary-500);
-    }
-
-    .empty-list-state {
-      text-align: center;
-      padding: 2.5rem 1rem;
+    .row-hint {
+      font-size: 12px;
       color: var(--text-muted);
     }
 
-    .empty-list-state i {
-      font-size: 2.2rem;
-      margin-bottom: 0.4rem;
-      display: block;
-    }
-
-    .loading-state {
-      padding: 4rem 1rem;
-      text-align: center;
-      color: var(--text-muted);
-    }
-
-    /* Modal styles */
+    /* Modal */
     .ticket-info-summary {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      padding: 0.75rem 1rem;
-      background: #f8fafc;
-      border-radius: var(--radius-sm);
+      gap: 14px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
       border: 1px solid var(--border-color);
+      background: var(--bg-subtle);
+      border-radius: var(--radius-md);
     }
 
     .summary-num {
-      font-size: 1.6rem;
-      font-weight: 900;
-      color: var(--primary-700);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
     .summary-name {
-      font-size: 0.95rem;
+      font-weight: 500;
       color: var(--text-main);
     }
 
     .summary-sub {
-      font-size: 0.8rem;
+      font-size: 13px;
       color: var(--text-muted);
-      margin-top: 0.15rem;
     }
 
-    .modal-sm-custom {
-      max-width: 420px;
+    .form-hint {
+      font-size: 12px;
+      color: var(--text-muted);
     }
+
+    .modal-sm-custom { max-width: 440px; }
+    .modal-emergency-custom { max-width: 500px; }
 
     .cancel-prompt {
-      font-size: 0.95rem;
-      color: var(--text-main);
-      line-height: 1.45;
-      margin-bottom: 1rem;
-    }
-
-    /* Emergency Confirmation Modal */
-    .modal-emergency-custom {
-      max-width: 490px;
-      border: 2px solid #fecdd3;
-      border-radius: var(--radius-md);
-      box-shadow: 0 10px 30px rgba(225, 29, 72, 0.2);
-    }
-
-    .modal-header-emergency {
-      background: #fff1f2;
-      border-bottom: 1px solid #fecdd3;
-      padding: 1rem 1.25rem;
-    }
-
-    .modal-emergency-title-box {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .emergency-icon-circle {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #fee2e2;
-      color: #e11d48;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.35rem;
-      flex-shrink: 0;
-    }
-
-    .emergency-subtitle {
-      font-size: 0.775rem;
-      color: #9f1239;
-      font-weight: 600;
-      display: block;
-      margin-top: 0.1rem;
-    }
-
-    .emergency-summary {
-      border: 1.5px solid #fecdd3;
-      background: #fff5f5;
+      margin-bottom: 12px;
+      color: var(--text-secondary);
     }
 
     .emergency-warning-box {
-      margin-top: 1rem;
-      background: #fef2f2;
-      border: 1px solid #fee2e2;
-      border-radius: var(--radius-sm);
-      padding: 0.85rem 1rem;
-    }
-
-    .warning-header {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.875rem;
-      color: #991b1b;
-      margin-bottom: 0.4rem;
+      padding: 10px 12px;
+      border: 1px solid var(--warning-border);
+      background: var(--warning-bg);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--warning-text);
     }
 
     .warning-list {
       margin: 0;
-      padding-left: 1.25rem;
-      font-size: 0.825rem;
-      color: #7f1d1d;
-      line-height: 1.5;
+      padding-left: 18px;
     }
 
-    .emergency-confirm-question {
-      margin-top: 1.15rem;
-      margin-bottom: 0.25rem;
-      font-size: 0.925rem;
-      font-weight: 700;
-      color: var(--text-main);
-      text-align: center;
+    .warning-list li + li { margin-top: 2px; }
+
+    @media (max-width: 1100px) {
+      .console-grid { grid-template-columns: 1fr; }
     }
 
-    .btn-lg-emergency {
-      font-weight: 800;
-      padding: 0.6rem 1.35rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.95rem;
-      box-shadow: 0 2px 6px rgba(225, 29, 72, 0.3);
+    @media (max-width: 768px) {
+      .page { padding: 16px; }
+      .room-filter-select { min-width: 0; width: 100%; }
+      .room-filter-left { flex: 1; }
+      .ticket-row-card { flex-wrap: wrap; }
+      .row-actions { width: 100%; justify-content: flex-end; }
     }
-  `]
-})
+  `]})
 export class QueueControlComponent implements OnInit, OnDestroy {
   private readonly queueService = inject(QueueService);
   private readonly scheduleService = inject(ScheduleService);

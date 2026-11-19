@@ -30,6 +30,11 @@ export class HomeComponent implements OnInit {
   readonly displayBoard = signal<ClinicDisplayBoard[]>([]);
   readonly recentTickets = signal<QueueTicket[]>([]);
 
+  // Tổng số người đang chờ ở tất cả phòng (hiển thị ở trang chủ)
+  readonly totalWaiting = computed(() =>
+    this.displayBoard().reduce((sum, r) => sum + (r.waitingCount || 0), 0)
+  );
+
   // Doctor cockpit state
   activeDoctorRoomId: number | null = null;
   readonly doctorRoomOverview = signal<RoomQueueOverview | null>(null);

@@ -11,58 +11,40 @@ import { toIsoDate } from '../../utils/date.utils';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="lab-workspace-page">
-      <!-- Header -->
-      <div class="lab-header">
-        <div class="header-left">
-          <div class="lab-badge">
-            <span class="live-dot"></span> {{ departmentLabel() }}
-          </div>
-          <h1 class="page-title">Bàn Làm Việc Kỹ Thuật Viên</h1>
-          <p class="page-subtitle">
-            Tiếp nhận chỉ định từ bác sĩ phòng khám, ghi nhận kết quả đo lường và ký duyệt kết quả tự động đồng bộ về ca khám
-          </p>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Chỉ định cận lâm sàng</h1>
+          <p class="page-subtitle">{{ departmentLabel() }} · {{ orders().length }} chỉ định {{ workDate() === todayIso ? 'hôm nay' : 'ngày ' + (workDate() | date:'dd/MM/yyyy') }}</p>
         </div>
 
-        <div class="header-right">
-          <input type="date" class="form-control date-picker" [max]="todayIso"
-                 [ngModel]="workDate()" (ngModelChange)="onWorkDateChange($event)" title="Ngày làm việc" />
-          <button type="button" class="btn btn-outline" (click)="loadOrders(true)" title="Làm mới danh sách">
-            <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i> Làm mới dữ liệu
+        <div class="page-actions">
+          <input type="date" class="filter-control date-picker" [max]="todayIso"
+                 [ngModel]="workDate()" (ngModelChange)="onWorkDateChange($event)" title="Ngày làm việc" aria-label="Ngày làm việc" />
+          <button type="button" class="btn btn-secondary" (click)="loadOrders(true)" title="Tải lại danh sách">
+            <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i> Tải lại
           </button>
         </div>
       </div>
 
-      <!-- Quick Metrics Counters -->
+      <!-- Số liệu nhanh -->
       <div class="metrics-grid">
-        <div class="metric-card card-pending" (click)="selectTab('PENDING')">
-          <div class="metric-icon"><i class="bi bi-hourglass-split"></i></div>
-          <div class="metric-info">
-            <span class="metric-val">{{ countPending() }}</span>
-            <span class="metric-lbl">Chờ Lấy Mẫu / Đo</span>
-          </div>
-        </div>
-        <div class="metric-card card-processing" (click)="selectTab('PROCESSING')">
-          <div class="metric-icon"><i class="bi bi-gear-wide-connected"></i></div>
-          <div class="metric-info">
-            <span class="metric-val">{{ countProcessing() }}</span>
-            <span class="metric-lbl">Đang Đo / Xử Lý</span>
-          </div>
-        </div>
-        <div class="metric-card card-completed" (click)="selectTab('COMPLETED')">
-          <div class="metric-icon"><i class="bi bi-check-circle-fill"></i></div>
-          <div class="metric-info">
-            <span class="metric-val">{{ countCompleted() }}</span>
-            <span class="metric-lbl">Đã Ký Duyệt Kết Quả</span>
-          </div>
-        </div>
-        <div class="metric-card card-total" (click)="selectTab('ALL')">
-          <div class="metric-icon"><i class="bi bi-collection-fill"></i></div>
-          <div class="metric-info">
-            <span class="metric-val">{{ orders().length }}</span>
-            <span class="metric-lbl">{{ workDate() === todayIso ? 'Tổng Chỉ Định Hôm Nay' : 'Tổng Chỉ Định Trong Ngày' }}</span>
-          </div>
-        </div>
+        <button type="button" class="metric-card" [class.active]="activeTab() === 'PENDING'" (click)="selectTab('PENDING')">
+          <span class="metric-lbl">Chờ lấy mẫu / đo</span>
+          <span class="metric-val mono">{{ countPending() }}</span>
+        </button>
+        <button type="button" class="metric-card" [class.active]="activeTab() === 'PROCESSING'" (click)="selectTab('PROCESSING')">
+          <span class="metric-lbl">Đang đo / xử lý</span>
+          <span class="metric-val mono">{{ countProcessing() }}</span>
+        </button>
+        <button type="button" class="metric-card" [class.active]="activeTab() === 'COMPLETED'" (click)="selectTab('COMPLETED')">
+          <span class="metric-lbl">Đã có kết quả</span>
+          <span class="metric-val mono">{{ countCompleted() }}</span>
+        </button>
+        <button type="button" class="metric-card" [class.active]="activeTab() === 'ALL'" (click)="selectTab('ALL')">
+          <span class="metric-lbl">Tổng chỉ định</span>
+          <span class="metric-val mono">{{ orders().length }}</span>
+        </button>
       </div>
 
       <!-- Floating Toast Notification -->
@@ -73,7 +55,7 @@ import { toIsoDate } from '../../utils/date.utils';
               <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
             </div>
             <div class="toast-content">
-              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo lỗi' }}</div>
+              <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Lỗi' }}</div>
               <div class="toast-message">{{ alertMessage() }}</div>
             </div>
             <button type="button" class="btn-close-toast" (click)="alertMessage.set(null)" title="Đóng thông báo" aria-label="Đóng">
@@ -83,187 +65,162 @@ import { toIsoDate } from '../../utils/date.utils';
         </div>
       }
 
-      <!-- Main Workspace Card -->
-      <div class="card main-table-card">
-        <!-- Control Bar (Tabs & Search) -->
-        <div class="control-bar">
-          <div class="tabs-group">
-            <button class="tab-btn" [class.active]="activeTab() === 'ALL'" (click)="selectTab('ALL')">
-              Tất Cả ({{ orders().length }})
-            </button>
-            <button class="tab-btn" [class.active]="activeTab() === 'PENDING'" (click)="selectTab('PENDING')">
-              <span class="dot-pending"></span> Chờ Làm ({{ countPending() }})
-            </button>
-            <button class="tab-btn" [class.active]="activeTab() === 'PROCESSING'" (click)="selectTab('PROCESSING')">
-              <span class="dot-processing"></span> Đang Đo ({{ countProcessing() }})
-            </button>
-            <button class="tab-btn" [class.active]="activeTab() === 'COMPLETED'" (click)="selectTab('COMPLETED')">
-              <span class="dot-completed"></span> Đã Hoàn Thành ({{ countCompleted() }})
-            </button>
-          </div>
+      <div class="panel main-table-card">
+        <div class="tabs-row">
+          <button class="tab-btn" [class.active]="activeTab() === 'ALL'" (click)="selectTab('ALL')">
+            Tất cả <span class="tab-count mono">{{ orders().length }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'PENDING'" (click)="selectTab('PENDING')">
+            Chờ làm <span class="tab-count mono">{{ countPending() }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'PROCESSING'" (click)="selectTab('PROCESSING')">
+            Đang đo <span class="tab-count mono">{{ countProcessing() }}</span>
+          </button>
+          <button class="tab-btn" [class.active]="activeTab() === 'COMPLETED'" (click)="selectTab('COMPLETED')">
+            Hoàn thành <span class="tab-count mono">{{ countCompleted() }}</span>
+          </button>
+        </div>
 
-          <select class="form-select room-filter" [ngModel]="roomFilter()" (ngModelChange)="onRoomFilterChange($event)"
-                  title="Lọc theo phòng khám ra chỉ định">
-            <option value="">Mọi phòng chỉ định</option>
-            @for (room of rooms(); track room) {
-              <option [value]="room">Chỉ định từ {{ room }}</option>
-            }
-          </select>
-
+        <div class="toolbar">
           <div class="search-box">
             <i class="bi bi-search"></i>
             <input
               type="text"
               [ngModel]="searchKeyword()"
               (ngModelChange)="onSearchChange($event)"
-              placeholder="Tìm theo số vé (#101), tên người bệnh, mã xét nghiệm..."
-              class="form-control-sm"
+              placeholder="Số phiếu, tên bệnh nhân, mã xét nghiệm"
+              class="filter-control search-input"
             />
             @if (searchKeyword()) {
-              <button class="btn-clear" (click)="onSearchChange('')" aria-label="Xoá từ khoá">×</button>
+              <button class="btn-clear" (click)="onSearchChange('')" aria-label="Xoá từ khoá" title="Xoá từ khoá">×</button>
             }
           </div>
+          <select class="filter-control room-filter" [ngModel]="roomFilter()" (ngModelChange)="onRoomFilterChange($event)"
+                  title="Lọc theo phòng khám ra chỉ định" aria-label="Phòng chỉ định">
+            <option value="">Tất cả phòng chỉ định</option>
+            @for (room of rooms(); track room) {
+              <option [value]="room">Chỉ định từ {{ room }}</option>
+            }
+          </select>
         </div>
 
-        <!-- Orders Table -->
         @if (loadError()) {
           <div class="empty-state">
-            <i class="bi bi-wifi-off text-danger"></i>
             <p>{{ loadError() }}</p>
-            <button type="button" class="btn btn-outline" (click)="loadOrders(true)">Thử lại</button>
+            <button type="button" class="btn btn-secondary btn-sm" (click)="loadOrders(true)">Thử lại</button>
           </div>
         } @else if (loading() && orders().length === 0) {
           <div class="loading-state">
             <div class="spinner"></div>
-            <p>Đang tải danh sách chỉ định xét nghiệm...</p>
+            <p>Đang tải danh sách chỉ định...</p>
           </div>
         } @else if (filteredOrders().length === 0) {
           <div class="empty-state">
-            <i class="bi bi-inbox text-muted"></i>
-            <p>{{ searchKeyword() ? 'Không tìm thấy chỉ định xét nghiệm nào khớp với từ khóa' : 'Không có chỉ định xét nghiệm nào trong mục này' }}</p>
+            <p>{{ searchKeyword() ? 'Không có chỉ định khớp từ khoá' : 'Không có chỉ định trong mục này' }}</p>
           </div>
         } @else {
           <div class="table-responsive">
-            <table class="table lab-orders-table">
+            <table class="data-table lab-orders-table">
               <thead>
                 <tr>
-                  <th style="width: 12%;">Vé khám &amp; Bệnh nhân</th>
-                  <th style="width: 14%;">Mã &amp; Nhóm DV</th>
-                  <th style="width: 26%;">Tên dịch vụ xét nghiệm</th>
-                  <th style="width: 16%; text-align: center;">Chỉ số đo được</th>
-                  <th style="width: 14%; text-align: center;">Trị số tham chiếu</th>
-                  <th style="width: 8%; text-align: center;">Trạng thái</th>
-                  <th style="width: 10%; text-align: center;">Thao tác</th>
+                  <th style="width: 200px;">Bệnh nhân</th>
+                  <th>Dịch vụ</th>
+                  <th style="width: 190px;">Kết quả</th>
+                  <th style="width: 160px;">Tham chiếu</th>
+                  <th style="width: 120px;">Trạng thái</th>
+                  <th style="width: 170px;"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (order of pagedOrders(); track order.id) {
                   <tr [class.row-abnormal]="order.isAbnormal">
-                    <!-- Vé khám & Bệnh nhân -->
                     <td>
                       <div class="patient-cell">
-                        <span class="ticket-tag">#{{ order.ticketNumber || 'N/A' }}</span>
-                        <strong class="patient-name">{{ order.patientName || 'Chưa rõ tên' }}</strong>
-                        @if (order.roomNumber) {
-                          <span class="patient-sub text-muted small" title="Phòng khám của bác sĩ ra chỉ định">Chỉ định từ {{ order.roomNumber }}</span>
-                        }
-                        <span class="patient-sub text-muted small">
-                          {{ order.patientGender || '---' }}
-                          @if (order.patientYearOfBirth) {
-                            • {{ order.patientYearOfBirth }}
+                        <span class="ticket-tag mono">{{ order.ticketNumber || '—' }}</span>
+                        <span class="patient-name">{{ order.patientName || 'Chưa rõ tên' }}</span>
+                        <span class="sub">
+                          {{ order.patientGender || '—' }}@if (order.patientYearOfBirth) { · {{ order.patientYearOfBirth }} }
+                          @if (order.roomNumber) {
+                            · <span title="Phòng khám của bác sĩ ra chỉ định">từ {{ order.roomNumber }}</span>
                           }
                         </span>
                       </div>
                     </td>
 
-                    <!-- Mã & Nhóm DV -->
                     <td>
-                      <span class="code-badge">{{ order.serviceCode }}</span>
-                      <div class="cat-text text-muted small mt-1">{{ order.category || 'Xét nghiệm' }}</div>
-                    </td>
-
-                    <!-- Tên dịch vụ xét nghiệm -->
-                    <td>
-                      <div class="service-name font-weight-bold">{{ order.serviceName }}</div>
-                      <div class="order-time text-muted small">
-                        <i class="bi bi-clock"></i> Chỉ định lúc: {{ formatDateTime(order.orderTime) }}
+                      <div class="service-name">{{ order.serviceName }}</div>
+                      <div class="sub">
+                        <span class="mono">{{ order.serviceCode }}</span> · {{ order.category || 'Xét nghiệm' }} ·
+                        chỉ định <span class="mono">{{ formatDateTime(order.orderTime) }}</span>
                       </div>
                       @if (order.conclusion) {
-                        <div class="order-conclusion small text-success mt-1">
-                          <i class="bi bi-check2"></i> <strong>Nhận xét:</strong> {{ order.conclusion }}
-                        </div>
+                        <div class="sub order-conclusion">Nhận xét: {{ order.conclusion }}</div>
                       }
                       @if (order.notes) {
-                        <div class="order-notes small text-muted">Ghi chú: {{ order.notes }}</div>
+                        <div class="sub">Ghi chú: {{ order.notes }}</div>
                       }
                     </td>
 
-                    <!-- Kết quả đo được -->
-                    <td style="text-align: center;">
+                    <td>
                       @if (order.status === 'COMPLETED') {
                         <div class="result-val-display" [class.val-danger]="order.isAbnormal">
-                          <span class="val-num">{{ order.resultValue }}</span>
-                          <span class="unit-sub text-muted">{{ order.unit || '' }}</span>
-                          @if (order.isAbnormal) {
-                            <span class="badge badge-abnormal"><i class="bi bi-exclamation-triangle-fill"></i> Vượt ngưỡng</span>
-                          }
+                          <span class="val-num mono">{{ order.resultValue }}</span>
+                          <span class="unit-sub">{{ order.unit || '' }}</span>
                         </div>
-                        <div class="signed-by text-muted small">
-                          {{ order.performerName || 'KTV' }} · {{ formatDateTime(order.performedTime) }}
-                        </div>
+                        @if (order.isAbnormal) {
+                          <span class="status danger">Ngoài ngưỡng</span>
+                        }
+                        <div class="sub">{{ order.performerName || 'KTV' }} · <span class="mono">{{ formatDateTime(order.performedTime) }}</span></div>
                         @if (order.shiftLabel) {
-                          <div class="signed-by text-muted small">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
+                          <div class="sub">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
                         }
                       } @else if (order.status === 'PROCESSING') {
-                        <span class="badge badge-waiting">Đang đo</span>
+                        <span class="text-muted">Chưa có kết quả</span>
                         @if (order.performerName) {
-                          <div class="signed-by text-muted small">Tiếp nhận: {{ order.performerName }}</div>
+                          <div class="sub">Tiếp nhận: {{ order.performerName }}</div>
                           @if (order.shiftLabel) {
-                            <div class="signed-by text-muted small">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
+                            <div class="sub">{{ order.shiftLabel }}{{ order.labRoomNumber ? ' · ' + order.labRoomNumber : '' }}</div>
                           }
                         }
                       } @else {
-                        <span class="badge badge-waiting">Chưa có kết quả</span>
+                        <span class="text-muted">—</span>
                       }
                     </td>
 
-                    <!-- Trị số tham chiếu -->
-                    <td style="text-align: center;">
-                      <div class="ref-range font-weight-bold text-secondary">{{ order.referenceRange || 'Chưa thiết lập' }}</div>
+                    <td>
+                      <div class="ref-range">{{ order.referenceRange || 'Chưa thiết lập' }}</div>
                       @if (order.unit) {
-                        <span class="unit-tag text-muted small">Đơn vị: {{ order.unit }}</span>
+                        <div class="sub">Đơn vị: {{ order.unit }}</div>
                       }
                     </td>
 
-                    <!-- Trạng thái -->
-                    <td style="text-align: center;">
+                    <td>
                       @if (order.status === 'COMPLETED') {
-                        <span class="badge badge-success"><i class="bi bi-check-circle-fill"></i> Hoàn thành</span>
+                        <span class="status success">Hoàn thành</span>
                       } @else if (order.status === 'PROCESSING') {
-                        <span class="badge badge-warning"><i class="bi bi-gear-fill spin-icon"></i> Đang đo</span>
+                        <span class="status info">Đang đo</span>
                       } @else if (order.status === 'CANCELLED') {
-                        <span class="badge badge-danger">Đã hủy</span>
+                        <span class="status danger">Đã hủy</span>
                       } @else {
-                        <span class="badge badge-secondary"><i class="bi bi-hourglass-split"></i> Chờ làm</span>
+                        <span class="status warning">Chờ làm</span>
                       }
                     </td>
 
-                    <!-- Thao tác -->
-                    <td style="text-align: center;">
+                    <td>
                       <div class="action-btn-group">
                         @if (order.status === 'PENDING') {
-                          <button class="btn btn-sm btn-outline-primary" [disabled]="startingId() === order.id"
+                          <button class="btn btn-sm btn-secondary" [disabled]="startingId() === order.id"
                                   (click)="startProcessing(order)" title="Tiếp nhận mẫu bệnh phẩm">
-                            <i class="bi bi-play-circle"></i> Tiếp nhận
+                            Tiếp nhận
                           </button>
                         }
                         @if (order.status === 'PENDING' || order.status === 'PROCESSING') {
-                          <button class="btn btn-sm btn-primary" (click)="openResultModal(order)" title="Nhập kết quả & Ký duyệt">
-                            <i class="bi bi-pencil-square"></i> Nhập KQ
+                          <button class="btn btn-sm btn-primary" (click)="openResultModal(order)" title="Nhập kết quả">
+                            Nhập KQ
                           </button>
                         } @else if (order.status === 'COMPLETED') {
-                          <button class="btn btn-sm btn-outline-secondary" (click)="openResultModal(order)" title="Sửa lại kết quả">
-                            <i class="bi bi-pencil"></i> Sửa KQ
+                          <button class="icon-btn" (click)="openResultModal(order)" title="Sửa kết quả" aria-label="Sửa kết quả">
+                            <i class="bi bi-pencil"></i>
                           </button>
                         }
                       </div>
@@ -274,38 +231,24 @@ import { toIsoDate } from '../../utils/date.utils';
             </table>
           </div>
 
-          <!-- Phân Trang Rõ Ràng (Pagination Bar) -->
           <div class="pagination-container">
             <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ startOrderIndex() }}</strong> – <strong>{{ endOrderIndex() }}</strong>
-                trên tổng số <strong>{{ totalOrders() }}</strong> ca xét nghiệm
-              </span>
+              <span>{{ startOrderIndex() }}–{{ endOrderIndex() }} / {{ totalOrders() }}</span>
               <div class="page-size-selector">
-                <label for="pageSizeSelect">Số ca/trang:</label>
-                <select id="pageSizeSelect" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+                <label for="pageSizeSelect">Số dòng</label>
+                <select id="pageSizeSelect" class="page-size-select" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
                   @for (opt of pageSizeOptions; track opt) {
-                    <option [ngValue]="opt">{{ opt }} ca</option>
+                    <option [ngValue]="opt">{{ opt }}</option>
                   }
                 </select>
               </div>
             </div>
 
             <div class="pagination-controls">
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="goToPage(1)"
-                title="Về trang đầu">
+              <button type="button" class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Trang đầu">
                 <i class="bi bi-chevron-double-left"></i>
               </button>
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="goToPage(currentPage() - 1)"
-                title="Trang trước">
+              <button type="button" class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Trang trước">
                 <i class="bi bi-chevron-left"></i>
               </button>
 
@@ -314,31 +257,17 @@ import { toIsoDate } from '../../utils/date.utils';
                   @if (p === '...') {
                     <span class="page-ellipsis">…</span>
                   } @else {
-                    <button
-                      type="button"
-                      class="btn-page-number"
-                      [class.active]="currentPage() === p"
-                      (click)="goToPage(+p)">
+                    <button type="button" class="btn-page" [class.active]="currentPage() === p" (click)="goToPage(+p)">
                       {{ p }}
                     </button>
                   }
                 }
               </div>
 
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="goToPage(currentPage() + 1)"
-                title="Trang sau">
+              <button type="button" class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Trang sau">
                 <i class="bi bi-chevron-right"></i>
               </button>
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="goToPage(totalPages())"
-                title="Đến trang cuối">
+              <button type="button" class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Trang cuối">
                 <i class="bi bi-chevron-double-right"></i>
               </button>
             </div>
@@ -346,48 +275,37 @@ import { toIsoDate } from '../../utils/date.utils';
         }
       </div>
 
-      <!-- MODAL: Nhập Kết Quả Xét Nghiệm & Ký Duyệt -->
+      <!-- Modal nhập kết quả -->
       @if (showResultModal() && activeOrder()) {
         <div class="modal-backdrop" (click)="closeResultModal()">
           <div class="modal-dialog modal-result-custom" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <div class="modal-title-box">
-                <i class="bi bi-file-earmark-medical-fill text-primary"></i>
-                <div>
-                  <h3 class="modal-title">{{ activeOrder()?.status === 'COMPLETED' ? 'Sửa Kết Quả Xét Nghiệm' : 'Nhập Kết Quả Xét Nghiệm &amp; Ký Duyệt' }}</h3>
-                  <span class="modal-sub">Mã chỉ định: #LAB-{{ activeOrder()?.id }} • Số phiếu: #{{ activeOrder()?.ticketNumber }}</span>
-                </div>
+              <div>
+                <h3 class="modal-title">{{ activeOrder()?.status === 'COMPLETED' ? 'Sửa kết quả' : 'Nhập kết quả' }}</h3>
+                <span class="modal-sub mono">LAB-{{ activeOrder()?.id }} · phiếu {{ activeOrder()?.ticketNumber }}</span>
               </div>
-              <button class="btn-close-modal" (click)="closeResultModal()">×</button>
+              <button class="modal-close-btn" (click)="closeResultModal()" aria-label="Đóng">×</button>
             </div>
 
             <div class="modal-body">
-              <!-- Thông tin người bệnh & Dịch vụ -->
-              <div class="order-summary-box">
-                <div class="summary-col">
-                  <span class="lbl">Người bệnh:</span>
-                  <strong class="val">{{ activeOrder()?.patientName }}</strong>
-                </div>
-                <div class="summary-col">
-                  <span class="lbl">Dịch vụ xét nghiệm:</span>
-                  <strong class="val text-primary">{{ activeOrder()?.serviceName }}</strong>
-                </div>
-                <div class="summary-col">
-                  <span class="lbl">Khoảng tham chiếu chuẩn:</span>
-                  <strong class="val text-secondary">{{ activeOrder()?.referenceRange || 'Chưa thiết lập' }} ({{ activeOrder()?.unit || '---' }})</strong>
-                </div>
-              </div>
+              <dl class="order-summary-box">
+                <dt>Bệnh nhân</dt>
+                <dd>{{ activeOrder()?.patientName }}</dd>
+                <dt>Dịch vụ</dt>
+                <dd>{{ activeOrder()?.serviceName }}</dd>
+                <dt>Tham chiếu</dt>
+                <dd>{{ activeOrder()?.referenceRange || 'Chưa thiết lập' }} ({{ activeOrder()?.unit || '—' }})</dd>
+              </dl>
 
-              <!-- Form nhập liệu kết quả -->
-              <div class="form-group mb-3">
-                <label class="form-label required">Chỉ số đo được thực tế (Result Value):</label>
+              <div class="form-group">
+                <label class="form-label required">Kết quả</label>
                 <div class="input-with-unit-group">
                   <input
                     type="text"
                     [(ngModel)]="resultValueInput"
                     (input)="autoCheckAbnormal()"
-                    placeholder="VD: 11.2 hoặc Âm tính, Bình thường..."
-                    class="form-control form-control-lg font-weight-bold"
+                    placeholder="Ví dụ: 11.2, âm tính"
+                    class="form-control"
                   />
                   @if (activeOrder()?.unit) {
                     <span class="input-unit">{{ activeOrder()?.unit }}</span>
@@ -395,55 +313,52 @@ import { toIsoDate } from '../../utils/date.utils';
                 </div>
               </div>
 
-              <!-- Cảnh báo / Đánh dấu bất thường -->
-              <div class="form-check abnormal-toggle-box mb-3" [class.is-abnormal]="isAbnormalInput">
+              <div class="abnormal-toggle-box" [class.is-abnormal]="isAbnormalInput">
                 <input
                   type="checkbox"
                   id="abnormalCheck"
                   [(ngModel)]="isAbnormalInput"
                   class="form-check-input"
                 />
-                <label for="abnormalCheck" class="form-check-label font-weight-bold cursor-pointer">
-                  <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
-                  Đánh dấu chỉ số BẤT THƯỜNG / VƯỢT NGƯỠNG THAM CHIẾU (tự đánh dấu khi kết quả số nằm ngoài ngưỡng, bác sĩ sẽ thấy cảnh báo đỏ)
+                <label for="abnormalCheck" class="form-check-label">
+                  <strong>Ngoài ngưỡng tham chiếu</strong>
+                  <span>Tự đánh dấu khi kết quả số nằm ngoài ngưỡng. Bác sĩ sẽ thấy cảnh báo.</span>
                 </label>
               </div>
 
-              <!-- Nhận xét / Kết luận -->
-              <div class="form-group mb-3">
-                <label class="form-label">Nhận xét / Kết luận của Kỹ thuật viên / Bác sĩ phòng Lab:</label>
+              <div class="form-group">
+                <label class="form-label">Nhận xét / kết luận</label>
                 <textarea
                   [(ngModel)]="conclusionInput"
                   rows="2"
                   class="form-control"
-                  placeholder="VD: Bạch cầu tăng cao, gợi ý tình trạng nhiễm trùng cấp..."
+                  placeholder="Ví dụ: bạch cầu tăng, gợi ý nhiễm trùng cấp"
                 ></textarea>
               </div>
 
-              <!-- Ghi chú mẫu bệnh phẩm -->
               <div class="form-group mb-0">
-                <label class="form-label">Ghi chú thêm về mẫu bệnh phẩm (nếu có):</label>
+                <label class="form-label">Ghi chú mẫu bệnh phẩm</label>
                 <input
                   type="text"
                   [(ngModel)]="notesInput"
                   class="form-control"
-                  placeholder="VD: Mẫu trong, không tán huyết..."
+                  placeholder="Ví dụ: mẫu trong, không tán huyết"
                 />
               </div>
             </div>
 
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" (click)="closeResultModal()">Hủy Bỏ</button>
+              <button type="button" class="btn btn-secondary" (click)="closeResultModal()">Hủy</button>
               <button
                 type="button"
-                class="btn btn-success btn-submit-result"
+                class="btn btn-primary btn-submit-result"
                 [disabled]="submittingResult() || !resultValueInput.trim()"
                 (click)="confirmSaveResult()"
               >
                 @if (submittingResult()) {
                   <span class="spinner-sm"></span> Đang lưu...
                 } @else {
-                  <i class="bi bi-check2-circle"></i> LƯU KẾT QUẢ &amp; KÝ DUYỆT
+                  Lưu kết quả
                 }
               </button>
             </div>
@@ -453,653 +368,379 @@ import { toIsoDate } from '../../utils/date.utils';
     </div>
   `,
   styles: [`
-    .date-picker {
-      width: auto;
-      min-width: 150px;
+    .date-picker { min-width: 150px; }
+
+    .filter-control {
+      height: 34px;
+      padding: 0 8px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #ffffff;
+      outline: none;
     }
 
-    .signed-by {
-      margin-top: 0.3rem;
-      font-size: 0.75rem;
+    .filter-control:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
-    .lab-workspace-page {
-      padding: 1.5rem 1.5rem 3.5rem;
-      max-width: 1400px;
-      margin: 0 auto;
+    .spin-active {
+      display: inline-block;
+      animation: spin 0.8s linear infinite;
     }
 
-    .lab-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      gap: 1rem;
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
-    .lab-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      background-color: #ecfdf5;
-      color: #065f46;
-      font-size: 0.775rem;
-      font-weight: 800;
-      border-radius: 9999px;
-      margin-bottom: 0.35rem;
-      border: 1px solid #a7f3d0;
-    }
-
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      background-color: #10b981;
-      border-radius: 50%;
-      animation: pulseGlow 2s infinite;
-    }
-
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.2); }
-    }
-
-    .page-title {
-      font-size: 1.75rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 0.25rem;
-    }
-
-    .page-subtitle {
-      color: #64748b;
-      margin: 0;
-      font-size: 0.925rem;
-    }
-
-    .header-right {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-    }
-
-    /* Metrics Grid */
+    /* Số liệu */
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
     .metric-card {
       display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 1rem 1.25rem;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      font: inherit;
+      text-align: left;
       cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      }
-
-      .metric-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-      }
-
-      .metric-info {
-        display: flex;
-        flex-direction: column;
-
-        .metric-val {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: #0f172a;
-          line-height: 1.1;
-        }
-
-        .metric-lbl {
-          font-size: 0.8rem;
-          color: #64748b;
-          font-weight: 600;
-          margin-top: 0.2rem;
-        }
-      }
-
-      &.card-pending {
-        border-left: 4px solid #f59e0b;
-        .metric-icon { background: #fef3c7; color: #b45309; }
-      }
-
-      &.card-processing {
-        border-left: 4px solid #3b82f6;
-        .metric-icon { background: #eff6ff; color: #1d4ed8; }
-      }
-
-      &.card-completed {
-        border-left: 4px solid #10b981;
-        .metric-icon { background: #ecfdf5; color: #047857; }
-      }
-
-      &.card-total {
-        border-left: 4px solid #8b5cf6;
-        .metric-icon { background: #f5f3ff; color: #6d28d9; }
-      }
+      transition: border-color 0.12s ease;
     }
 
-    /* Main Table Card */
-    .main-table-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-      overflow: hidden;
+    .metric-card:hover { border-color: var(--border-strong); }
+    .metric-card.active { border-color: var(--primary-600); }
+
+    .metric-lbl {
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .control-bar {
+    .metric-val {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+
+    /* Tabs + toolbar */
+    .tabs-row {
       display: flex;
-      justify-content: space-between;
+      gap: 4px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border-color);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      display: inline-flex;
       align-items: center;
-      padding: 0.85rem 1.25rem;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-
-      .tabs-group {
-        display: flex;
-        gap: 0.35rem;
-
-        .tab-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          padding: 0.45rem 0.85rem;
-          background: transparent;
-          border: 1px solid transparent;
-          border-radius: 8px;
-          color: #64748b;
-          font-size: 0.85rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.15s ease;
-
-          &:hover {
-            background: #e2e8f0;
-            color: #1e293b;
-          }
-
-          &.active {
-            background: #ffffff;
-            border-color: #cbd5e1;
-            color: #0f172a;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-          }
-        }
-
-        .dot-pending { width: 7px; height: 7px; background: #f59e0b; border-radius: 50%; }
-        .dot-processing { width: 7px; height: 7px; background: #3b82f6; border-radius: 50%; }
-        .dot-completed { width: 7px; height: 7px; background: #10b981; border-radius: 50%; }
-      }
-
-      .room-filter {
-        width: 180px;
-        height: 36px;
-        margin-left: auto;
-        margin-right: 0.75rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 0.85rem;
-      }
-
-      .search-box {
-        position: relative;
-        width: 380px;
-
-        i {
-          position: absolute;
-          left: 0.75rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #94a3b8;
-        }
-
-        input {
-          padding-left: 2.2rem;
-          padding-right: 1.8rem;
-          width: 100%;
-          border: 1px solid #cbd5e1;
-          border-radius: 8px;
-          font-size: 0.85rem;
-          height: 36px;
-        }
-
-        .btn-clear {
-          position: absolute;
-          right: 0.5rem;
-          top: 50%;
-          transform: translateY(-50%);
-          background: transparent;
-          border: none;
-          color: #94a3b8;
-          font-size: 1.1rem;
-          cursor: pointer;
-        }
-      }
+      gap: 6px;
+      padding: 12px 8px 10px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.12s ease, border-color 0.12s ease;
     }
 
-    .lab-orders-table {
+    .tab-btn:hover { color: var(--text-main); }
+
+    .tab-btn.active {
+      color: var(--primary-600);
+      border-bottom-color: var(--primary-600);
+      font-weight: 500;
+    }
+
+    .tab-count {
+      min-width: 20px;
+      padding: 0 6px;
+      border-radius: var(--radius-full);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 18px;
+      text-align: center;
+    }
+
+    .tab-btn.active .tab-count {
+      background: var(--primary-50);
+      color: var(--primary-700);
+    }
+
+    .toolbar .search-box {
+      position: relative;
+      flex: 1 1 280px;
+      max-width: 420px;
+    }
+
+    .search-box i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 14px;
+    }
+
+    .search-input {
       width: 100%;
-      margin: 0;
-
-      thead th {
-        background: #f8fafc;
-        color: #475569;
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        padding: 0.85rem 1rem;
-        border-bottom: 1px solid #e2e8f0;
-      }
-
-      tbody tr {
-        border-bottom: 1px solid #f1f5f9;
-
-        &:hover {
-          background: #f8fafc;
-        }
-
-        &.row-abnormal {
-          background: #fff1f2;
-          &:hover { background: #fee2e2; }
-        }
-
-        td {
-          padding: 0.85rem 1rem;
-          vertical-align: middle;
-        }
-      }
+      padding: 0 28px 0 32px;
     }
+
+    .btn-clear {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .room-filter { min-width: 200px; }
+
+    /* Bảng */
+    .table-responsive { overflow-x: auto; }
+    .lab-orders-table { min-width: 1000px; }
+    .lab-orders-table td { vertical-align: top; }
+
+    .lab-orders-table tbody tr.row-abnormal { box-shadow: inset 3px 0 0 var(--danger-solid); }
 
     .patient-cell {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
-
-      .ticket-tag {
-        display: inline-block;
-        width: fit-content;
-        background: #eff6ff;
-        color: #1d4ed8;
-        font-weight: 800;
-        font-size: 0.75rem;
-        padding: 0.1rem 0.4rem;
-        border-radius: 4px;
-        border: 1px solid #bfdbfe;
-      }
-
-      .patient-name {
-        color: #0f172a;
-        font-size: 0.925rem;
-      }
+      line-height: 1.4;
     }
 
-    .code-badge {
-      display: inline-block;
-      padding: 0.2rem 0.5rem;
-      background: #f1f5f9;
-      color: #334155;
-      font-size: 0.75rem;
-      font-weight: 700;
-      border-radius: 4px;
-      font-family: monospace;
-      border: 1px solid #e2e8f0;
+    .ticket-tag {
+      font-size: 12px;
+      color: var(--text-muted);
     }
+
+    .patient-name { font-weight: 500; color: var(--text-main); }
+
+    .service-name { font-weight: 500; color: var(--text-main); }
+
+    .sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .order-conclusion { color: var(--text-secondary); }
 
     .result-val-display {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.15rem;
-
-      .val-num {
-        font-weight: 800;
-        font-size: 1.1rem;
-        color: #0f172a;
-      }
-
-      &.val-danger .val-num {
-        color: #dc2626 !important;
-        font-size: 1.2rem;
-      }
-
-      .badge-abnormal {
-        background: #dc2626;
-        color: #ffffff;
-        font-size: 0.65rem;
-        font-weight: 800;
-        padding: 0.1rem 0.4rem;
-        border-radius: 4px;
-      }
+      align-items: baseline;
+      gap: 4px;
     }
 
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      padding: 0.25rem 0.55rem;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 700;
-
-      &.badge-success { background: #dcfce7; color: #15803d; }
-      &.badge-warning { background: #fef3c7; color: #b45309; }
-      &.badge-secondary { background: #f1f5f9; color: #475569; }
-      &.badge-danger { background: #fee2e2; color: #991b1b; }
-      &.badge-waiting { background: #f1f5f9; color: #94a3b8; font-weight: 500; font-style: italic; }
+    .val-num {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
-    .spin-icon {
-      animation: spin 2s infinite linear;
+    .val-danger .val-num { color: var(--danger-text); }
+
+    .unit-sub {
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
-    .spin-active {
-      animation: spin 1s infinite linear;
-    }
+    .result-val-display + .status { margin-top: 4px; }
 
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+    .ref-range {
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
     .action-btn-group {
       display: flex;
-      justify-content: center;
-      gap: 0.4rem;
-    }
-
-    /* Modal Styling */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1050;
-      padding: 1rem;
-    }
-
-    .modal-result-custom {
-      background: #ffffff;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 580px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-      overflow: hidden;
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.25rem;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
-
-      .modal-title-box {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-
-        i { font-size: 1.5rem; }
-
-        .modal-title {
-          font-size: 1.15rem;
-          font-weight: 800;
-          margin: 0;
-          color: #0f172a;
-        }
-
-        .modal-sub {
-          font-size: 0.8rem;
-          color: #64748b;
-        }
-      }
-
-      .btn-close-modal {
-        background: transparent;
-        border: none;
-        font-size: 1.4rem;
-        color: #94a3b8;
-        cursor: pointer;
-      }
-    }
-
-    .modal-body {
-      padding: 1.25rem;
-
-      .order-summary-box {
-        background: #f1f5f9;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.85rem;
-        margin-bottom: 1.25rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-
-        .summary-col {
-          display: flex;
-          justify-content: space-between;
-          font-size: 0.85rem;
-
-          .lbl { color: #64748b; }
-        }
-      }
-
-      .input-with-unit-group {
-        position: relative;
-
-        input {
-          padding-right: 4rem;
-        }
-
-        .input-unit {
-          position: absolute;
-          right: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          font-weight: 700;
-          color: #64748b;
-        }
-      }
-
-      .abnormal-toggle-box {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-
-        &.is-abnormal {
-          background: #fef2f2;
-          border-color: #fecaca;
-        }
-      }
-    }
-
-    .modal-footer {
-      display: flex;
       justify-content: flex-end;
-      gap: 0.75rem;
-      padding: 0.85rem 1.25rem;
-      background: #f8fafc;
-      border-top: 1px solid #e2e8f0;
-
-      .btn-submit-result {
-        background: #10b981;
-        border-color: #059669;
-        color: #ffffff;
-        font-weight: 700;
-      }
+      align-items: center;
+      gap: 6px;
     }
 
-    /* Phân Trang Rõ Ràng (Pagination Bar) */
+    .empty-state p { margin-bottom: 12px; }
+
+    /* Phân trang */
     .pagination-container {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       flex-wrap: wrap;
-      gap: 1rem;
-      padding: 1rem 1.25rem;
-      background: #ffffff;
-      border-top: 1px solid #e2e8f0;
-      border-radius: 0 0 12px 12px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .pagination-info {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      color: #64748b;
-      font-size: 0.875rem;
-
-      strong {
-        color: #0f172a;
-        font-weight: 700;
-      }
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-
-      label {
-        color: #64748b;
-        margin: 0;
-      }
-
-      select {
-        padding: 0.25rem 0.6rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #0f172a;
-        font-weight: 600;
-        font-size: 0.85rem;
-        cursor: pointer;
-        outline: none;
-        transition: border-color 0.15s;
-
-        &:focus {
-          border-color: #0284c7;
-          box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
-        }
-      }
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .btn-page-nav {
-      width: 34px;
-      height: 34px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      color: #475569;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.15s ease;
-
-      &:hover:not(:disabled) {
-        background: #f0f9ff;
-        border-color: #0284c7;
-        color: #0284c7;
-      }
-
-      &:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-        background: #f8fafc;
-        border-color: #e2e8f0;
-      }
-    }
-
+    .pagination-info,
+    .page-size-selector,
+    .pagination-controls,
     .page-numbers {
       display: flex;
       align-items: center;
-      gap: 0.25rem;
-      margin: 0 0.25rem;
+      gap: 8px;
     }
 
-    .btn-page-number {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 0.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .pagination-info { gap: 16px; }
+    .pagination-controls,
+    .page-numbers { gap: 4px; }
+
+    .page-size-select {
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
       background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      color: #334155;
-      font-size: 0.875rem;
-      font-weight: 600;
+    }
+
+    .btn-page {
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
-      transition: all 0.15s ease;
-
-      &:hover:not(.active) {
-        background: #f0f9ff;
-        border-color: #0284c7;
-        color: #0284c7;
-      }
-
-      &.active {
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-        border-color: #0284c7;
-        color: #ffffff;
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-      }
     }
 
-    .page-ellipsis {
-      padding: 0 0.35rem;
-      color: #94a3b8;
-      font-weight: 700;
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-page.active {
+      background: var(--primary-600);
+      border-color: var(--primary-600);
+      color: #ffffff;
     }
 
-    .empty-state, .loading-state {
-      text-align: center;
-      padding: 3.5rem 1rem;
-      color: #94a3b8;
+    .page-ellipsis { padding: 0 4px; }
 
-      i { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
+    /* Modal */
+    .modal-result-custom { max-width: 560px; width: 100%; }
+
+    .modal-sub {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
-  `]
-})
+
+    .order-summary-box {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 6px 12px;
+      margin: 0 0 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-subtle);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+    }
+
+    .order-summary-box dt { color: var(--text-muted); font-size: 13px; }
+    .order-summary-box dd { margin: 0; color: var(--text-main); }
+
+    .input-with-unit-group {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .input-with-unit-group .form-control { flex: 1; }
+
+    .input-with-unit-group .form-control:not(:last-child) {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .input-unit {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid var(--border-strong);
+      border-left: none;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .abnormal-toggle-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 1.15rem;
+      padding: 10px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      transition: background-color 0.12s ease, border-color 0.12s ease;
+    }
+
+    .abnormal-toggle-box.is-abnormal {
+      border-color: var(--danger-border);
+      background: var(--danger-bg);
+    }
+
+    .form-check-input {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      accent-color: var(--danger-solid);
+      cursor: pointer;
+    }
+
+    .form-check-label {
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .form-check-label strong { font-weight: 500; color: var(--text-main); }
+    .is-abnormal .form-check-label strong { color: var(--danger-text); }
+
+    .form-check-label span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .mb-0 { margin-bottom: 0; }
+
+    @media (max-width: 900px) {
+      .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 768px) {
+      .page { padding: 16px; }
+    }
+  `]})
 export class LabManagementComponent implements OnInit, OnDestroy {
   private readonly labService = inject(ClinicalLabService);
   private readonly authService = inject(AuthService);
@@ -1107,9 +748,9 @@ export class LabManagementComponent implements OnInit, OnDestroy {
   // Khoa của KTV đang đăng nhập (backend đã lọc danh sách theo khoa này)
   readonly departmentLabel = computed(() => {
     switch (this.authService.currentUser()?.department) {
-      case 'XET_NGHIEM': return 'KHOA XÉT NGHIỆM';
-      case 'CHAN_DOAN_HINH_ANH': return 'KHOA CHẨN ĐOÁN HÌNH ẢNH';
-      default: return 'XÉT NGHIỆM & CHẨN ĐOÁN HÌNH ẢNH';
+      case 'XET_NGHIEM': return 'Khoa xét nghiệm';
+      case 'CHAN_DOAN_HINH_ANH': return 'Khoa chẩn đoán hình ảnh';
+      default: return 'Xét nghiệm & chẩn đoán hình ảnh';
     }
   });
 

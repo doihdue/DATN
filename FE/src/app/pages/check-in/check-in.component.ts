@@ -14,24 +14,16 @@ import { toIsoDate } from '../../utils/date.utils';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="check-in-page">
-      <!-- Page Header -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <span class="live-dot"></span> Bàn Tiếp Đón &amp; Cấp Số Thứ Tự
-          </div>
-          <h1 class="page-title">Tiếp Đón Bệnh Nhân &amp; Phát Số Khám</h1>
-          <p class="page-subtitle">
-            Tra cứu hồ sơ y tế cũ hoặc đăng ký bệnh nhân mới, lựa chọn phòng khám và phát phiếu in nhiệt cho người bệnh
-          </p>
+        <div>
+          <h1 class="page-title">Tiếp đón &amp; cấp số</h1>
+          <p class="page-subtitle">{{ recentTickets().length }} phiếu đã cấp hôm nay</p>
         </div>
-        <div class="header-actions">
-          <a routerLink="/staff/queue" class="btn btn-outline">
-            <i class="bi bi-sliders"></i> Sang Bàn Điều Phối Hàng Đợi
-          </a>
-          <a routerLink="/queue" target="_blank" class="btn btn-outline">
-            <i class="bi bi-display"></i> Mở TV Sảnh Chờ
+        <div class="page-actions">
+          <a routerLink="/staff/queue" class="btn btn-secondary">Điều phối hàng đợi</a>
+          <a routerLink="/queue" target="_blank" class="btn btn-secondary">
+            <i class="bi bi-box-arrow-up-right"></i> Màn hình sảnh chờ
           </a>
         </div>
       </div>
@@ -55,21 +47,17 @@ import { toIsoDate } from '../../utils/date.utils';
       }
 
       <div class="main-layout-grid">
-        <!-- Left Column: Patient Reception Form -->
+        <!-- Cột trái: tiếp đón -->
         <div class="reception-form-section">
-          <!-- Step 1: Patient Search Card -->
-          <div class="card-box mb-4">
-            <div class="card-box-header">
-              <div class="card-box-title">
-                <i class="bi bi-search text-primary"></i> 1. Tra Cứu Hồ Sơ Bệnh Nhân Cũ (Nếu có)
-              </div>
+          <!-- Tra cứu hồ sơ -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Tra cứu hồ sơ bệnh nhân</h2>
               @if (selectedPatient()) {
-                <button class="btn btn-sm btn-outline" (click)="resetFormToNew()">
-                  <i class="bi bi-plus-circle"></i> Đăng Ký Người Mới
-                </button>
+                <button class="btn btn-sm btn-secondary" (click)="resetFormToNew()">Tiếp đón người mới</button>
               }
             </div>
-            <div class="card-box-body">
+            <div class="panel-body">
               <div class="search-input-group">
                 <div class="search-field">
                   <i class="bi bi-search search-icon"></i>
@@ -78,52 +66,49 @@ import { toIsoDate } from '../../utils/date.utils';
                     [(ngModel)]="searchKeyword"
                     (input)="onSearchInput()"
                     (keyup.enter)="executePatientLookup()"
-                    placeholder="Nhập Số điện thoại, Họ tên hoặc CCCD để tra cứu nhanh..."
+                    placeholder="Số điện thoại, họ tên hoặc CCCD"
                     class="form-control search-input"
                   />
                   @if (searchKeyword) {
-                    <button class="clear-btn" (click)="clearSearch()">
-                      <i class="bi bi-x-circle-fill"></i>
+                    <button class="clear-btn" (click)="clearSearch()" title="Xoá từ khoá" aria-label="Xoá từ khoá">
+                      <i class="bi bi-x-lg"></i>
                     </button>
                   }
                 </div>
                 <button
-                  class="btn btn-primary-outline search-btn"
+                  class="btn btn-secondary search-btn"
                   [disabled]="isSearching() || !searchKeyword.trim()"
                   (click)="executePatientLookup()"
                 >
                   @if (isSearching()) {
                     <span class="spinner-sm"></span> Đang tìm...
                   } @else {
-                    <i class="bi bi-search"></i> Tìm kiếm
+                    Tìm kiếm
                   }
                 </button>
               </div>
 
-              <!-- Search Results Dropdown/List -->
               @if (lookupResults().length > 0) {
                 <div class="lookup-results-list">
-                  <div class="results-title">
-                    <i class="bi bi-people-fill"></i> Tìm thấy {{ lookupResults().length }} hồ sơ bệnh nhân phù hợp:
-                  </div>
+                  <div class="results-title">{{ lookupResults().length }} hồ sơ phù hợp</div>
                   @for (p of lookupResults(); track p.id) {
                     <div class="lookup-item" (click)="selectPatient(p)">
                       <div class="lookup-item-main">
                         <span class="lookup-name">{{ p.fullName }}</span>
                         @if (p.gender) {
-                          <span class="lookup-badge gender-badge">{{ p.gender }}</span>
+                          <span class="lookup-meta">{{ p.gender }}</span>
                         }
                         @if (p.dateOfBirth) {
-                          <span class="lookup-meta">Sinh ngày: {{ p.dateOfBirth | date:'dd/MM/yyyy' }}</span>
+                          <span class="lookup-meta mono">{{ p.dateOfBirth | date:'dd/MM/yyyy' }}</span>
                         }
                       </div>
                       <div class="lookup-item-sub">
-                        <span><i class="bi bi-telephone"></i> {{ p.phoneNumber || 'Chưa có SĐT' }}</span>
+                        <span class="mono">{{ p.phoneNumber || 'Chưa có SĐT' }}</span>
                         @if (p.nationalId) {
-                          <span><i class="bi bi-card-heading"></i> CCCD: {{ p.nationalId }}</span>
+                          <span class="mono">CCCD {{ p.nationalId }}</span>
                         }
                         @if (p.address) {
-                          <span><i class="bi bi-geo-alt"></i> {{ p.address }}</span>
+                          <span>{{ p.address }}</span>
                         }
                       </div>
                     </div>
@@ -131,29 +116,27 @@ import { toIsoDate } from '../../utils/date.utils';
                 </div>
               } @else if (hasSearched() && !isSearching()) {
                 <div class="search-empty-hint">
-                  <i class="bi bi-info-circle"></i> Không tìm thấy hồ sơ trùng khớp. Vui lòng điền thông tin bên dưới để tiếp đón như bệnh nhân mới.
+                  Không tìm thấy hồ sơ. Nhập thông tin bên dưới để tiếp đón bệnh nhân mới.
                 </div>
               }
 
               @if (selectedPatient()) {
                 <div class="selected-patient-banner">
-                  <div class="banner-icon">
-                    <i class="bi bi-person-check-fill"></i>
-                  </div>
                   <div class="banner-content">
                     <div class="banner-title">
-                      Đã chọn hồ sơ: <strong>{{ selectedPatient()?.fullName }}</strong> (Mã HS: #{{ selectedPatient()?.id }})
+                      <strong>{{ selectedPatient()?.fullName }}</strong>
+                      <span class="mono text-muted">Mã HS {{ selectedPatient()?.id }}</span>
                     </div>
                     <div class="banner-details">
-                      SĐT: {{ selectedPatient()?.phoneNumber || 'N/A' }} • 
-                      Ngày sinh: {{ selectedPatient()?.dateOfBirth ? (selectedPatient()?.dateOfBirth | date:'dd/MM/yyyy') : 'N/A' }} • 
-                      Giới tính: {{ selectedPatient()?.gender || 'N/A' }}
+                      SĐT {{ selectedPatient()?.phoneNumber || '—' }} ·
+                      Ngày sinh {{ selectedPatient()?.dateOfBirth ? (selectedPatient()?.dateOfBirth | date:'dd/MM/yyyy') : '—' }} ·
+                      {{ selectedPatient()?.gender || '—' }}
                       @if (selectedPatient()?.allergies) {
-                        <span class="text-danger font-bold"> • Dị ứng: {{ selectedPatient()?.allergies }}</span>
+                        <span class="allergy-text"> · Dị ứng: {{ selectedPatient()?.allergies }}</span>
                       }
                     </div>
                   </div>
-                  <button class="btn btn-sm btn-outline-danger" (click)="resetFormToNew()" title="Hủy liên kết hồ sơ">
+                  <button class="icon-btn danger" (click)="resetFormToNew()" title="Bỏ chọn hồ sơ" aria-label="Bỏ chọn hồ sơ">
                     <i class="bi bi-x-lg"></i>
                   </button>
                 </div>
@@ -161,18 +144,16 @@ import { toIsoDate } from '../../utils/date.utils';
             </div>
           </div>
 
-          <!-- Step 2: Check-in Form -->
-          <div class="card-box">
-            <div class="card-box-header">
-              <div class="card-box-title">
-                <i class="bi bi-card-checklist text-primary"></i> 2. Thông Tin Khám Bệnh &amp; Chỉ Định Phòng
-              </div>
+          <!-- Thông tin tiếp đón -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Thông tin tiếp đón</h2>
             </div>
-            <div class="card-box-body">
+            <div class="panel-body">
               <form (ngSubmit)="submitCheckIn()" #f="ngForm">
                 <div class="form-row">
                   <div class="form-group flex-2">
-                    <label class="form-label required">Họ và tên bệnh nhân</label>
+                    <label class="form-label required">Họ và tên</label>
                     <input
                       type="text"
                       [(ngModel)]="form.patientName"
@@ -205,9 +186,7 @@ import { toIsoDate } from '../../utils/date.utils';
 
                 <div class="form-row">
                   <div class="form-group flex-1">
-                    <label class="form-label required">
-                      Ngày tháng năm sinh
-                    </label>
+                    <label class="form-label required">Ngày sinh</label>
                     <input
                       type="date"
                       [(ngModel)]="form.patientDob"
@@ -217,21 +196,19 @@ import { toIsoDate } from '../../utils/date.utils';
                       class="form-control"
                       required
                     />
-                    <small class="form-hint">
-                      Chọn đầy đủ ngày, tháng, năm để hệ thống tự động xác định tuổi &amp; áp dụng chính sách ưu tiên
-                    </small>
+                    <small class="form-hint">Dùng để tính tuổi và diện ưu tiên.</small>
                   </div>
                   <div class="form-group flex-1">
-                    <label class="form-label">Tuổi &amp; Diện ưu tiên độ tuổi</label>
+                    <label class="form-label">Tuổi / diện ưu tiên</label>
                     <div class="age-display-box">
                       @if (calculatedAge() !== null) {
-                        <span class="age-val"><strong>{{ calculatedAge() }}</strong> tuổi</span>
+                        <span class="age-val"><strong class="mono">{{ calculatedAge() }}</strong> tuổi</span>
                         @if (isPriorityElderly()) {
-                          <span class="badge badge-elderly"><i class="bi bi-star-fill"></i> Người cao tuổi (≥70)</span>
+                          <span class="status warning">Người cao tuổi (≥70)</span>
                         } @else if (isPriorityChild()) {
-                          <span class="badge badge-child"><i class="bi bi-star-fill"></i> Trẻ nhỏ (≤6)</span>
+                          <span class="status warning">Trẻ nhỏ (≤6)</span>
                         } @else {
-                          <span class="badge badge-normal">Độ tuổi thông thường</span>
+                          <span class="status">Không ưu tiên</span>
                         }
                       } @else {
                         <span class="text-muted">Chưa nhập ngày sinh</span>
@@ -240,9 +217,8 @@ import { toIsoDate } from '../../utils/date.utils';
                   </div>
                 </div>
 
-                <!-- Room Selection (Clean Standard Select Field) -->
                 <div class="form-group">
-                  <label class="form-label required">Phòng khám tiếp nhận</label>
+                  <label class="form-label required">Phòng khám</label>
                   <select
                     [(ngModel)]="form.examinationRoomId"
                     name="examinationRoomId"
@@ -250,10 +226,10 @@ import { toIsoDate } from '../../utils/date.utils';
                     required
                   >
                     @for (floor of availableFloors(); track floor) {
-                      <optgroup [label]="'🏢 Tầng ' + floor">
+                      <optgroup [label]="'Tầng ' + floor">
                         @for (r of getRoomsByFloor(floor); track r.id) {
                           <option [ngValue]="r.id">
-                            {{ r.roomNumber }} - {{ r.roomName }} (Tầng {{ r.floor }} • Đang chờ: {{ getRoomWaitingCount(r.id) }} ca)
+                            {{ r.roomNumber }} - {{ r.roomName }} (đang chờ {{ getRoomWaitingCount(r.id) }})
                           </option>
                         }
                       </optgroup>
@@ -261,46 +237,39 @@ import { toIsoDate } from '../../utils/date.utils';
                   </select>
                 </div>
 
-                <!-- Emergency Priority Checkbox -->
-                <div class="emergency-toggle-card">
+                <div class="emergency-toggle-card" [class.checked]="form.isEmergency">
                   <label class="toggle-container">
                     <input type="checkbox" [(ngModel)]="form.isEmergency" name="isEmergency" />
                     <span class="toggle-text">
-                      <strong class="text-danger">
-                        <i class="bi bi-exclamation-octagon-fill"></i> Cấp cứu / Khẩn cấp (Ưu tiên số 1)
-                      </strong>
-                      <span class="toggle-sub">Đánh dấu nếu bệnh nhân cần cấp cứu khẩn cấp hoặc tình trạng chuyển nặng</span>
+                      <strong>Cấp cứu</strong>
+                      <span class="toggle-sub">Ưu tiên số 1, đưa lên đầu hàng đợi của phòng.</span>
                     </span>
                   </label>
                 </div>
 
-                <!-- Initial Symptoms / Notes -->
                 <div class="form-group">
-                  <label class="form-label">Lý do khám / Triệu chứng ban đầu</label>
+                  <label class="form-label">Lý do khám / triệu chứng</label>
                   <textarea
                     [(ngModel)]="form.notes"
                     name="notes"
                     rows="2"
-                    placeholder="Ví dụ: Đau đầu kéo dài 3 ngày, sốt nhẹ 38 độ, ho khan..."
+                    placeholder="Ví dụ: đau đầu 3 ngày, sốt 38 độ, ho khan"
                     class="form-control"
                   ></textarea>
                 </div>
 
-                <!-- Submit Button -->
                 <div class="form-action-bar">
+                  <button type="button" class="btn btn-secondary" (click)="resetFormToNew()">Nhập lại</button>
                   <button
                     type="submit"
-                    class="btn btn-primary btn-lg submit-checkin-btn"
+                    class="btn btn-primary submit-checkin-btn"
                     [disabled]="submitting() || !isFormValid()"
                   >
                     @if (submitting()) {
-                      <span class="spinner-sm"></span> Đang tạo phiếu khám...
+                      <span class="spinner-sm"></span> Đang cấp số...
                     } @else {
-                      <i class="bi bi-printer-fill"></i> Cấp Số Thứ Tự &amp; In Phiếu Khám
+                      Cấp số &amp; in phiếu
                     }
-                  </button>
-                  <button type="button" class="btn btn-outline" (click)="resetFormToNew()">
-                    <i class="bi bi-arrow-counterclockwise"></i> Làm Mới Form
                   </button>
                 </div>
               </form>
@@ -308,92 +277,83 @@ import { toIsoDate } from '../../utils/date.utils';
           </div>
         </div>
 
-        <!-- Right Column: Recent Issued Tickets & Quick Print -->
+        <!-- Cột phải: phiếu đã cấp -->
         <div class="recent-tickets-section">
-          <div class="card-box h-full">
-            <div class="card-box-header">
-              <div class="card-box-title">
-                <i class="bi bi-clock-history text-primary"></i> Phiếu Đã Cấp Gần Nhất Hôm Nay
-              </div>
-              <button class="btn btn-sm btn-outline" (click)="loadRecentTickets()" title="Tải lại danh sách">
-                <i class="bi bi-arrow-clockwise"></i> Làm mới
+          <div class="panel recent-panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Phiếu đã cấp hôm nay</h2>
+              <button class="icon-btn" (click)="loadRecentTickets()" title="Tải lại" aria-label="Tải lại">
+                <i class="bi bi-arrow-clockwise"></i>
               </button>
             </div>
-            <div class="card-box-body p-0">
-              @if (recentLoading()) {
-                <div class="loading-state-sm">
-                  <div class="spinner-sm"></div>
-                  <span>Đang tải lịch sử cấp số...</span>
-                </div>
-              } @else if (recentTickets().length === 0) {
-                <div class="empty-state-card">
-                  <i class="bi bi-ticket-detailed"></i>
-                  <p>Hôm nay chưa có phiếu khám nào được cấp</p>
-                </div>
-              } @else {
-                <div class="recent-tickets-list">
-                  @for (t of recentTickets(); track t.id) {
-                    <div class="recent-ticket-card" [class.emergency-card]="t.isEmergency">
-                      <div class="recent-ticket-top">
-                        <span class="ticket-badge num">{{ t.ticketNumber }}</span>
-                        <span class="ticket-status-pill" [ngClass]="getStatusClass(t.status)">
-                          {{ getStatusLabel(t.status) }}
-                        </span>
-                      </div>
-                      <div class="recent-patient-info">
-                        <strong class="patient-name">{{ t.patientName }}</strong>
-                        <div class="patient-meta-row">
-                          <span><i class="bi bi-telephone"></i> {{ t.patientPhone }}</span>
-                          <span><i class="bi bi-clock"></i> {{ t.checkInTime }}</span>
-                        </div>
-                        <div class="patient-room-info">
-                          <i class="bi bi-door-closed"></i> Phòng: <strong>{{ t.roomNumber }} - {{ t.roomName }}</strong>
-                        </div>
-                      </div>
-                      <div class="recent-ticket-actions">
-                        <button class="btn btn-sm btn-outline-primary" (click)="openThermalPrintModal(t)" title="In lại phiếu khám">
-                          <i class="bi bi-printer"></i> In lại
-                        </button>
-                      </div>
+            @if (recentLoading()) {
+              <div class="loading-state-sm">
+                <div class="spinner-sm"></div>
+                <span>Đang tải...</span>
+              </div>
+            } @else if (recentTickets().length === 0) {
+              <div class="empty-state-card">
+                <p>Chưa có phiếu nào được cấp hôm nay.</p>
+              </div>
+            } @else {
+              <div class="recent-tickets-list">
+                @for (t of recentTickets(); track t.id) {
+                  <div class="recent-ticket-card" [class.emergency-card]="t.isEmergency">
+                    <div class="recent-ticket-top">
+                      <span class="ticket-badge mono">{{ t.ticketNumber }}</span>
+                      @if (t.isEmergency) {
+                        <span class="status danger">Cấp cứu</span>
+                      }
+                      <span class="status ticket-status-pill" [ngClass]="getStatusClass(t.status)">
+                        {{ getStatusLabel(t.status) }}
+                      </span>
                     </div>
-                  }
-                </div>
-              }
-            </div>
+                    <div class="recent-patient-info">
+                      <div class="patient-name">{{ t.patientName }}</div>
+                      <div class="patient-meta-row">
+                        <span class="mono">{{ t.patientPhone }}</span>
+                        <span class="mono">{{ t.checkInTime | slice:0:5 }}</span>
+                      </div>
+                      <div class="patient-room-info">{{ t.roomNumber }} - {{ t.roomName }}</div>
+                    </div>
+                    <div class="recent-ticket-actions">
+                      <button class="icon-btn" (click)="openThermalPrintModal(t)" title="In lại phiếu" aria-label="In lại phiếu">
+                        <i class="bi bi-printer"></i>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
           </div>
         </div>
       </div>
 
-      <!-- Thermal Ticket Print Modal -->
+      <!-- Phiếu in nhiệt -->
       @if (showPrintModal() && printedTicket()) {
         <div class="modal-backdrop" (click)="closePrintModal()">
           <div class="modal-dialog print-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi bi-printer-fill text-primary"></i> Phiếu Khám Bệnh In Nhiệt
-              </h2>
-              <button class="modal-close-btn" (click)="closePrintModal()">×</button>
+              <h2 class="modal-title">Phiếu khám bệnh</h2>
+              <button class="modal-close-btn" (click)="closePrintModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body print-modal-body">
-              <!-- Thermal Paper Simulation -->
               <div class="thermal-receipt" id="thermal-receipt-element">
                 <div class="receipt-header">
-                  <div class="receipt-hospital-name">PHÒNG KHÁM ĐA KHOA MEDQUEUE</div>
+                  <div class="receipt-hospital-name">Phòng khám đa khoa MedQueue</div>
                   <div class="receipt-address">123 Đường Y Tế, Quận Đống Đa, Hà Nội</div>
-                  <div class="receipt-hotline">Hotline: 1900 6868 • Website: medqueue.vn</div>
+                  <div class="receipt-hotline">Hotline: 1900 6868 · medqueue.vn</div>
                   <div class="receipt-divider">================================</div>
-                  <div class="receipt-title">PHIẾU ĐĂNG KÝ KHÁM BỆNH</div>
+                  <div class="receipt-title">Phiếu đăng ký khám bệnh</div>
                 </div>
 
                 <div class="receipt-ticket-number">
-                  <span class="number-label">SỐ THỨ TỰ</span>
-                  <span class="number-big num">{{ printedTicket()?.ticketNumber }}</span>
+                  <span class="number-label">Số thứ tự</span>
+                  <span class="number-big mono">{{ printedTicket()?.ticketNumber }}</span>
                 </div>
 
                 @if (printedTicket()?.isEmergency) {
-                  <div class="receipt-emergency-banner">
-                    *** ƯU TIÊN CẤP CỨU ***
-                  </div>
+                  <div class="receipt-emergency-banner">Ưu tiên cấp cứu</div>
                 }
 
                 <div class="receipt-body">
@@ -408,7 +368,7 @@ import { toIsoDate } from '../../utils/date.utils';
                   <div class="receipt-row">
                     <span class="r-label">Ngày sinh:</span>
                     <span class="r-val">
-                      {{ printedTicket()?.patientDob ? (printedTicket()?.patientDob | date:'dd/MM/yyyy') : (printedTicket()?.patientYearOfBirth || 'N/A') }}
+                      {{ printedTicket()?.patientDob ? (printedTicket()?.patientDob | date:'dd/MM/yyyy') : (printedTicket()?.patientYearOfBirth || '---') }}
                     </span>
                   </div>
                   <div class="receipt-row">
@@ -445,21 +405,19 @@ import { toIsoDate } from '../../utils/date.utils';
 
                 <div class="receipt-footer">
                   <div class="receipt-note">
-                    * Quý khách vui lòng theo dõi bảng điện tử tại sảnh chờ.<br />
-                    * Khi được gọi số, vui lòng xuất trình phiếu này tại phòng khám.
+                    Vui lòng theo dõi bảng gọi số tại sảnh chờ.<br />
+                    Xuất trình phiếu này tại phòng khám khi được gọi.
                   </div>
                   <div class="receipt-code">
-                    Mã tra cứu trực tuyến: <strong>{{ printedTicket()?.ticketNumber }}</strong>
+                    Mã tra cứu: <strong>{{ printedTicket()?.ticketNumber }}</strong>
                   </div>
-                  <div class="receipt-thanks">CẢM ƠN QUÝ KHÁCH ĐÃ TIN TƯỞNG!</div>
+                  <div class="receipt-thanks">Cảm ơn quý khách</div>
                 </div>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-outline" (click)="closePrintModal()">Đóng</button>
-              <button class="btn btn-primary" (click)="triggerBrowserPrint()">
-                <i class="bi bi-printer-fill"></i> In Phiếu (Print)
-              </button>
+              <button class="btn btn-secondary" (click)="closePrintModal()">Đóng</button>
+              <button class="btn btn-primary" (click)="triggerBrowserPrint()">In phiếu</button>
             </div>
           </div>
         </div>
@@ -467,124 +425,23 @@ import { toIsoDate } from '../../utils/date.utils';
     </div>
   `,
   styles: [`
-    .check-in-page {
-      padding: 1.5rem 1.5rem 3.5rem;
-      max-width: 1360px;
-      margin: 0 auto;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      background-color: var(--primary-50);
-      color: var(--primary-800);
-      font-size: 0.775rem;
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: 0.4rem;
-      border: 1px solid var(--primary-200);
-    }
-
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      background-color: var(--success-solid);
-      border-radius: 50%;
-    }
-
-    .page-title {
-      font-size: 1.75rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin: 0 0 0.25rem;
-      letter-spacing: -0.01em;
-    }
-
-    .page-subtitle {
-      color: var(--text-muted);
-      margin: 0;
-      font-size: 0.925rem;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    /* Main Grid Layout */
     .main-layout-grid {
       display: grid;
-      grid-template-columns: 1fr 380px;
-      gap: 1.5rem;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 16px;
+      align-items: start;
     }
 
-    @media (max-width: 1024px) {
-      .main-layout-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Card Box */
-    .card-box {
-      background: #ffffff;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-sm);
-      overflow: hidden;
-    }
-
-    .card-box.h-full {
-      height: 100%;
+    .reception-form-section {
       display: flex;
       flex-direction: column;
+      gap: 16px;
     }
 
-    .card-box-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.9rem 1.25rem;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .card-box-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .card-box-body {
-      padding: 1.25rem;
-    }
-
-    .card-box-body.p-0 {
-      padding: 0;
-    }
-
-    .mb-4 {
-      margin-bottom: 1.25rem;
-    }
-
-    /* Step 1 Search */
+    /* Tra cứu */
     .search-input-group {
       display: flex;
-      gap: 0.65rem;
+      gap: 8px;
     }
 
     .search-field {
@@ -594,263 +451,187 @@ import { toIsoDate } from '../../utils/date.utils';
 
     .search-icon {
       position: absolute;
-      left: 0.85rem;
+      left: 10px;
       top: 50%;
       transform: translateY(-50%);
-      color: var(--text-muted);
-      font-size: 0.9rem;
+      color: var(--text-light);
+      font-size: 14px;
     }
 
     .search-input {
-      padding-left: 2.35rem;
-      padding-right: 2.2rem;
+      padding-left: 32px;
+      padding-right: 32px;
     }
 
     .clear-btn {
       position: absolute;
-      right: 0.75rem;
+      right: 6px;
       top: 50%;
       transform: translateY(-50%);
-      background: none;
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border: none;
-      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-light);
       cursor: pointer;
-      padding: 0;
-      font-size: 0.9rem;
+      font-size: 12px;
     }
 
     .clear-btn:hover {
-      color: var(--danger-solid);
+      background: var(--bg-hover);
+      color: var(--text-main);
     }
 
-    .btn-primary-outline {
-      background: transparent;
-      border: 1.5px solid var(--primary-600);
-      color: var(--primary-600);
-      font-weight: 600;
-      padding: 0.45rem 1rem;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      transition: all 0.15s;
-    }
+    .search-btn { min-width: 96px; }
 
-    .btn-primary-outline:hover:not(:disabled) {
-      background: var(--primary-50);
-    }
-
-    /* Lookup Results */
     .lookup-results-list {
-      margin-top: 0.85rem;
+      margin-top: 12px;
       border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      background: #ffffff;
-      max-height: 240px;
+      border-radius: var(--radius-md);
+      max-height: 280px;
       overflow-y: auto;
     }
 
     .results-title {
-      padding: 0.5rem 0.85rem;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--primary-800);
-      background: var(--primary-50);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
       border-bottom: 1px solid var(--border-color);
     }
 
     .lookup-item {
-      padding: 0.65rem 0.85rem;
-      border-bottom: 1px solid var(--border-subtle);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
       cursor: pointer;
-      transition: background-color 0.15s;
+      transition: background-color 0.12s ease;
     }
 
-    .lookup-item:hover {
-      background-color: var(--bg-subtle);
-    }
+    .lookup-item:last-child { border-bottom: none; }
+    .lookup-item:hover { background: var(--bg-hover); }
 
     .lookup-item-main {
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.2rem;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
-    .lookup-name {
-      font-weight: 700;
-      color: var(--text-main);
-      font-size: 0.9rem;
-    }
-
-    .lookup-badge {
-      font-size: 0.725rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: var(--radius-xs);
-      font-weight: 600;
-    }
-
-    .gender-badge {
-      background: #e2e8f0;
-      color: #334155;
-    }
+    .lookup-name { font-weight: 500; color: var(--text-main); }
 
     .lookup-meta {
-      font-size: 0.8rem;
+      font-size: 13px;
       color: var(--text-muted);
     }
 
     .lookup-item-sub {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
       display: flex;
-      gap: 0.85rem;
+      gap: 12px;
       flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     .search-empty-hint {
-      margin-top: 0.75rem;
-      padding: 0.6rem 0.85rem;
-      background: #f1f5f9;
-      border-radius: var(--radius-sm);
-      font-size: 0.825rem;
+      margin-top: 12px;
+      padding: 8px 12px;
+      font-size: 13px;
       color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
+      background: var(--bg-subtle);
+      border-radius: var(--radius-md);
     }
 
     .selected-patient-banner {
-      margin-top: 0.85rem;
-      padding: 0.75rem 1rem;
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--primary-200);
+      background: var(--primary-50);
+      border-radius: var(--radius-md);
     }
 
-    .banner-icon {
-      font-size: 1.4rem;
-      color: var(--success-solid);
-    }
-
-    .banner-content {
-      flex: 1;
-    }
+    .banner-content { flex: 1; min-width: 0; }
 
     .banner-title {
-      font-size: 0.875rem;
-      color: #065f46;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 14px;
     }
+
+    .banner-title strong { font-weight: 600; }
+    .banner-title .mono { font-size: 12px; }
 
     .banner-details {
-      font-size: 0.8rem;
-      color: #047857;
-      margin-top: 0.15rem;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 2px;
     }
 
-    /* Form Rows */
+    .allergy-text {
+      color: var(--danger-text);
+      font-weight: 500;
+    }
+
+    /* Form */
     .form-row {
       display: flex;
-      gap: 1rem;
-      margin-bottom: 1rem;
+      gap: 16px;
     }
 
-    .flex-1 { flex: 1; }
-    .flex-2 { flex: 2; }
-
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    .form-label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin-bottom: 0.35rem;
-    }
-
-    .form-label.required::after {
-      content: " *";
-      color: var(--danger-solid);
-    }
+    .flex-1 { flex: 1; min-width: 0; }
+    .flex-2 { flex: 2; min-width: 0; }
 
     .form-hint {
-      display: block;
-      font-size: 0.75rem;
+      font-size: 12px;
       color: var(--text-muted);
-      margin-top: 0.3rem;
     }
 
     .age-display-box {
-      height: 38px;
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      padding: 0 0.85rem;
-      background: #f8fafc;
+      gap: 10px;
+      min-height: 36px;
+      padding: 0 10px;
       border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
+      background: var(--bg-subtle);
+      border-radius: var(--radius-md);
+      font-size: 14px;
     }
 
-    .age-val {
-      font-size: 0.9rem;
-      color: var(--text-main);
-    }
+    .age-val strong { font-weight: 600; }
 
-    .badge-elderly {
-      background: #fef3c7;
-      color: #92400e;
-      border: 1px solid #fde68a;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 0.15rem 0.5rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .badge-child {
-      background: #e0e7ff;
-      color: #3730a3;
-      border: 1px solid #c7d2fe;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 0.15rem 0.5rem;
-      border-radius: var(--radius-xs);
-    }
-
-    .badge-normal {
-      background: #f1f5f9;
-      color: #475569;
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.15rem 0.5rem;
-      border-radius: var(--radius-xs);
-    }
-
-    /* Emergency Toggle */
     .emergency-toggle-card {
-      background: #fff1f2;
-      border: 1.5px solid #fecdd3;
-      border-radius: var(--radius-sm);
-      padding: 0.75rem 1rem;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.15rem;
+      padding: 10px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      transition: background-color 0.12s ease, border-color 0.12s ease;
+    }
+
+    .emergency-toggle-card.checked {
+      border-color: var(--danger-border);
+      background: var(--danger-bg);
     }
 
     .toggle-container {
       display: flex;
       align-items: flex-start;
-      gap: 0.75rem;
+      gap: 10px;
       cursor: pointer;
     }
 
     .toggle-container input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      margin-top: 0.15rem;
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
       accent-color: var(--danger-solid);
       cursor: pointer;
     }
@@ -858,151 +639,124 @@ import { toIsoDate } from '../../utils/date.utils';
     .toggle-text {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      font-size: 14px;
     }
+
+    .toggle-text strong { font-weight: 500; color: var(--text-main); }
+    .emergency-toggle-card.checked .toggle-text strong { color: var(--danger-text); }
 
     .toggle-sub {
-      font-size: 0.775rem;
-      color: #9f1239;
+      font-size: 12px;
+      color: var(--text-muted);
     }
-
-    .font-bold { font-weight: 700; }
-    .text-danger { color: var(--danger-solid); }
 
     .form-action-bar {
       display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      margin-top: 1.25rem;
-      padding-top: 1.25rem;
+      justify-content: flex-end;
+      gap: 8px;
+      padding-top: 16px;
       border-top: 1px solid var(--border-color);
     }
 
-    .submit-checkin-btn {
-      flex: 1;
-      padding: 0.75rem 1.5rem;
-      font-size: 1.05rem;
-      font-weight: 700;
+    .submit-checkin-btn { min-width: 160px; }
+
+    /* Phiếu đã cấp */
+    .recent-panel {
+      position: sticky;
+      top: calc(var(--topbar-height) + 16px);
     }
 
-    /* Recent Tickets Right Column */
+    .recent-panel .panel-header { padding: 8px 8px 8px 16px; }
+
     .recent-tickets-list {
-      max-height: 640px;
+      max-height: calc(100vh - 220px);
       overflow-y: auto;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
     }
 
     .recent-ticket-card {
-      padding: 0.75rem 0.85rem;
-      background: #ffffff;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
       display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      transition: all 0.15s ease;
+      align-items: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px 8px 10px 16px;
+      border-bottom: 1px solid var(--border-color);
     }
 
-    .recent-ticket-card:hover {
-      border-color: var(--primary-300);
-      box-shadow: var(--shadow-xs);
-    }
-
-    .recent-ticket-card.emergency-card {
-      border-left: 4px solid var(--danger-solid);
-      background-color: #fffaf0;
-    }
+    .recent-ticket-card:last-child { border-bottom: none; }
+    .recent-ticket-card.emergency-card { box-shadow: inset 3px 0 0 var(--danger-solid); }
 
     .recent-ticket-top {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      gap: 6px;
+      width: 100%;
     }
 
     .ticket-badge {
-      font-size: 1rem;
-      font-weight: 800;
-      color: var(--primary-800);
-      background: var(--primary-50);
-      padding: 0.15rem 0.5rem;
-      border-radius: var(--radius-xs);
-      border: 1px solid var(--primary-200);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-main);
+      margin-right: auto;
     }
 
-    .ticket-status-pill {
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.15rem 0.45rem;
-      border-radius: var(--radius-xs);
+    .recent-patient-info {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
     }
-
-    .status-waiting { background: #fef3c7; color: #92400e; }
-    .status-called { background: #e0f2fe; color: #0369a1; }
-    .status-progress { background: #dcfce7; color: #15803d; }
-    .status-completed { background: #f1f5f9; color: #475569; }
-    .status-skipped { background: #fee2e2; color: #b91c1c; }
-    .status-cancelled { background: #e2e8f0; color: #64748b; }
 
     .patient-name {
-      font-size: 0.9rem;
+      font-size: 14px;
+      font-weight: 500;
       color: var(--text-main);
     }
 
     .patient-meta-row {
-      font-size: 0.775rem;
-      color: var(--text-muted);
       display: flex;
-      gap: 0.75rem;
-      margin-top: 0.2rem;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 12px;
     }
 
     .patient-room-info {
-      font-size: 0.8rem;
       color: var(--text-secondary);
-      margin-top: 0.2rem;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .recent-ticket-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 0.35rem;
-      padding-top: 0.35rem;
-      border-top: 1px dashed var(--border-subtle);
-    }
+    .recent-ticket-actions { align-self: flex-end; }
 
-    .empty-state-card {
-      padding: 3rem 1rem;
+    /* Trạng thái phiếu (lớp từ getStatusClass) */
+    .status.status-waiting { background: var(--warning-bg); color: var(--warning-text); }
+    .status.status-called { background: var(--info-bg); color: var(--info-text); }
+    .status.status-progress { background: var(--info-bg); color: var(--info-text); }
+    .status.status-completed { background: var(--success-bg); color: var(--success-text); }
+    .status.status-skipped,
+    .status.status-cancelled { background: var(--bg-subtle); color: var(--text-muted); }
+
+    .empty-state-card,
+    .loading-state-sm {
+      padding: 32px 16px;
       text-align: center;
       color: var(--text-muted);
-    }
-
-    .empty-state-card i {
-      font-size: 2.5rem;
-      display: block;
-      margin-bottom: 0.5rem;
+      font-size: 13px;
     }
 
     .loading-state-sm {
-      padding: 2rem 1rem;
-      text-align: center;
-      color: var(--text-muted);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      gap: 8px;
     }
 
-    /* Thermal Receipt Simulation Modal */
-    .print-dialog {
-      max-width: 440px;
-    }
+    /* Phiếu in nhiệt */
+    .print-dialog { max-width: 420px; }
 
     .print-modal-body {
-      background-color: #f1f5f9;
-      padding: 1.5rem;
+      background-color: var(--bg-subtle);
+      padding: 20px;
       display: flex;
       justify-content: center;
     }
@@ -1011,116 +765,125 @@ import { toIsoDate } from '../../utils/date.utils';
       background: #ffffff;
       width: 100%;
       max-width: 320px;
-      padding: 1.5rem 1.25rem;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      padding: 20px 18px;
+      border: 1px solid var(--border-color);
       font-family: 'Courier New', Courier, monospace;
-      color: #1e293b;
-      font-size: 0.85rem;
+      color: #111111;
+      font-size: 13px;
       line-height: 1.4;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
     }
 
     .receipt-header {
       text-align: center;
-      margin-bottom: 0.75rem;
+      margin-bottom: 10px;
     }
 
     .receipt-hospital-name {
-      font-weight: 800;
-      font-size: 0.95rem;
-      letter-spacing: -0.01em;
+      font-weight: 700;
+      font-size: 15px;
     }
 
-    .receipt-address, .receipt-hotline {
-      font-size: 0.725rem;
-      color: #64748b;
+    .receipt-address,
+    .receipt-hotline {
+      font-size: 11px;
+      color: #555555;
     }
 
     .receipt-divider {
       overflow: hidden;
       white-space: nowrap;
-      margin: 0.4rem 0;
-      color: #94a3b8;
+      margin: 6px 0;
+      color: #999999;
     }
 
     .receipt-title {
       font-weight: 700;
-      font-size: 0.875rem;
-      letter-spacing: 0.05em;
+      font-size: 14px;
     }
 
     .receipt-ticket-number {
       text-align: center;
-      margin: 0.85rem 0;
-      padding: 0.5rem 0;
-      border-top: 1px dashed #cbd5e1;
-      border-bottom: 1px dashed #cbd5e1;
+      margin: 12px 0;
+      padding: 8px 0;
+      border-top: 1px dashed #bbbbbb;
+      border-bottom: 1px dashed #bbbbbb;
     }
 
     .number-label {
       display: block;
-      font-size: 0.775rem;
-      color: #64748b;
-      font-weight: 600;
+      font-size: 12px;
+      color: #555555;
     }
 
     .number-big {
       display: block;
-      font-size: 2.2rem;
-      font-weight: 900;
-      color: #0f172a;
-      letter-spacing: 0.03em;
+      font-size: 34px;
+      font-weight: 700;
+      color: #000000;
     }
 
     .receipt-emergency-banner {
-      background: #000;
-      color: #fff;
+      background: #000000;
+      color: #ffffff;
       text-align: center;
-      font-weight: 900;
-      padding: 0.25rem 0;
-      margin-bottom: 0.75rem;
-      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 0;
+      margin-bottom: 10px;
     }
 
     .receipt-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 0.25rem;
-      font-size: 0.825rem;
+      margin-bottom: 4px;
+      font-size: 13px;
     }
 
     .r-label {
-      color: #64748b;
+      color: #555555;
       min-width: 90px;
     }
 
     .r-val {
       text-align: right;
-      color: #0f172a;
+      color: #000000;
     }
+
+    .font-bold { font-weight: 700; }
 
     .receipt-footer {
       text-align: center;
-      margin-top: 0.85rem;
-      border-top: 1px dashed #cbd5e1;
-      padding-top: 0.75rem;
+      margin-top: 12px;
+      border-top: 1px dashed #bbbbbb;
+      padding-top: 10px;
     }
 
     .receipt-note {
-      font-size: 0.725rem;
-      color: #64748b;
+      font-size: 11px;
+      color: #555555;
       line-height: 1.35;
-      margin-bottom: 0.5rem;
+      margin-bottom: 8px;
     }
 
     .receipt-code {
-      font-size: 0.775rem;
-      margin-bottom: 0.4rem;
+      font-size: 12px;
+      margin-bottom: 6px;
     }
 
     .receipt-thanks {
       font-weight: 700;
-      font-size: 0.75rem;
+      font-size: 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .main-layout-grid { grid-template-columns: 1fr; }
+      .recent-panel { position: static; }
+      .recent-tickets-list { max-height: 420px; }
+    }
+
+    @media (max-width: 768px) {
+      .page { padding: 16px; }
+      .form-row { flex-direction: column; gap: 0; }
     }
 
     @media print {
@@ -1135,13 +898,13 @@ import { toIsoDate } from '../../utils/date.utils';
         left: 0;
         top: 0;
         width: 80mm;
+        border: none;
         box-shadow: none;
         padding: 0;
         margin: 0;
       }
     }
-  `]
-})
+  `]})
 export class CheckInComponent implements OnInit, OnDestroy {
   private readonly queueService = inject(QueueService);
   private readonly scheduleService = inject(ScheduleService);

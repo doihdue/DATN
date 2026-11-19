@@ -20,12 +20,12 @@ interface ScheduleDayGroup {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="booking-page">
-      <!-- Header -->
+    <div class="page booking-page">
       <div class="page-header">
-        <div class="header-badge"><i class="bi bi-calendar-plus-fill"></i> Đặt lịch khám online</div>
-        <h1 class="page-title">Đặt Lịch Khám Bệnh</h1>
-        <p class="page-subtitle">Chọn chuyên khoa, bác sĩ và ca khám còn chỗ. Đến đúng giờ để không phải xếp hàng lâu.</p>
+        <div>
+          <h1 class="page-title">Đặt lịch khám</h1>
+          <p class="page-subtitle">Chọn chuyên khoa, ngày khám và ca còn chỗ.</p>
+        </div>
       </div>
 
       <!-- Toast -->
@@ -46,131 +46,126 @@ interface ScheduleDayGroup {
         </div>
       }
 
-      <!-- Bước 1: Chuyên khoa -->
-      <section class="step-card">
-        <h2 class="step-title"><span class="step-num">1</span> Chọn chuyên khoa</h2>
-        <div class="chip-list">
-          <button type="button" class="chip" [class.active]="specialtyId() === null" (click)="selectSpecialty(null)">
-            <i class="bi bi-grid"></i> Tất cả
-          </button>
-          @for (spec of specialties(); track spec.id) {
-            <button type="button" class="chip" [class.active]="specialtyId() === spec.id" (click)="selectSpecialty(spec.id)">
-              {{ spec.name }}
+      <!-- Bộ lọc: chuyên khoa, ngày, bác sĩ -->
+      <section class="panel filter-panel">
+        <div class="panel-body">
+          <div class="filter-label">Chuyên khoa</div>
+          <div class="chip-list">
+            <button type="button" class="chip" [class.active]="specialtyId() === null" (click)="selectSpecialty(null)">
+              Tất cả
             </button>
-          }
-        </div>
-      </section>
+            @for (spec of specialties(); track spec.id) {
+              <button type="button" class="chip" [class.active]="specialtyId() === spec.id" (click)="selectSpecialty(spec.id)">
+                {{ spec.name }}
+              </button>
+            }
+          </div>
 
-      <!-- Bước 2: Thời gian & bác sĩ -->
-      <section class="step-card">
-        <h2 class="step-title"><span class="step-num">2</span> Chọn thời gian và bác sĩ</h2>
-        <div class="filters-grid">
-          <div class="form-group">
-            <label class="form-label" for="work-date">Ngày khám</label>
-            <input id="work-date" type="date" class="form-control" [min]="today" [(ngModel)]="workDate" (change)="onDateChange()" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="doctor">Bác sĩ</label>
-            <select id="doctor" class="form-control" [ngModel]="doctorId()" (ngModelChange)="selectDoctor($event)">
-              <option [ngValue]="null">-- Tất cả bác sĩ --</option>
-              @for (doc of doctors(); track doc.id) {
-                <option [ngValue]="doc.id">{{ doc.name }}</option>
-              }
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <!-- Bước 3: Ca khám -->
-      <section class="step-card" #slotsSection>
-        <h2 class="step-title">
-          <span class="step-num">3</span> Chọn ca khám còn chỗ
-          @if (!loading() && filteredSchedules().length > 0) {
-            <span class="step-count">{{ filteredSchedules().length }} ca</span>
-          }
-        </h2>
-
-        @if (loading()) {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Đang tìm ca khám còn chỗ...</p>
-          </div>
-        } @else if (filteredSchedules().length === 0) {
-          <div class="empty-state">
-            <i class="bi bi-calendar-x"></i>
-            <h3>Không còn ca khám trống</h3>
-            <p>Hãy chọn chuyên khoa khác hoặc chọn một ngày khám khác.</p>
-          </div>
-        } @else {
-          @for (group of groupedSchedules(); track group.date) {
-            <div class="day-group">
-              <h3 class="day-title"><i class="bi bi-calendar3"></i> {{ formatDayTitle(group.date) }}</h3>
-              <div class="slot-grid">
-                @for (item of group.schedules; track item.id) {
-                  <div class="slot-card">
-                    <div class="slot-time">
-                      <i class="bi bi-clock"></i> {{ item.startTime | slice:0:5 }} - {{ item.endTime | slice:0:5 }}
-                    </div>
-                    <div class="slot-doctor">{{ item.academicTitle ? item.academicTitle + ' ' : '' }}{{ item.doctorName }}</div>
-                    <div class="slot-meta">
-                      <span><i class="bi bi-diagram-3"></i> {{ item.specialtyName || 'Đa khoa' }}</span>
-                      <span><i class="bi bi-door-open"></i> Phòng {{ item.roomNumber }}{{ item.floor ? ' - Tầng ' + item.floor : '' }}</span>
-                    </div>
-                    <div class="slot-capacity">
-                      <div class="capacity-bar">
-                        <div class="capacity-fill" [style.width.%]="(item.currentBookedCount / item.maxPatients) * 100"></div>
-                      </div>
-                      <span [class.low]="item.remainingSlots <= 3">Còn {{ item.remainingSlots }} / {{ item.maxPatients }} chỗ</span>
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm btn-block" (click)="openBookingModal(item)">
-                      <i class="bi bi-check2-circle"></i> Chọn ca này
-                    </button>
-                  </div>
-                }
-              </div>
+          <div class="filters-grid">
+            <div class="form-group">
+              <label class="form-label" for="work-date">Ngày khám</label>
+              <input id="work-date" type="date" class="form-control" [min]="today" [(ngModel)]="workDate" (change)="onDateChange()" />
             </div>
+            <div class="form-group">
+              <label class="form-label" for="doctor">Bác sĩ</label>
+              <select id="doctor" class="form-control" [ngModel]="doctorId()" (ngModelChange)="selectDoctor($event)">
+                <option [ngValue]="null">Tất cả bác sĩ</option>
+                @for (doc of doctors(); track doc.id) {
+                  <option [ngValue]="doc.id">{{ doc.name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ca khám -->
+      <section class="panel" #slotsSection>
+        <div class="panel-header">
+          <h2 class="panel-title">Ca khám còn chỗ</h2>
+          @if (!loading() && filteredSchedules().length > 0) {
+            <span class="step-count text-muted mono">{{ filteredSchedules().length }} ca</span>
           }
+        </div>
 
-          @if (totalPages() > 1) {
-            <nav class="pagination-footer" aria-label="Phân trang ca khám">
-              <div class="pagination-info">
-                <span>
-                  Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredSchedules().length }}</strong> ca khám
-                </span>
-                <div class="page-size-selector">
-                  <label for="pageSizeSelect">Số ca/trang:</label>
-                  <select id="pageSizeSelect" class="form-select-sm" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
-                    @for (opt of pageSizeOptions; track opt) {
-                      <option [ngValue]="opt">{{ opt }}</option>
-                    }
-                  </select>
-                </div>
-              </div>
-
-              <div class="pagination-controls">
-                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Về trang đầu tiên" aria-label="Trang đầu">
-                  <i class="bi bi-chevron-double-left"></i>
-                </button>
-                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Trang trước" aria-label="Trang trước">
-                  <i class="bi bi-chevron-left"></i> <span class="nav-label">Trước</span>
-                </button>
-                <div class="page-numbers-group">
-                  @for (p of pagesList(); track p) {
-                    <button type="button" class="btn-page btn-page-num" [class.active]="currentPage() === p"
-                            [attr.aria-current]="currentPage() === p ? 'page' : null" (click)="goToPage(p)">
-                      {{ p }}
-                    </button>
+        <div class="panel-body">
+          @if (loading()) {
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Đang tải ca khám...</p>
+            </div>
+          } @else if (filteredSchedules().length === 0) {
+            <div class="empty-state">
+              <h3>Không còn ca khám trống</h3>
+              <p>Thử chọn chuyên khoa hoặc ngày khám khác.</p>
+            </div>
+          } @else {
+            @for (group of groupedSchedules(); track group.date) {
+              <div class="day-group">
+                <h3 class="day-title">{{ formatDayTitle(group.date) }}</h3>
+                <div class="slot-grid">
+                  @for (item of group.schedules; track item.id) {
+                    <div class="slot-card">
+                      <div class="slot-time mono">{{ item.startTime | slice:0:5 }} – {{ item.endTime | slice:0:5 }}</div>
+                      <div class="slot-doctor">{{ item.academicTitle ? item.academicTitle + ' ' : '' }}{{ item.doctorName }}</div>
+                      <div class="slot-meta">
+                        <span>{{ item.specialtyName || 'Đa khoa' }}</span>
+                        <span>Phòng {{ item.roomNumber }}{{ item.floor ? ', tầng ' + item.floor : '' }}</span>
+                      </div>
+                      <div class="slot-capacity">
+                        <div class="capacity-bar">
+                          <div class="capacity-fill" [style.width.%]="(item.currentBookedCount / item.maxPatients) * 100"></div>
+                        </div>
+                        <span class="mono" [class.low]="item.remainingSlots <= 3">Còn {{ item.remainingSlots }}/{{ item.maxPatients }} chỗ</span>
+                      </div>
+                      <button type="button" class="btn btn-outline btn-sm btn-block" (click)="openBookingModal(item)">
+                        Chọn ca này
+                      </button>
+                    </div>
                   }
                 </div>
-                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Trang sau" aria-label="Trang sau">
-                  <span class="nav-label">Sau</span> <i class="bi bi-chevron-right"></i>
-                </button>
-                <button type="button" class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Đến trang cuối cùng" aria-label="Trang cuối">
-                  <i class="bi bi-chevron-double-right"></i>
-                </button>
               </div>
-            </nav>
+            }
           }
+        </div>
+
+        @if (!loading() && filteredSchedules().length > 0 && totalPages() > 1) {
+          <nav class="pagination-footer" aria-label="Phân trang ca khám">
+            <div class="pagination-info">
+              <span class="mono">{{ startIndex() }}–{{ endIndex() }} / {{ filteredSchedules().length }} ca</span>
+              <div class="page-size-selector">
+                <label for="pageSizeSelect">Số ca mỗi trang</label>
+                <select id="pageSizeSelect" class="form-select-sm" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+                  @for (opt of pageSizeOptions; track opt) {
+                    <option [ngValue]="opt">{{ opt }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div class="pagination-controls">
+              <button type="button" class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Trang đầu" aria-label="Trang đầu">
+                <i class="bi bi-chevron-double-left"></i>
+              </button>
+              <button type="button" class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Trang trước" aria-label="Trang trước">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+              <div class="page-numbers-group">
+                @for (p of pagesList(); track p) {
+                  <button type="button" class="btn-page" [class.active]="currentPage() === p"
+                          [attr.aria-current]="currentPage() === p ? 'page' : null" (click)="goToPage(p)">
+                    {{ p }}
+                  </button>
+                }
+              </div>
+              <button type="button" class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Trang sau" aria-label="Trang sau">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+              <button type="button" class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Trang cuối" aria-label="Trang cuối">
+                <i class="bi bi-chevron-double-right"></i>
+              </button>
+            </div>
+          </nav>
         }
       </section>
 
@@ -179,43 +174,37 @@ interface ScheduleDayGroup {
         <div class="modal-backdrop" (click)="closeBookingModal()">
           <div class="modal-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title"><i class="bi bi-calendar-check"></i> Xác nhận đặt lịch</h2>
-              <button type="button" class="modal-close-btn" (click)="closeBookingModal()" aria-label="Đóng"><i class="bi bi-x-lg"></i></button>
+              <h2 class="modal-title">Xác nhận đặt lịch</h2>
+              <button type="button" class="modal-close-btn" (click)="closeBookingModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               <dl class="summary-list">
                 <dt>Bác sĩ</dt><dd>{{ sel.academicTitle ? sel.academicTitle + ' ' : '' }}{{ sel.doctorName }}</dd>
                 <dt>Chuyên khoa</dt><dd>{{ sel.specialtyName || 'Đa khoa' }}</dd>
                 <dt>Ngày khám</dt><dd>{{ formatDayTitle(sel.workDate) }}</dd>
-                <dt>Ca khám</dt><dd>{{ sel.startTime | slice:0:5 }} - {{ sel.endTime | slice:0:5 }}</dd>
+                <dt>Ca khám</dt><dd class="mono">{{ sel.startTime | slice:0:5 }} – {{ sel.endTime | slice:0:5 }}</dd>
                 <dt>Phòng</dt><dd>{{ sel.roomNumber }} {{ sel.roomName ? '(' + sel.roomName + ')' : '' }}</dd>
               </dl>
 
               @if (!authService.isAuthenticated()) {
-                <div class="alert alert-warning">
-                  <i class="bi bi-info-circle"></i> Bạn cần đăng nhập tài khoản bệnh nhân để đặt lịch.
-                </div>
+                <div class="alert alert-warning">Cần đăng nhập tài khoản bệnh nhân để đặt lịch.</div>
               } @else if (!isPatient()) {
-                <div class="alert alert-warning">
-                  <i class="bi bi-info-circle"></i> Chỉ tài khoản bệnh nhân mới đặt lịch online được. Lễ tân vui lòng cấp số tại quầy.
-                </div>
+                <div class="alert alert-warning">Chỉ tài khoản bệnh nhân được đặt lịch online. Lễ tân cấp số tại quầy.</div>
               } @else {
                 <div class="form-group">
                   <label class="form-label" for="reason">Triệu chứng / lý do khám (không bắt buộc)</label>
                   <textarea id="reason" class="form-control" rows="3" maxlength="500"
-                            placeholder="Ví dụ: Sốt nhẹ, ho khan 3 ngày nay..." [(ngModel)]="reasonForVisit"></textarea>
+                            placeholder="Ví dụ: sốt nhẹ, ho khan 3 ngày" [(ngModel)]="reasonForVisit"></textarea>
                 </div>
               }
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" (click)="closeBookingModal()">Quay lại</button>
+              <button type="button" class="btn btn-secondary" (click)="closeBookingModal()">Hủy</button>
               @if (!authService.isAuthenticated()) {
-                <button type="button" class="btn btn-primary" (click)="goToLogin()">
-                  <i class="bi bi-box-arrow-in-right"></i> Đăng nhập để đặt lịch
-                </button>
+                <button type="button" class="btn btn-primary" (click)="goToLogin()">Đăng nhập để đặt lịch</button>
               } @else if (isPatient()) {
                 <button type="button" class="btn btn-primary" [disabled]="submitting()" (click)="confirmBooking()">
-                  @if (submitting()) { <span class="spinner-sm"></span> } @else { <i class="bi bi-send-check"></i> }
+                  @if (submitting()) { <span class="spinner-sm"></span> }
                   Xác nhận đặt lịch
                 </button>
               }
@@ -228,25 +217,26 @@ interface ScheduleDayGroup {
       @if (bookedAppointment(); as appt) {
         <div class="modal-backdrop">
           <div class="modal-dialog">
-            <div class="modal-body success-body">
-              <div class="success-icon"><i class="bi bi-check-circle-fill"></i></div>
-              <h2>Đặt lịch thành công!</h2>
-              <p class="text-muted">Lịch hẹn đang chờ phòng khám xác nhận. Vui lòng xuất trình mã lịch hẹn tại quầy lễ tân.</p>
+            <div class="modal-header">
+              <h2 class="modal-title">Đã đặt lịch</h2>
+            </div>
+            <div class="modal-body">
+              <p class="success-note">Lịch hẹn đang chờ phòng khám xác nhận. Xuất trình mã lịch hẹn tại quầy lễ tân khi đến khám.</p>
               <div class="code-box">
                 <span class="code-label">Mã lịch hẹn</span>
-                <span class="code-value num">{{ appt.appointmentCode }}</span>
+                <span class="code-value mono">{{ appt.appointmentCode }}</span>
               </div>
               <dl class="summary-list">
-                <dt>Số thứ tự đặt trước</dt><dd class="num">#{{ appt.bookingNumber }}</dd>
+                <dt>Số thứ tự đặt trước</dt><dd class="mono">#{{ appt.bookingNumber }}</dd>
                 <dt>Ngày khám</dt><dd>{{ formatDayTitle(appt.appointmentDate) }}</dd>
-                <dt>Giờ khám dự kiến</dt><dd class="num">{{ appt.estimatedStartTime | slice:0:5 }}</dd>
+                <dt>Giờ khám dự kiến</dt><dd class="mono">{{ appt.estimatedStartTime | slice:0:5 }}</dd>
                 <dt>Bác sĩ</dt><dd>{{ appt.doctorName }}</dd>
                 <dt>Phòng</dt><dd>{{ appt.roomNumber }}</dd>
               </dl>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-outline" (click)="bookedAppointment.set(null)">Đặt thêm lịch</button>
-              <a routerLink="/my-appointments" class="btn btn-primary"><i class="bi bi-list-check"></i> Xem lịch hẹn của tôi</a>
+              <button type="button" class="btn btn-secondary" (click)="bookedAppointment.set(null)">Đặt thêm lịch</button>
+              <a routerLink="/my-appointments" class="btn btn-primary">Xem lịch hẹn của tôi</a>
             </div>
           </div>
         </div>
@@ -254,106 +244,83 @@ interface ScheduleDayGroup {
     </div>
   `,
   styles: [`
-    .booking-page { padding: 1.5rem 1rem 3rem; max-width: 1100px; margin: 0 auto; }
-    .page-header { margin-bottom: 1.5rem; }
-    .header-badge {
-      display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .8rem;
-      background: var(--primary-50); color: var(--primary-700); border: 1px solid var(--primary-200);
-      border-radius: var(--radius-full); font-size: .8rem; font-weight: 600; margin-bottom: .6rem;
-    }
-    .page-title { font-size: 1.75rem; font-weight: 800; color: var(--text-main); margin: 0 0 .35rem; }
-    .page-subtitle { color: var(--text-muted); margin: 0; font-size: 1rem; }
+    .booking-page { max-width: 1100px; }
 
-    .step-card {
-      background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-card); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
-    }
-    .step-title { display: flex; align-items: center; gap: .6rem; font-size: 1.1rem; font-weight: 700; margin: 0 0 1rem; color: var(--text-main); }
-    .step-num {
-      width: 28px; height: 28px; border-radius: 50%; background: var(--primary-600); color: #fff;
-      display: inline-flex; align-items: center; justify-content: center; font-size: .9rem;
-    }
+    .filter-panel { margin-bottom: 16px; }
+    .filter-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
 
-    .chip-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
     .chip {
-      border: 1px solid var(--border-color); background: var(--bg-subtle); color: var(--text-secondary);
-      padding: .55rem 1rem; border-radius: var(--radius-full); font-size: .95rem; font-weight: 600; cursor: pointer;
-      transition: all .15s ease;
+      height: 30px; padding: 0 12px;
+      border: 1px solid var(--border-strong); background: #fff; color: var(--text-secondary);
+      border-radius: var(--radius-md); font: inherit; font-size: 13px; cursor: pointer;
+      transition: background-color .12s ease, border-color .12s ease, color .12s ease;
     }
-    .chip:hover { border-color: var(--primary-300); color: var(--primary-700); }
+    .chip:hover { background: var(--bg-hover); color: var(--text-main); }
     .chip.active { background: var(--primary-600); border-color: var(--primary-600); color: #fff; }
 
-    .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
     .filters-grid .form-group { margin-bottom: 0; }
 
-    .day-group + .day-group { margin-top: 1.5rem; }
-    .day-title { font-size: 1rem; font-weight: 700; color: var(--primary-800); margin: 0 0 .75rem; display: flex; gap: .4rem; align-items: center; }
-    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+    .step-count { font-size: 13px; }
+
+    .day-group + .day-group { margin-top: 20px; }
+    .day-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 8px; }
+    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
     .slot-card {
-      border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem;
-      display: flex; flex-direction: column; gap: .5rem; background: #fff; transition: box-shadow .15s ease, border-color .15s ease;
+      border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 6px; background: #fff;
+      transition: border-color .12s ease;
     }
-    .slot-card:hover { border-color: var(--primary-300); box-shadow: var(--shadow-md); }
-    .slot-time { font-weight: 700; color: var(--primary-700); font-size: 1.05rem; }
-    .slot-doctor { font-weight: 700; color: var(--text-main); font-size: 1rem; }
-    .slot-meta { display: flex; flex-direction: column; gap: .2rem; font-size: .88rem; color: var(--text-muted); }
-    .slot-capacity { font-size: .85rem; color: var(--success-text); font-weight: 600; }
-    .slot-capacity .low { color: var(--warning-solid); }
-    .capacity-bar { height: 6px; background: var(--bg-subtle); border-radius: var(--radius-full); overflow: hidden; margin-bottom: .3rem; }
-    .capacity-fill { height: 100%; background: var(--teal-500); }
-    .btn-block { width: 100%; justify-content: center; margin-top: auto; }
+    .slot-card:hover { border-color: var(--border-strong); }
+    .slot-time { font-size: 15px; font-weight: 600; color: var(--text-main); }
+    .slot-doctor { font-size: 14px; font-weight: 500; color: var(--text-main); }
+    .slot-meta { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-muted); }
+    .slot-capacity { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .slot-capacity .low { color: var(--warning-text); font-weight: 500; }
+    .capacity-bar { height: 4px; background: var(--bg-subtle); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
+    .capacity-fill { height: 100%; background: var(--primary-500); }
+    .btn-block { width: 100%; margin-top: 6px; }
 
-    .step-count {
-      margin-left: auto; font-size: .82rem; font-weight: 600; color: var(--primary-700);
-      background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-full); padding: .15rem .7rem;
-    }
+    .loading-state, .empty-state { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
+    .empty-state h3 { font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
 
-    /* Phân trang: cùng kiểu với trang Quản lý lịch làm việc */
     .pagination-footer {
-      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
-      margin-top: 1.5rem; padding-top: 1rem; border-top: 1.5px solid var(--bg-subtle);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+      padding: 10px 16px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-muted);
     }
-    .pagination-info { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1.5rem; font-size: .88rem; color: var(--text-secondary); }
-    .pagination-info strong { color: var(--text-main); }
-    .page-size-selector { display: flex; align-items: center; gap: .5rem; font-size: .85rem; }
+    .pagination-info, .page-size-selector, .pagination-controls, .page-numbers-group { display: flex; align-items: center; gap: 8px; }
+    .pagination-info { gap: 16px; }
+    .pagination-controls, .page-numbers-group { gap: 4px; }
     .form-select-sm {
-      padding: .35rem .65rem; border: 1.5px solid #cbd5e1; border-radius: 6px;
-      color: var(--text-main); font-weight: 700; background: #fff;
+      height: 28px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      font: inherit; font-size: 13px; padding: 0 6px; background: #fff;
     }
-    .pagination-controls { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-    .page-numbers-group { display: flex; gap: .3rem; }
     .btn-page {
-      min-width: 34px; height: 34px; padding: 0 .5rem; border-radius: 8px; border: 1px solid #cbd5e1;
-      background: #fff; color: var(--text-secondary); font-weight: 700; font-size: .85rem; cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center; gap: .25rem; transition: all .15s;
+      min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+      background: #fff; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
     }
-    .btn-page:hover:not(:disabled) { background: var(--primary-50); border-color: var(--primary-600); color: var(--primary-600); }
-    .btn-page.active { background: var(--primary-600); border-color: var(--primary-600); color: #fff; box-shadow: 0 2px 8px rgba(2, 132, 199, .35); }
-    .btn-page:disabled { opacity: .45; cursor: not-allowed; background: var(--bg-main); border-color: var(--border-color); }
-    .btn-page-nav { padding: 0 .75rem; }
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-page.active { background: var(--primary-600); border-color: var(--primary-600); color: #fff; }
 
-    .summary-list { display: grid; grid-template-columns: max-content 1fr; gap: .45rem 1rem; margin: 0 0 1rem; }
-    .summary-list dt { color: var(--text-muted); font-size: .9rem; }
-    .summary-list dd { margin: 0; font-weight: 600; color: var(--text-main); }
+    .summary-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0 0 16px; font-size: 14px; }
+    .summary-list dt { color: var(--text-muted); }
+    .summary-list dd { margin: 0; color: var(--text-main); font-weight: 500; }
 
-    .success-body { text-align: center; }
-    .success-body .summary-list { text-align: left; max-width: 360px; margin: 1rem auto 0; }
-    .success-icon { font-size: 3rem; color: var(--success-solid); }
-    .success-body h2 { margin: .25rem 0 .5rem; font-size: 1.4rem; }
-    .text-muted { color: var(--text-muted); }
+    .success-note { font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; }
     .code-box {
-      display: inline-flex; flex-direction: column; padding: .75rem 1.5rem; margin-top: .5rem;
-      background: var(--primary-50); border: 1px dashed var(--primary-300); border-radius: var(--radius-md);
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; margin-bottom: 16px;
+      background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md);
     }
-    .code-label { font-size: .8rem; color: var(--text-muted); }
-    .code-value { font-size: 1.5rem; font-weight: 800; color: var(--primary-700); letter-spacing: .05em; }
+    .code-label { font-size: 13px; color: var(--text-muted); }
+    .code-value { font-size: 20px; font-weight: 600; color: var(--text-main); letter-spacing: .02em; }
 
     @media (max-width: 600px) {
-      .step-card { padding: 1rem; }
-      .page-title { font-size: 1.4rem; }
+      .page { padding: 16px; }
       .pagination-footer { justify-content: center; }
-      .btn-page-nav { padding: 0 .5rem; }
-      .nav-label { display: none; }
     }
   `]
 })

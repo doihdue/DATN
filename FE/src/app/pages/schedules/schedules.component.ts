@@ -84,58 +84,41 @@ function lastOfMonth(date: Date): Date {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="schedules-page">
-      <!-- Header Banner -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <i class="bi" [ngClass]="isTech() ? 'bi-eyedropper' : 'bi-person-badge'"></i>
-            {{ isAdmin() ? (isTech() ? 'Lịch Trực Kỹ Thuật Viên Cận Lâm Sàng' : 'Lịch Trực Bác Sĩ Phòng Khám') : isTech() ? 'Lịch Trực Kỹ Thuật Viên' : 'Lịch Trực Ca Bác Sĩ' }}
-          </div>
-          <h1 class="page-title">{{ isAdmin() ? (isTech() ? 'Quản Lý Lịch Trực Kỹ Thuật Viên' : 'Quản Lý Lịch Trực Bác Sĩ') : 'Lịch Trực Của Tôi' }}</h1>
+        <div>
+          <h1 class="page-title">{{ isAdmin() ? (isTech() ? 'Lịch trực kỹ thuật viên' : 'Lịch trực bác sĩ') : (isTech() ? 'Ca trực của tôi' : 'Lịch trực của tôi') }}</h1>
           <p class="page-subtitle">
             @if (isAdmin()) {
               {{ isTech()
-                ? 'Xếp kỹ thuật viên vào phòng xét nghiệm / chẩn đoán hình ảnh. Mỗi ca có thể có nhiều KTV, chỉ chọn được KTV đúng khoa của phòng'
-                : 'Phân bổ ca trực theo chuyên khoa, kiểm tra tự động xung đột trùng giờ bác sĩ & phòng khám' }}
+                ? 'Một ca có thể có nhiều KTV; chỉ chọn được KTV thuộc khoa của phòng'
+                : 'Tự kiểm tra trùng giờ của bác sĩ và phòng khám khi xếp ca' }}
             } @else {
-              {{ isTech()
-                ? 'Theo dõi các ca trực được phân công cho bạn tại phòng cận lâm sàng'
-                : 'Theo dõi các ca trực được phân công cho bạn, phòng khám và số lượng bệnh nhân tiếp nhận theo ca' }}
+              {{ schedules().length }} ca trong khoảng thời gian đã chọn
             }
           </p>
         </div>
         @if (isAdmin()) {
-          <div class="header-actions">
-            <div class="view-toggle" role="tablist" aria-label="Chế độ xem">
-              <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'MONTH'" (click)="setViewMode('MONTH')">
-                <i class="bi bi-calendar3"></i> Tháng
-              </button>
-              <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'ROSTER'" (click)="setViewMode('ROSTER')">
-                <i class="bi bi-grid-3x3-gap-fill"></i> Tuần
-              </button>
-              <button type="button" class="view-toggle-btn" [class.active]="viewMode() === 'LIST'" (click)="setViewMode('LIST')">
-                <i class="bi bi-list-ul"></i> Danh sách
-              </button>
+          <div class="page-actions">
+            <div class="segmented" role="tablist" aria-label="Chế độ xem">
+              <button type="button" class="segmented-btn" [class.active]="viewMode() === 'MONTH'" (click)="setViewMode('MONTH')">Tháng</button>
+              <button type="button" class="segmented-btn" [class.active]="viewMode() === 'ROSTER'" (click)="setViewMode('ROSTER')">Tuần</button>
+              <button type="button" class="segmented-btn" [class.active]="viewMode() === 'LIST'" (click)="setViewMode('LIST')">Danh sách</button>
             </div>
             <button class="btn btn-primary" [disabled]="openingForm()" (click)="openAddModal()">
               @if (openingForm()) {
-                <span class="spinner-sm"></span> Đang tải dữ liệu...
+                <span class="spinner-sm"></span> Đang tải...
               } @else {
-                <i class="bi bi-calendar-plus-fill"></i> Đăng Ký Ca Trực
+                <i class="bi bi-plus-lg"></i> Xếp ca trực
               }
             </button>
           </div>
         }
       </div>
 
-      <!-- Feedback Alerts (Top-Right Floating Toast) -->
       @if (alertMessage()) {
         <div class="toast-floating-container">
           <div class="toast-card" [ngClass]="alertType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
-            <div class="toast-icon">
-              <i class="bi" [ngClass]="alertType() === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-            </div>
             <div class="toast-content">
               <div class="toast-title">{{ alertType() === 'success' ? 'Thành công' : 'Thông báo' }}</div>
               <div class="toast-message">{{ alertMessage() }}</div>
@@ -149,21 +132,22 @@ function lastOfMonth(date: Date): Date {
 
       @if (isAdmin() && viewMode() === 'ROSTER') {
       <!-- Bảng phân ca theo tuần: hàng = phòng, cột = ngày, mỗi ô gồm 3 ca -->
-      <div class="roster-card">
-        <div class="roster-toolbar">
-          <div class="week-nav">
-            <button type="button" class="btn btn-outline btn-sm" (click)="shiftWeek(-1)" title="Tuần trước" aria-label="Tuần trước">
+      <div class="panel">
+        <div class="toolbar toolbar-split">
+          <div class="period-nav">
+            <button type="button" class="nav-btn" (click)="shiftWeek(-1)" title="Tuần trước" aria-label="Tuần trước">
               <i class="bi bi-chevron-left"></i>
             </button>
-            <button type="button" class="btn btn-outline btn-sm" [disabled]="isCurrentWeek()" (click)="goToCurrentWeek()">Tuần này</button>
-            <button type="button" class="btn btn-outline btn-sm" (click)="shiftWeek(1)" title="Tuần sau" aria-label="Tuần sau">
+            <button type="button" class="nav-btn" (click)="shiftWeek(1)" title="Tuần sau" aria-label="Tuần sau">
               <i class="bi bi-chevron-right"></i>
             </button>
-            <span class="week-label">{{ weekLabel() }}</span>
+            <button type="button" class="btn btn-secondary btn-sm" [disabled]="isCurrentWeek()" (click)="goToCurrentWeek()">Tuần này</button>
+            <span class="period-label mono">{{ weekLabel() }}</span>
           </div>
-          <div class="roster-summary">
-            <span class="sum-chip sum-filled"><i class="bi bi-person-check-fill"></i> {{ rosterStats().filled }} ca đã xếp</span>
-            <span class="sum-chip sum-empty"><i class="bi bi-exclamation-circle-fill"></i> {{ rosterStats().empty }} ca còn trống</span>
+          <div class="period-summary">
+            <span><strong class="mono">{{ rosterStats().filled }}</strong> ca đã xếp</span>
+            <span class="sep">·</span>
+            <span [class.has-gap]="rosterStats().empty > 0"><strong class="mono">{{ rosterStats().empty }}</strong> ca còn trống</span>
           </div>
         </div>
 
@@ -174,9 +158,8 @@ function lastOfMonth(date: Date): Date {
           </div>
         } @else if (rooms().length === 0) {
           <div class="empty-state">
-            <i class="bi bi-door-closed"></i>
             <h3>Chưa có {{ roomLabel().toLowerCase() }} nào</h3>
-            <p>Hãy thêm {{ roomLabel().toLowerCase() }} trước khi xếp lịch trực.</p>
+            <p>Thêm {{ roomLabel().toLowerCase() }} trước khi xếp lịch trực.</p>
           </div>
         } @else {
           <div class="roster-scroll">
@@ -187,7 +170,7 @@ function lastOfMonth(date: Date): Date {
                   @for (day of weekDays(); track day.iso) {
                     <th [class.is-today]="day.isToday" [class.is-past]="day.isPast">
                       <span class="day-name">{{ day.weekday }}</span>
-                      <span class="day-date">{{ day.short }}</span>
+                      <span class="day-date mono">{{ day.short }}</span>
                     </th>
                   }
                 </tr>
@@ -196,7 +179,7 @@ function lastOfMonth(date: Date): Date {
                 @for (room of rooms(); track room.id) {
                   <tr>
                     <th class="roster-room-col">
-                      <span class="room-badge">{{ room.roomNumber }}</span>
+                      <span class="room-number">{{ room.roomNumber }}</span>
                       <span class="roster-room-name">{{ room.roomName }}</span>
                     </th>
                     @for (day of weekDays(); track day.iso) {
@@ -209,7 +192,7 @@ function lastOfMonth(date: Date): Date {
                                     [title]="shift.label + ' ' + day.short + ' · ' + s.personName + ' (' + s.personSub + ')' + (day.isPast ? '' : ' · Bấm để sửa')">
                               <span class="slot-shift">{{ shift.label }}</span>
                               <span class="slot-doctor">{{ s.personName }}</span>
-                              <span class="slot-meta">
+                              <span class="slot-meta mono">
                                 {{ s.startTime.substring(0, 5) }}–{{ s.endTime.substring(0, 5) }}{{ isTech() ? '' : ' · ' + s.booked + '/' + s.max }}
                               </span>
                             </button>
@@ -224,14 +207,14 @@ function lastOfMonth(date: Date): Date {
                                     (click)="openSlot(room.id, day.iso, shift.key)"
                                     [title]="'Xếp ca ' + shift.label + ' ' + day.short + ' tại ' + room.roomNumber">
                               <span class="slot-shift">{{ shift.label }}</span>
-                              <span class="slot-add"><i class="bi bi-plus-lg"></i> Trống</span>
+                              <span class="slot-add">+ Xếp ca</span>
                             </button>
                           } @else if (isTech() && !day.isPast) {
                             <!-- Phòng cận lâm sàng: một ca có thể thêm nhiều KTV -->
                             <button type="button" class="slot-more" [disabled]="openingForm()"
                                     (click)="openSlot(room.id, day.iso, shift.key)"
                                     [title]="'Thêm KTV vào ca ' + shift.label + ' ' + day.short + ' tại ' + room.roomNumber">
-                              <i class="bi bi-plus-lg"></i> Thêm KTV
+                              + Thêm KTV
                             </button>
                           }
                         }
@@ -243,35 +226,36 @@ function lastOfMonth(date: Date): Date {
             </table>
           </div>
 
-          <div class="roster-legend">
-            <span><i class="legend-dot shift-morning"></i> Ca sáng 07:30–12:00</span>
-            <span><i class="legend-dot shift-afternoon"></i> Ca chiều 13:30–17:30</span>
-            <span><i class="legend-dot shift-evening"></i> Ca tối 18:00–21:00</span>
-            <span><i class="legend-dot legend-empty"></i> Ô trống: bấm để xếp ca</span>
-            <span><i class="bi bi-pencil-square"></i> Ca đã xếp: bấm để sửa</span>
+          <div class="legend">
+            <span><i class="legend-swatch shift-morning"></i> Sáng 07:30–12:00</span>
+            <span><i class="legend-swatch shift-afternoon"></i> Chiều 13:30–17:30</span>
+            <span><i class="legend-swatch shift-evening"></i> Tối 18:00–21:00</span>
+            <span><i class="legend-swatch legend-empty"></i> Ô trống: bấm để xếp ca</span>
+            <span>Ca đã xếp: bấm để sửa</span>
             @if (isTech()) {
-              <span><i class="bi bi-plus-lg"></i> Thêm KTV: một ca có thể có nhiều KTV</span>
+              <span>Một ca có thể có nhiều KTV</span>
             }
           </div>
         }
       </div>
       } @else if (isAdmin() && viewMode() === 'MONTH') {
       <!-- Tổng quan tháng: mỗi ngày hiện số ca đã có người / tổng số ca (phòng × 3 ca) -->
-      <div class="roster-card">
-        <div class="roster-toolbar">
-          <div class="week-nav">
-            <button type="button" class="btn btn-outline btn-sm" (click)="shiftMonth(-1)" title="Tháng trước" aria-label="Tháng trước">
+      <div class="panel">
+        <div class="toolbar toolbar-split">
+          <div class="period-nav">
+            <button type="button" class="nav-btn" (click)="shiftMonth(-1)" title="Tháng trước" aria-label="Tháng trước">
               <i class="bi bi-chevron-left"></i>
             </button>
-            <button type="button" class="btn btn-outline btn-sm" [disabled]="isCurrentMonth()" (click)="goToCurrentMonth()">Tháng này</button>
-            <button type="button" class="btn btn-outline btn-sm" (click)="shiftMonth(1)" title="Tháng sau" aria-label="Tháng sau">
+            <button type="button" class="nav-btn" (click)="shiftMonth(1)" title="Tháng sau" aria-label="Tháng sau">
               <i class="bi bi-chevron-right"></i>
             </button>
-            <span class="week-label">{{ monthLabel() }}</span>
+            <button type="button" class="btn btn-secondary btn-sm" [disabled]="isCurrentMonth()" (click)="goToCurrentMonth()">Tháng này</button>
+            <span class="period-label">{{ monthLabel() }}</span>
           </div>
-          <div class="roster-summary">
-            <span class="sum-chip sum-filled"><i class="bi bi-person-check-fill"></i> {{ monthStats().filled }} ca đã xếp</span>
-            <span class="sum-chip sum-empty"><i class="bi bi-exclamation-circle-fill"></i> {{ monthStats().empty }} ca còn trống</span>
+          <div class="period-summary">
+            <span><strong class="mono">{{ monthStats().filled }}</strong> ca đã xếp</span>
+            <span class="sep">·</span>
+            <span [class.has-gap]="monthStats().empty > 0"><strong class="mono">{{ monthStats().empty }}</strong> ca còn trống</span>
           </div>
         </div>
 
@@ -290,210 +274,188 @@ function lastOfMonth(date: Date): Date {
                       [class.out-month]="!cell.inMonth" [class.is-today]="cell.isToday"
                       [disabled]="!cell.inMonth" (click)="openWeekOf(cell.iso)"
                       [title]="cell.inMonth ? 'Xem bảng phân ca tuần chứa ngày ' + cell.label : ''">
-                <span class="month-day">{{ cell.day }}</span>
+                <span class="month-day mono">{{ cell.day }}</span>
                 @if (cell.inMonth) {
-                  <span class="month-count">{{ cell.filled }}/{{ cell.total }} ca</span>
+                  <span class="month-count mono">{{ cell.filled }}/{{ cell.total }} ca</span>
                   <span class="month-bar"><span [style.width.%]="cell.total ? (cell.filled / cell.total) * 100 : 0"></span></span>
                 }
               </button>
             }
           </div>
 
-          <div class="roster-legend">
-            <span><i class="legend-dot cov-full"></i> Đủ người trực</span>
-            <span><i class="legend-dot cov-partial"></i> Thiếu một vài ca</span>
-            <span><i class="legend-dot cov-low"></i> Thiếu nhiều ca</span>
-            <span><i class="bi bi-hand-index"></i> Bấm vào ngày để xếp chi tiết theo tuần</span>
+          <div class="legend">
+            <span><i class="legend-swatch cov-full"></i> Đủ người trực</span>
+            <span><i class="legend-swatch cov-partial"></i> Thiếu một vài ca</span>
+            <span><i class="legend-swatch cov-low"></i> Thiếu nhiều ca</span>
+            <span>Bấm vào ngày để xếp chi tiết theo tuần</span>
           </div>
         }
       </div>
       } @else {
 
-      <!-- Filters Bar -->
-      <div class="filters-card">
-        <div class="filters-grid">
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-calendar3"></i> Từ ngày</label>
-            <input type="date" [(ngModel)]="filterStartDate" (change)="loadSchedules()" class="form-control" />
-          </div>
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-calendar3"></i> Đến ngày</label>
-            <input type="date" [(ngModel)]="filterEndDate" (change)="loadSchedules()" class="form-control" />
-          </div>
-          @if (isAdmin()) {
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-door-open"></i> {{ roomLabel() }}</label>
-            <select [(ngModel)]="filterRoomId" (change)="loadSchedules()" class="form-control">
-              <option [ngValue]="null">-- Tất cả phòng --</option>
-              @for (room of rooms(); track room.id) {
-                <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }}</option>
-              }
-            </select>
-          </div>
-          @if (!isTech()) {
-          <div class="filter-item">
-            <label class="filter-label"><i class="bi bi-diagram-3"></i> Chuyên khoa</label>
-            <select [(ngModel)]="filterSpecialtyId" (change)="loadSchedules()" class="form-control">
-              <option [ngValue]="null">-- Tất cả chuyên khoa --</option>
-              @for (spec of specialties(); track spec.id) {
-                <option [ngValue]="spec.id">{{ spec.name }}</option>
-              }
-            </select>
-          </div>
-          }
-          }
-        </div>
-
-        <div class="filter-actions">
-          <button class="btn btn-outline btn-sm" (click)="resetFilters()">
-            <i class="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
-          </button>
-        </div>
-      </div>
-
-      <!-- Stats Summary Strip -->
-      <div class="stats-strip">
-        <div class="stat-box">
-          <span class="stat-number">{{ schedules().length }}</span>
-          <span class="stat-label">Tổng ca làm việc</span>
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-label">Tổng số ca</span>
+          <strong class="stat-value mono">{{ schedules().length }}</strong>
         </div>
         @if (isTech()) {
-          <div class="stat-box stat-available">
-            <span class="stat-number">{{ listStats().people }}</span>
+          <div class="stat-card">
             <span class="stat-label">Kỹ thuật viên tham gia</span>
+            <strong class="stat-value mono">{{ listStats().people }}</strong>
           </div>
-          <div class="stat-box stat-booked">
-            <span class="stat-number">{{ listStats().rooms }}</span>
+          <div class="stat-card">
             <span class="stat-label">Phòng có người trực</span>
+            <strong class="stat-value mono">{{ listStats().rooms }}</strong>
           </div>
         } @else {
-          <div class="stat-box stat-available">
-            <span class="stat-number">{{ listStats().available }}</span>
+          <div class="stat-card">
             <span class="stat-label">Chỗ khám còn trống</span>
+            <strong class="stat-value mono">{{ listStats().available }}</strong>
           </div>
-          <div class="stat-box stat-booked">
-            <span class="stat-number">{{ listStats().booked }}</span>
-            <span class="stat-label">Đã được đặt trước</span>
+          <div class="stat-card">
+            <span class="stat-label">Đã đặt trước</span>
+            <strong class="stat-value mono">{{ listStats().booked }}</strong>
           </div>
         }
       </div>
 
-      <!-- Schedules Table -->
-      <div class="table-container">
+      <div class="panel">
+        <div class="toolbar">
+          <label class="inline-field">
+            <span>Từ ngày</span>
+            <input type="date" [(ngModel)]="filterStartDate" (change)="loadSchedules()" class="filter-input" />
+          </label>
+          <label class="inline-field">
+            <span>Đến ngày</span>
+            <input type="date" [(ngModel)]="filterEndDate" (change)="loadSchedules()" class="filter-input" />
+          </label>
+          @if (isAdmin()) {
+            <select [(ngModel)]="filterRoomId" (change)="loadSchedules()" class="filter-input filter-select" [attr.aria-label]="'Lọc theo ' + roomLabel().toLowerCase()">
+              <option [ngValue]="null">Tất cả phòng</option>
+              @for (room of rooms(); track room.id) {
+                <option [ngValue]="room.id">{{ room.roomNumber }} - {{ room.roomName }}</option>
+              }
+            </select>
+            @if (!isTech()) {
+              <select [(ngModel)]="filterSpecialtyId" (change)="loadSchedules()" class="filter-input filter-select" aria-label="Lọc theo chuyên khoa">
+                <option [ngValue]="null">Tất cả chuyên khoa</option>
+                @for (spec of specialties(); track spec.id) {
+                  <option [ngValue]="spec.id">{{ spec.name }}</option>
+                }
+              </select>
+            }
+          }
+          <button class="btn-reset-filters" (click)="resetFilters()">Đặt lại</button>
+        </div>
+
         @if (loading()) {
           <div class="loading-state">
             <div class="spinner"></div>
-            <p>Đang tải danh sách ca làm việc...</p>
+            <p>Đang tải danh sách ca trực...</p>
           </div>
         } @else if (schedules().length === 0) {
           <div class="empty-state">
-            <i class="bi bi-calendar-x"></i>
-            <h3>Không có ca làm việc nào phù hợp</h3>
-            <p>Hãy thay đổi bộ lọc{{ isAdmin() ? ' hoặc đăng ký ca trực mới cho ' + personLabel().toLowerCase() : '' }}.</p>
+            <h3>Không có ca trực phù hợp</h3>
+            <p>Thử đổi bộ lọc{{ isAdmin() ? ' hoặc xếp ca mới cho ' + personLabel().toLowerCase() : '' }}.</p>
           </div>
         } @else {
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Ngày & Giờ</th>
-                <th>Ca trực</th>
-                <th>{{ isTech() ? 'Kỹ thuật viên' : 'Bác sĩ phụ trách' }}</th>
-                <th>{{ roomLabel() }}</th>
-                @if (isTech()) {
-                  <th>Ghi chú</th>
-                } @else {
-                  <th>Lượng bệnh nhân (Đã đặt / Tối đa)</th>
-                  <th>Trạng thái</th>
-                }
-                @if (isAdmin()) {
-                  <th class="text-right">Thao tác</th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @for (item of paginatedSchedules(); track item.id) {
-                <tr [class.row-cancelled]="item.status === 'CANCELLED'">
-                  <td>
-                    <div class="date-col">
-                      <span class="work-date">{{ item.workDate }}</span>
-                      <span class="work-time"><i class="bi bi-clock"></i> {{ item.startTime }} - {{ item.endTime }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="badge" [ngClass]="getShiftBadgeClass(item.shiftType)">
-                      {{ item.shiftType }}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="doctor-col">
-                      <strong>{{ item.personName }}</strong>
-                      <span class="doctor-sub">{{ isTech() ? item.personSub : (item.personTitle || 'Bác sĩ') + ' • ' + item.personSub }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="room-col">
-                      <span class="room-badge">{{ item.roomNumber }}</span>
-                      <span class="room-desc">{{ item.roomName }}{{ item.floor ? ' (Tầng ' + item.floor + ')' : '' }}</span>
-                    </div>
-                  </td>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 150px;">Ngày, giờ</th>
+                  <th style="width: 110px;">Ca</th>
+                  <th>{{ isTech() ? 'Kỹ thuật viên' : 'Bác sĩ' }}</th>
+                  <th>{{ roomLabel() }}</th>
                   @if (isTech()) {
-                    <td>{{ item.notes || '—' }}</td>
+                    <th>Ghi chú</th>
                   } @else {
-                    <td>
-                      <div class="capacity-col">
-                        <div class="capacity-label">
-                          <span>{{ item.booked }} / {{ item.max }}</span>
-                          <small>Còn {{ item.remaining }} chỗ</small>
-                        </div>
-                        <div class="progress-bar-bg">
-                          <div
-                            class="progress-bar-fill"
-                            [style.width.%]="(item.booked / item.max) * 100"
-                            [ngClass]="getCapacityColorClass(item.booked, item.max)"
-                          ></div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span class="badge" [ngClass]="getStatusBadgeClass(item.status)">
-                        {{ getStatusDisplayName(item.status) }}
-                      </span>
-                    </td>
+                    <th style="width: 170px;">Đã đặt / tối đa</th>
+                    <th style="width: 120px;">Trạng thái</th>
                   }
                   @if (isAdmin()) {
-                    <td class="text-right">
-                      <div class="row-actions">
-                        @if (item.status !== 'CANCELLED' && item.workDate >= todayIso) {
-                          <button class="btn btn-sm btn-outline" [disabled]="openingForm()" (click)="openEditModal(item)" title="Sửa ca trực">
-                            <i class="bi bi-pencil-square"></i> Sửa
-                          </button>
-                        }
-                        @if (!isTech() && item.status !== 'CANCELLED') {
-                          <button class="btn btn-sm btn-outline-warning" (click)="cancelSchedule(item)" title="Hủy ca trực">
-                            <i class="bi bi-x-circle"></i> Hủy
-                          </button>
-                        }
-                        @if (!isTech() || item.workDate >= todayIso) {
-                          <button class="btn btn-sm btn-outline-danger" (click)="deleteEntry(item)" title="Xóa ca">
-                            <i class="bi bi-trash3"></i>
-                          </button>
-                        }
-                      </div>
-                    </td>
+                    <th style="width: 120px;"></th>
                   }
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (item of paginatedSchedules(); track item.id) {
+                  <tr [class.row-cancelled]="item.status === 'CANCELLED'">
+                    <td>
+                      <div class="stack">
+                        <span class="mono">{{ item.workDate | date:'dd/MM/yyyy' }}</span>
+                        <span class="sub mono">{{ item.startTime.substring(0, 5) }}–{{ item.endTime.substring(0, 5) }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="shift-tag" [ngClass]="getShiftBadgeClass(item.shiftType)">{{ item.shiftType.includes('SÁNG') ? 'Sáng' : item.shiftType.includes('CHIỀU') ? 'Chiều' : item.shiftType.includes('TỐI') ? 'Tối' : item.shiftType }}</span>
+                    </td>
+                    <td>
+                      <div class="stack">
+                        <span class="strong">{{ item.personName }}</span>
+                        <span class="sub">{{ isTech() ? item.personSub : (item.personTitle || 'Bác sĩ') + ' · ' + item.personSub }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="stack">
+                        <span class="strong">{{ item.roomNumber }}</span>
+                        <span class="sub">{{ item.roomName }}{{ item.floor ? ' · Tầng ' + item.floor : '' }}</span>
+                      </div>
+                    </td>
+                    @if (isTech()) {
+                      <td class="text-muted">{{ item.notes || '—' }}</td>
+                    } @else {
+                      <td>
+                        <div class="capacity">
+                          <span class="mono">{{ item.booked }} / {{ item.max }}</span>
+                          <div class="capacity-bar">
+                            <div
+                              class="capacity-fill"
+                              [style.width.%]="(item.booked / item.max) * 100"
+                              [ngClass]="getCapacityColorClass(item.booked, item.max)"
+                            ></div>
+                          </div>
+                          <span class="sub">Còn {{ item.remaining }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="status" [ngClass]="getStatusBadgeClass(item.status)">
+                          {{ getStatusDisplayName(item.status) }}
+                        </span>
+                      </td>
+                    }
+                    @if (isAdmin()) {
+                      <td>
+                        <div class="row-actions">
+                          @if (item.status !== 'CANCELLED' && item.workDate >= todayIso) {
+                            <button class="icon-btn" [disabled]="openingForm()" (click)="openEditModal(item)" title="Sửa ca trực" aria-label="Sửa ca trực">
+                              <i class="bi bi-pencil"></i>
+                            </button>
+                          }
+                          @if (!isTech() && item.status !== 'CANCELLED') {
+                            <button class="icon-btn" (click)="cancelSchedule(item)" title="Hủy ca trực" aria-label="Hủy ca trực">
+                              <i class="bi bi-x-circle"></i>
+                            </button>
+                          }
+                          @if (!isTech() || item.workDate >= todayIso) {
+                            <button class="icon-btn danger" (click)="deleteEntry(item)" title="Xóa ca" aria-label="Xóa ca">
+                              <i class="bi bi-trash3"></i>
+                            </button>
+                          }
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
 
-          <!-- CLEAR & POWERFUL PAGINATION BAR -->
           <div class="pagination-footer">
             <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ schedules().length }}</strong> ca trực
-              </span>
+              <span>{{ startIndex() }}–{{ endIndex() }} / {{ schedules().length }}</span>
               <div class="page-size-selector">
-                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <label for="pageSizeSelect">Số dòng</label>
                 <select
                   id="pageSizeSelect"
                   [ngModel]="pageSize()"
@@ -507,54 +469,20 @@ function lastOfMonth(date: Date): Date {
               </div>
             </div>
 
-            <!-- Pagination Navigation Buttons -->
             <div class="pagination-controls">
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="goToPage(1)"
-                title="Về trang đầu tiên"
-              >
+              <button class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Trang đầu">
                 <i class="bi bi-chevron-double-left"></i>
               </button>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="prevPage()"
-                title="Trang trước"
-              >
-                <i class="bi bi-chevron-left"></i> Trước
+              <button class="btn-page" [disabled]="currentPage() === 1" (click)="prevPage()" title="Trang trước">
+                <i class="bi bi-chevron-left"></i>
               </button>
-
-              <!-- Page Number Pills -->
-              <div class="page-numbers-group">
-                @for (p of pagesList(); track p) {
-                  <button
-                    class="btn-page btn-page-num"
-                    [class.active]="currentPage() === p"
-                    (click)="goToPage(p)"
-                  >
-                    {{ p }}
-                  </button>
-                }
-              </div>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="nextPage()"
-                title="Trang sau"
-              >
-                Sau <i class="bi bi-chevron-right"></i>
+              @for (p of pagesList(); track p) {
+                <button class="btn-page" [class.active]="currentPage() === p" (click)="goToPage(p)">{{ p }}</button>
+              }
+              <button class="btn-page" [disabled]="currentPage() === totalPages()" (click)="nextPage()" title="Trang sau">
+                <i class="bi bi-chevron-right"></i>
               </button>
-
-              <button
-                class="btn-page btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="goToPage(totalPages())"
-                title="Đến trang cuối cùng"
-              >
+              <button class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Trang cuối">
                 <i class="bi bi-chevron-double-right"></i>
               </button>
             </div>
@@ -563,87 +491,69 @@ function lastOfMonth(date: Date): Date {
       </div>
       }
 
-      <!-- Modal Đăng ký / Sửa ca trực -->
+      <!-- Modal xếp / sửa ca trực -->
       @if (showModal()) {
         <div class="modal-backdrop" (click)="closeModal()">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi" [ngClass]="editingEntry() ? 'bi-pencil-square' : 'bi-calendar-plus'"></i>
-                {{ editingEntry() ? 'Cập Nhật Ca Trực ' : 'Đăng Ký Ca Trực ' }}{{ personLabel() }}
-              </h2>
-              <button class="modal-close-btn" (click)="closeModal()">×</button>
+              <h2 class="modal-title">{{ editingEntry() ? 'Sửa ca trực' : 'Xếp ca trực' }} {{ personLabel().toLowerCase() }}</h2>
+              <button class="modal-close-btn" (click)="closeModal()" aria-label="Đóng">×</button>
             </div>
 
             @if (batchResult()) {
-              <!-- Summary Report after Batch Execution -->
+              <!-- Kết quả sau khi xếp nhiều ngày -->
               <div class="modal-body">
-                <div class="batch-result-header">
-                  <div class="result-icon" [ngClass]="batchResult()!.successCount > 0 ? 'icon-success' : 'icon-warning'">
-                    <i class="bi" [ngClass]="batchResult()!.successCount > 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'"></i>
-                  </div>
-                  <h3 class="result-title">Kết Quả Đăng Ký Lịch Làm Việc</h3>
-                  <p class="result-desc">Tổng số ngày theo lịch: <strong>{{ batchResult()!.totalRequested }} ngày</strong></p>
-                </div>
+                <p class="result-desc">Đã gửi <strong class="mono">{{ batchResult()!.totalRequested }}</strong> ngày theo lịch.</p>
 
                 <div class="result-stats-row">
-                  <div class="result-stat-box stat-box-green">
-                    <span class="result-number">{{ batchResult()!.successCount }}</span>
-                    <span class="result-label">Ca trực tạo thành công</span>
+                  <div class="stat-card">
+                    <span class="stat-label">Tạo thành công</span>
+                    <strong class="stat-value mono" [class.is-success]="batchResult()!.successCount > 0">{{ batchResult()!.successCount }}</strong>
                   </div>
-                  <div class="result-stat-box stat-box-amber">
-                    <span class="result-number">{{ batchResult()!.conflictCount }}</span>
-                    <span class="result-label">Ngày bị trùng lịch (Đã bỏ qua)</span>
+                  <div class="stat-card">
+                    <span class="stat-label">Trùng lịch, đã bỏ qua</span>
+                    <strong class="stat-value mono" [class.is-warning]="batchResult()!.conflictCount > 0">{{ batchResult()!.conflictCount }}</strong>
                   </div>
                 </div>
 
                 @if (batchResult()!.conflictMessages.length > 0) {
-                  <div class="conflict-list-container">
-                    <h4 class="conflict-list-title"><i class="bi bi-info-circle-fill"></i> Chi tiết các ngày bị trùng lịch đã được bỏ qua:</h4>
-                    <ul class="conflict-ul">
+                  <div class="conflict-list">
+                    <h4 class="conflict-list-title">Các ngày bị trùng lịch</h4>
+                    <ul>
                       @for (msg of batchResult()!.conflictMessages; track msg) {
-                        <li><i class="bi bi-exclamation-circle text-amber"></i> {{ msg }}</li>
+                        <li>{{ msg }}</li>
                       }
                     </ul>
                   </div>
                 }
               </div>
               <div class="modal-footer">
-                <button class="btn btn-primary" (click)="closeBatchResult()">
-                  <i class="bi bi-check-lg"></i> Đóng
-                </button>
+                <button class="btn btn-primary" (click)="closeBatchResult()">Đóng</button>
               </div>
             } @else {
-              <!-- Form input -->
               <div class="modal-body">
                 @if (editingEntry(); as editing) {
-                  <div class="edit-info-box">
-                    <i class="bi bi-info-circle-fill"></i>
-                    <div>
-                      Đang sửa ca {{ editing.workDate | date:'dd/MM/yyyy' }} ({{ editing.startTime.substring(0, 5) }}–{{ editing.endTime.substring(0, 5) }})
-                      tại {{ editing.roomNumber }}.
-                      @if (!isTech()) {
-                        Đã có <strong>{{ editing.booked }}</strong> lịch hẹn.
-                      }
-                      @if (timeLocked()) {
-                        <br />Ca đã có bệnh nhân đặt nên <strong>không đổi được ngày/giờ</strong>; đổi bác sĩ thì lịch hẹn chuyển sang bác sĩ mới.
-                      }
-                    </div>
+                  <div class="note-box note-info">
+                    Đang sửa ca <span class="mono">{{ editing.workDate | date:'dd/MM/yyyy' }}</span>
+                    (<span class="mono">{{ editing.startTime.substring(0, 5) }}–{{ editing.endTime.substring(0, 5) }}</span>)
+                    tại {{ editing.roomNumber }}.
+                    @if (!isTech()) {
+                      Đã có <strong>{{ editing.booked }}</strong> lịch hẹn.
+                    }
+                    @if (timeLocked()) {
+                      <br />Ca đã có bệnh nhân đặt nên <strong>không đổi được ngày, giờ</strong>; đổi bác sĩ thì lịch hẹn chuyển sang bác sĩ mới.
+                    }
                   </div>
                 } @else {
-                  <div class="mode-tabs">
-                    <button type="button" class="mode-tab-btn" [class.active]="scheduleMode === 'SINGLE'" (click)="setScheduleMode('SINGLE')">
-                      <i class="bi bi-calendar-event"></i> 1 Ngày
-                    </button>
-                    <button type="button" class="mode-tab-btn" [class.active]="scheduleMode === 'MULTI'" (click)="setScheduleMode('MULTI')">
-                      <i class="bi bi-calendar-month"></i> Nhiều Ngày (Chọn Trên Lịch)
-                    </button>
+                  <div class="segmented segmented-block">
+                    <button type="button" class="segmented-btn" [class.active]="scheduleMode === 'SINGLE'" (click)="setScheduleMode('SINGLE')">Một ngày</button>
+                    <button type="button" class="segmented-btn" [class.active]="scheduleMode === 'MULTI'" (click)="setScheduleMode('MULTI')">Nhiều ngày (chọn trên lịch)</button>
                   </div>
                 }
 
                 <div class="form-row">
-                  <div class="form-group flex-1">
-                    <label class="form-label required">{{ isTech() ? 'Kỹ thuật viên (theo khoa của phòng)' : 'Bác sĩ phụ trách' }}</label>
+                  <div class="form-group">
+                    <label class="form-label required">{{ isTech() ? 'Kỹ thuật viên (theo khoa của phòng)' : 'Bác sĩ' }}</label>
                     <select [(ngModel)]="activePersonId" class="form-control" required>
                       <option [ngValue]="null">-- Chọn {{ personLabel().toLowerCase() }} --</option>
                       @for (person of personList(); track person.id) {
@@ -654,7 +564,7 @@ function lastOfMonth(date: Date): Date {
                       }
                     </select>
                   </div>
-                  <div class="form-group flex-1">
+                  <div class="form-group">
                     <label class="form-label required">{{ roomLabel() }}</label>
                     <select [ngModel]="activeRoomId" (ngModelChange)="onRoomChange($event)" class="form-control" required>
                       <option [ngValue]="null">-- Chọn phòng --</option>
@@ -668,13 +578,9 @@ function lastOfMonth(date: Date): Date {
                   </div>
                 </div>
                 @if (isTech() && activeRoomId && personList().length === 0) {
-                  <div class="slot-warning">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    Khoa của phòng này chưa có kỹ thuật viên nào.
-                  </div>
+                  <div class="note-box note-warning">Khoa của phòng này chưa có kỹ thuật viên nào.</div>
                 } @else if (scheduleMode === 'SINGLE' && freePersonCount() === 0 && personList().length > 0) {
-                  <div class="slot-warning">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
+                  <div class="note-box note-warning">
                     Tất cả {{ personLabel().toLowerCase() }} đều đã có ca giao nhau với khung giờ này. Hãy chọn khung giờ khác.
                   </div>
                 }
@@ -687,17 +593,16 @@ function lastOfMonth(date: Date): Date {
                 }
 
                 <!-- Chọn ca: chế độ 1 ngày hiện luôn tình trạng từng ca của phòng trong ngày đó -->
-                <div class="availability-box">
-                  <div class="availability-title">
-                    <i class="bi bi-clock"></i>
+                <div class="form-section">
+                  <div class="form-section-title">
                     @if (scheduleMode === 'SINGLE') {
-                      Ca trực ngày {{ activeWorkDate | date:'dd/MM/yyyy' }} tại phòng đã chọn
+                      Ca trực ngày <span class="mono">{{ activeWorkDate | date:'dd/MM/yyyy' }}</span> tại phòng đã chọn
                     } @else {
                       Ca trực áp dụng cho các ngày chọn bên dưới
                     }
                   </div>
                   @if (scheduleMode === 'SINGLE' && formChecking()) {
-                    <div class="availability-loading"><span class="spinner-sm"></span> Đang kiểm tra lịch...</div>
+                    <div class="section-loading"><span class="spinner-sm spinner-dark"></span> Đang kiểm tra lịch...</div>
                   } @else {
                     <div class="availability-chips">
                       @for (st of shiftOptions(); track st.key) {
@@ -705,7 +610,7 @@ function lastOfMonth(date: Date): Date {
                                 [class.selected]="activeShiftKey() === st.key"
                                 [disabled]="st.state !== 'free' || timeLocked()"
                                 (click)="selectShift(st.key)">
-                          <strong>Ca {{ st.label }} · {{ st.start }}–{{ st.end }}</strong>
+                          <strong>Ca {{ st.label.toLowerCase() }} <span class="mono">{{ st.start }}–{{ st.end }}</span></strong>
                           <span>{{ st.note }}</span>
                         </button>
                       }
@@ -715,28 +620,28 @@ function lastOfMonth(date: Date): Date {
 
                 @if (scheduleMode === 'MULTI') {
                   <!-- Lịch tháng của người được chọn: tick từng ngày muốn xếp trực -->
-                  <div class="availability-box">
+                  <div class="form-section">
                     <div class="month-picker-row">
-                      <div class="week-nav">
-                        <button type="button" class="btn btn-outline btn-sm" [disabled]="formMonthStart <= currentMonthIso" (click)="shiftFormMonth(-1)" title="Tháng trước" aria-label="Tháng trước">
+                      <div class="period-nav">
+                        <button type="button" class="nav-btn" [disabled]="formMonthStart <= currentMonthIso" (click)="shiftFormMonth(-1)" title="Tháng trước" aria-label="Tháng trước">
                           <i class="bi bi-chevron-left"></i>
                         </button>
-                        <strong class="week-label">{{ formMonthLabel() }}</strong>
-                        <button type="button" class="btn btn-outline btn-sm" (click)="shiftFormMonth(1)" title="Tháng sau" aria-label="Tháng sau">
+                        <strong class="period-label">{{ formMonthLabel() }}</strong>
+                        <button type="button" class="nav-btn" (click)="shiftFormMonth(1)" title="Tháng sau" aria-label="Tháng sau">
                           <i class="bi bi-chevron-right"></i>
                         </button>
                       </div>
                       <div class="days-shortcuts">
-                        <button type="button" class="btn-shortcut" (click)="selectFreeDates(false)">Chọn tất cả ngày trống</button>
-                        <button type="button" class="btn-shortcut" (click)="selectFreeDates(true)">Chỉ T2 - T6</button>
+                        <button type="button" class="btn-shortcut" (click)="selectFreeDates(false)">Chọn mọi ngày trống</button>
+                        <button type="button" class="btn-shortcut" (click)="selectFreeDates(true)">Chỉ T2–T6</button>
                         <button type="button" class="btn-shortcut" (click)="clearDates()">Bỏ chọn</button>
                       </div>
                     </div>
 
                     @if (!activePersonId || !activeRoomId) {
-                      <div class="availability-loading">Chọn {{ personLabel().toLowerCase() }} và phòng để xem các ngày còn trống.</div>
+                      <div class="section-loading">Chọn {{ personLabel().toLowerCase() }} và phòng để xem các ngày còn trống.</div>
                     } @else if (formChecking()) {
-                      <div class="availability-loading"><span class="spinner-sm"></span> Đang kiểm tra lịch...</div>
+                      <div class="section-loading"><span class="spinner-sm spinner-dark"></span> Đang kiểm tra lịch...</div>
                     } @else {
                       <div class="pick-grid">
                         @for (label of monthWeekdayLabels; track label) {
@@ -748,9 +653,9 @@ function lastOfMonth(date: Date): Date {
                           } @else {
                             <button type="button" class="pick-cell" [ngClass]="'pick-' + cell.state" [class.selected]="cell.selected"
                                     [disabled]="cell.state !== 'free'" (click)="toggleDate(cell.iso)" [title]="cell.note">
-                              <span class="pick-day">{{ cell.day }}</span>
+                              <span class="pick-day mono">{{ cell.day }}</span>
                               @if (cell.selected) {
-                                <i class="bi bi-check-circle-fill"></i>
+                                <i class="bi bi-check-lg"></i>
                               } @else if (cell.state === 'doctor' || cell.state === 'room') {
                                 <span class="pick-note">{{ cell.note }}</span>
                               }
@@ -758,60 +663,55 @@ function lastOfMonth(date: Date): Date {
                           }
                         }
                       </div>
-                      <div class="pick-legend">
-                        <span><i class="legend-dot pick-legend-selected"></i> Đã chọn</span>
-                        <span><i class="legend-dot pick-legend-free"></i> Còn trống</span>
-                        <span><i class="legend-dot pick-legend-doctor"></i> {{ personLabel() }} đã có ca</span>
+                      <div class="legend legend-inline">
+                        <span><i class="legend-swatch pick-legend-selected"></i> Đã chọn</span>
+                        <span><i class="legend-swatch pick-legend-free"></i> Còn trống</span>
+                        <span><i class="legend-swatch pick-legend-doctor"></i> {{ personLabel() }} đã có ca</span>
                         @if (!isTech()) {
-                          <span><i class="legend-dot pick-legend-room"></i> Phòng đã có người</span>
+                          <span><i class="legend-swatch pick-legend-room"></i> Phòng đã có người</span>
                         }
                       </div>
-                      <div class="days-helper-text">
-                        <i class="bi bi-info-circle"></i>
-                        Đã chọn <strong>{{ selectedFreeDates().length }}</strong> ngày, ca {{ activeStartTime }}–{{ activeEndTime }}. Bấm vào ngày để chọn / bỏ chọn.
-                      </div>
+                      <p class="helper-text">
+                        Đã chọn <strong class="mono">{{ selectedFreeDates().length }}</strong> ngày, ca <span class="mono">{{ activeStartTime }}–{{ activeEndTime }}</span>. Bấm vào ngày để chọn hoặc bỏ chọn.
+                      </p>
                     }
                   </div>
                 }
 
-                <div class="form-row">
-                  <div class="form-group flex-1">
+                <div class="form-row form-row-3">
+                  <div class="form-group">
                     <label class="form-label required">Giờ bắt đầu</label>
                     <input type="time" [(ngModel)]="activeStartTime" [disabled]="timeLocked()" class="form-control" required />
                   </div>
-                  <div class="form-group flex-1">
+                  <div class="form-group">
                     <label class="form-label required">Giờ kết thúc</label>
                     <input type="time" [(ngModel)]="activeEndTime" [disabled]="timeLocked()" class="form-control" required />
                   </div>
                   @if (isTech()) {
-                    <div class="form-group flex-1">
+                    <div class="form-group">
                       <label class="form-label">Ghi chú</label>
                       <input type="text" [(ngModel)]="activeNotes" maxlength="255" class="form-control" placeholder="Không bắt buộc" />
                     </div>
                   } @else {
-                    <div class="form-group flex-1">
+                    <div class="form-group">
                       <label class="form-label required">Bệnh nhân tối đa / ca</label>
                       <input type="number" [(ngModel)]="activeMaxPatients" min="1" max="100" class="form-control" required />
                     </div>
                   }
                 </div>
-                <div class="days-helper-text">
-                  <i class="bi bi-info-circle"></i> Sửa giờ bắt đầu / kết thúc nếu cần khung giờ khác 3 ca mặc định.
-                </div>
+                <p class="helper-text">Sửa giờ bắt đầu, kết thúc nếu cần khung giờ khác 3 ca mặc định.</p>
               </div>
 
               <div class="modal-footer">
                 @if (editingEntry(); as editing) {
-                  <button class="btn btn-outline-danger footer-left" [disabled]="submitting()" (click)="deleteEntry(editing)">
-                    <i class="bi bi-trash3"></i> Xoá ca
-                  </button>
+                  <button class="btn btn-outline-danger footer-left" [disabled]="submitting()" (click)="deleteEntry(editing)">Xóa ca</button>
                 }
-                <button class="btn btn-outline" (click)="closeModal()">Hủy bỏ</button>
+                <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
                 <button class="btn btn-primary" [disabled]="submitting() || !isFormValid()" (click)="saveSchedule()">
                   @if (submitting()) {
-                    <span class="spinner-sm"></span> Đang kiểm tra & tạo lịch...
+                    <span class="spinner-sm"></span> Đang lưu...
                   } @else {
-                    <i class="bi bi-check-circle"></i> {{ editingEntry() ? 'Lưu Thay Đổi' : scheduleMode === 'SINGLE' ? 'Xác Nhận Xếp Ca' : 'Xếp Ca Cho ' + selectedFreeDates().length + ' Ngày Đã Chọn' }}
+                    {{ editingEntry() ? 'Lưu thay đổi' : scheduleMode === 'SINGLE' ? 'Xếp ca' : 'Xếp ca cho ' + selectedFreeDates().length + ' ngày' }}
                   }
                 </button>
               </div>
@@ -822,441 +722,166 @@ function lastOfMonth(date: Date): Date {
     </div>
   `,
   styles: [`
-    .schedules-page {
-      padding: 1.5rem 0 3rem;
-      max-width: 1250px;
-      margin: 0 auto;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
+    /* Chuyển chế độ xem */
+    .segmented {
       display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      background: var(--primary-100);
-      color: var(--primary-800);
-      font-size: 0.8rem;
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: 0.5rem;
-    }
-
-    .page-title {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--text-main);
-      margin: 0 0 0.4rem;
-      letter-spacing: -0.02em;
-    }
-
-    .page-subtitle {
-      color: var(--text-muted);
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    .filters-card {
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-color);
-      padding: 1.25rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 4px 15px -3px rgba(15, 23, 42, 0.04);
-    }
-
-    .filters-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .filter-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .filter-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .filter-actions {
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    .stats-strip {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .stat-box {
-      background: #ffffff;
+      padding: 2px;
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius-md);
-      border: 1px solid var(--border-color);
-      padding: 1rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .stat-number {
-      font-size: 1.85rem;
-      font-weight: 800;
-      color: var(--primary-800);
-      line-height: 1.1;
-    }
-
-    .stat-label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      margin-top: 0.25rem;
-    }
-
-    .stat-available .stat-number {
-      color: #059669;
-    }
-
-    .stat-booked .stat-number {
-      color: #d97706;
-    }
-
-    /* Table */
-    .table-container {
       background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-color);
-      overflow-x: auto;
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
     }
 
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      text-align: left;
+    .segmented-btn {
+      height: 30px;
+      padding: 0 12px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.12s ease, color 0.12s ease;
     }
 
-    .data-table th {
-      background: #f8fafc;
-      padding: 0.85rem 1rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border-color);
-      white-space: nowrap;
-    }
+    .segmented-btn:hover:not(.active) { background: var(--bg-hover); }
 
-    .data-table td {
-      padding: 0.95rem 1rem;
-      border-bottom: 1px solid #f1f5f9;
-      color: var(--text-main);
-      vertical-align: middle;
-    }
-
-    .row-cancelled {
-      opacity: 0.6;
-      background: #fafafa;
-    }
-
-    .date-col {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-
-    .work-date {
-      font-weight: 700;
-      color: var(--text-main);
-    }
-
-    .work-time {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .doctor-col {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .doctor-sub {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .room-col {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .room-badge {
-      font-family: monospace;
-      font-weight: 700;
+    .segmented-btn.active {
       background: var(--primary-50);
       color: var(--primary-700);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      border: 1px solid var(--primary-200);
+      font-weight: 500;
     }
 
-    .room-desc {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    .capacity-col {
-      width: 180px;
-    }
-
-    .capacity-label {
+    .segmented-block {
       display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      font-weight: 600;
-      margin-bottom: 0.35rem;
+      margin-bottom: 16px;
     }
 
-    .progress-bar-bg {
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: var(--radius-full);
-      overflow: hidden;
-    }
+    .segmented-block .segmented-btn { flex: 1; }
 
-    .progress-bar-fill {
-      height: 100%;
-      border-radius: var(--radius-full);
-      transition: width 0.3s;
-    }
+    /* Thanh điều hướng tuần / tháng */
+    .toolbar-split { justify-content: space-between; }
 
-    .cap-green { background: #10b981; }
-    .cap-orange { background: #f59e0b; }
-    .cap-red { background: #ef4444; }
-
-    .badge-shift-morning {
-      background: #e0f2fe;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
-    }
-
-    .badge-shift-afternoon {
-      background: #fef3c7;
-      color: #b45309;
-      border: 1px solid #fde68a;
-    }
-
-    .badge-shift-evening {
-      background: #f3e8ff;
-      color: #7e22ce;
-      border: 1px solid #e9d5ff;
-    }
-
-    .badge-status-available {
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-    }
-
-    .badge-status-full {
-      background: #fff7ed;
-      color: #c2410c;
-      border: 1px solid #ffedd5;
-    }
-
-    .badge-status-cancelled {
-      background: #f1f5f9;
-      color: #64748b;
-      border: 1px solid #e2e8f0;
-    }
-
-    .row-actions {
-      display: flex;
-      gap: 0.4rem;
-      justify-content: flex-end;
-    }
-
-    .text-right { text-align: right; }
-
-    /* View toggle */
-    .header-actions {
+    .period-nav {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
+      gap: 6px;
     }
 
-    .view-toggle {
+    .nav-btn {
       display: inline-flex;
-      background: #f1f5f9;
-      border: 1px solid var(--border-color);
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius-md);
-      padding: 3px;
-    }
-
-    .view-toggle-btn {
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      font-weight: 600;
-      font-size: 0.85rem;
-      padding: 0.45rem 0.9rem;
-      border-radius: calc(var(--radius-md) - 2px);
+      background: #ffffff;
+      color: var(--text-secondary);
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
+      font-size: 13px;
     }
 
-    .view-toggle-btn.active {
-      background: #ffffff;
-      color: var(--primary-700);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
-    }
+    .nav-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-main); }
+    .nav-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    /* Weekly roster */
-    .roster-card {
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
-      overflow: hidden;
-    }
-
-    .roster-toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .week-nav {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .week-label {
-      font-weight: 700;
+    .period-label {
+      margin-left: 6px;
+      font-size: 15px;
+      font-weight: 600;
       color: var(--text-main);
-      margin-left: 0.5rem;
     }
 
-    .roster-summary {
+    .period-summary {
       display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .sum-chip {
-      display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      font-size: 0.82rem;
-      font-weight: 700;
-      padding: 0.3rem 0.7rem;
-      border-radius: var(--radius-full);
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .sum-filled { background: #ecfdf5; color: #047857; }
-    .sum-empty { background: #fef2f2; color: #b91c1c; }
+    .period-summary strong { color: var(--text-main); font-weight: 600; }
+    .period-summary .has-gap strong { color: var(--warning-text); }
+    .period-summary .sep { color: var(--text-light); }
 
-    /* Nhiều phòng: bảng cuộn trong khung, dòng ngày và cột phòng đứng yên */
+    /* Bảng phân ca tuần */
     .roster-scroll {
       overflow: auto;
       max-height: 72vh;
     }
 
-    .roster-table thead th {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-    }
-
-    .roster-table .roster-room-col {
-      position: sticky;
-      left: 0;
-      z-index: 1;
-    }
-
-    .roster-table thead .roster-room-col {
-      z-index: 3;
-    }
-
-    .slot-new {
-      animation: slot-pulse 1.2s ease-in-out 3;
-      box-shadow: 0 0 0 2px #10b981;
-    }
-
-    @keyframes slot-pulse {
-      0%, 100% { box-shadow: 0 0 0 2px #10b981; }
-      50% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.35); }
-    }
-
     .roster-table {
       width: 100%;
       min-width: 980px;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       table-layout: fixed;
     }
 
     .roster-table th,
     .roster-table td {
-      border-bottom: 1px solid #f1f5f9;
-      border-right: 1px solid #f1f5f9;
-      padding: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      border-right: 1px solid var(--border-color);
+      padding: 6px;
       vertical-align: top;
     }
 
+    .roster-table tr > :last-child { border-right: none; }
+    .roster-table tbody tr:last-child > * { border-bottom: none; }
+
     .roster-table thead th {
-      background: #f8fafc;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 8px 6px;
+      background: var(--bg-subtle);
       text-align: center;
       color: var(--text-muted);
-      font-weight: 700;
+      font-weight: 600;
     }
 
-    .day-name { display: block; font-size: 0.85rem; }
-    .day-date { display: block; font-size: 0.75rem; font-weight: 600; }
+    .day-name { display: block; font-size: 13px; color: var(--text-secondary); }
+    .day-date { display: block; font-size: 12px; font-weight: 400; }
 
     .roster-table thead th.is-today {
       background: var(--primary-50);
-      color: var(--primary-700);
+      box-shadow: inset 0 -2px 0 var(--primary-600);
     }
 
-    .roster-table td.is-today { background: #fbfdff; }
-    .roster-table td.is-past { background: #fafafa; }
+    .roster-table thead th.is-today .day-name,
+    .roster-table thead th.is-today .day-date { color: var(--primary-700); }
 
-    .roster-room-col {
-      width: 140px;
+    .roster-table td.is-past { background: #fafbfc; }
+
+    .roster-table .roster-room-col {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      width: 150px;
+      padding: 8px 10px;
       text-align: left;
-      background: #f8fafc;
+      background: #ffffff;
+    }
+
+    .roster-table thead .roster-room-col {
+      z-index: 3;
+      background: var(--bg-subtle);
+      font-size: 12px;
+    }
+
+    .room-number {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
     .roster-room-name {
       display: block;
-      margin-top: 0.3rem;
-      font-size: 0.78rem;
-      font-weight: 600;
+      margin-top: 2px;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.35;
       color: var(--text-muted);
     }
 
@@ -1264,218 +889,571 @@ function lastOfMonth(date: Date): Date {
       display: flex;
       flex-direction: column;
       width: 100%;
-      min-height: 52px;
-      margin-bottom: 0.35rem;
-      padding: 0.3rem 0.45rem;
-      border-radius: 6px;
+      min-height: 50px;
+      margin-bottom: 4px;
+      padding: 4px 6px 4px 8px;
       border: 1px solid transparent;
-      font-size: 0.75rem;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 12px;
       text-align: left;
-      line-height: 1.3;
+      line-height: 1.35;
+      color: var(--text-main);
     }
 
     .slot:last-child { margin-bottom: 0; }
 
     .slot-shift {
-      font-size: 0.68rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-      opacity: 0.8;
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
     .slot-doctor {
-      font-weight: 700;
+      font-weight: 500;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .slot-meta { font-size: 0.7rem; opacity: 0.85; }
+    .slot-meta { font-size: 11px; color: var(--text-muted); }
 
-    .slot-filled.shift-morning { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
-    .slot-filled.shift-afternoon { background: #fef3c7; color: #b45309; border-color: #fde68a; }
-    .slot-filled.shift-evening { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
+    /* Ca đã xếp: nền nhạt + vạch trái theo loại ca */
+    .slot-filled {
+      border-left-width: 3px;
+      cursor: pointer;
+      transition: background-color 0.12s ease;
+    }
+
+    .slot-filled.shift-morning { background: #eef4fb; border-color: #d6e4f5; border-left-color: #4a7fc6; }
+    .slot-filled.shift-afternoon { background: #fbf6ea; border-color: #efe2bf; border-left-color: #c8962b; }
+    .slot-filled.shift-evening { background: #f2f3f6; border-color: #dfe2e8; border-left-color: #6b7487; }
+
+    .slot-filled.shift-morning:hover:not(:disabled) { background: #e3edf9; }
+    .slot-filled.shift-afternoon:hover:not(:disabled) { background: #f7efda; }
+    .slot-filled.shift-evening:hover:not(:disabled) { background: #e9ebf0; }
+
+    .slot-filled:disabled { cursor: default; opacity: 0.8; }
+
+    .slot-new { outline: 2px solid var(--success-solid); outline-offset: 1px; }
 
     .slot-empty {
       background: #ffffff;
-      border: 1px dashed #fca5a5;
-      color: #b91c1c;
+      border: 1px dashed var(--border-strong);
       cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s, border-color 0.15s;
+      transition: background-color 0.12s ease, border-color 0.12s ease;
     }
 
     .slot-empty:hover:not(:disabled) {
-      background: #fef2f2;
-      border-color: #ef4444;
+      background: var(--primary-50);
+      border-color: var(--primary-300);
     }
 
+    .slot-empty:hover:not(:disabled) .slot-add { color: var(--primary-700); }
     .slot-empty:disabled { cursor: wait; opacity: 0.6; }
 
-    .slot-add { font-weight: 700; }
+    .slot-add { color: var(--text-light); }
 
     .slot-past {
-      background: #f8fafc;
-      color: #94a3b8;
-      border-color: #f1f5f9;
+      background: transparent;
+      border-color: var(--border-color);
+      color: var(--text-light);
     }
 
-    .slot-none { font-weight: 700; }
+    .slot-past .slot-shift,
+    .slot-none { color: var(--text-light); }
 
-    .roster-legend {
+    .slot-more {
+      display: block;
+      width: 100%;
+      margin: -2px 0 4px;
+      padding: 2px 6px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-muted);
+      font: inherit;
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .slot-more:hover:not(:disabled) { background: var(--bg-hover); color: var(--primary-700); }
+    .slot-more:disabled { cursor: wait; opacity: 0.6; }
+
+    /* Chú thích */
+    .legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 1.25rem;
-      padding: 0.85rem 1.25rem;
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      gap: 6px 18px;
+      padding: 10px 16px;
       border-top: 1px solid var(--border-color);
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
-    .roster-legend span {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+    .legend-inline {
+      padding: 10px 0 0;
+      border-top: none;
     }
 
-    .legend-dot {
+    .legend-swatch {
+      display: inline-block;
       width: 12px;
       height: 12px;
       border-radius: 3px;
-      display: inline-block;
+      border: 1px solid transparent;
     }
 
-    .legend-dot.shift-morning { background: #bae6fd; }
-    .legend-dot.shift-afternoon { background: #fde68a; }
-    .legend-dot.shift-evening { background: #e9d5ff; }
-    .legend-dot.legend-empty { border: 1px dashed #ef4444; background: #ffffff; }
-
-    /* Ca đã xếp là nút bấm để sửa */
-    button.slot-filled {
-      font-family: inherit;
-      cursor: pointer;
-      transition: filter 0.15s;
-    }
-
-    button.slot-filled:hover:not(:disabled) { filter: brightness(0.96); }
-    button.slot-filled:disabled { cursor: default; }
+    .legend-swatch.shift-morning { background: #eef4fb; border-color: #d6e4f5; box-shadow: inset 3px 0 0 #4a7fc6; }
+    .legend-swatch.shift-afternoon { background: #fbf6ea; border-color: #efe2bf; box-shadow: inset 3px 0 0 #c8962b; }
+    .legend-swatch.shift-evening { background: #f2f3f6; border-color: #dfe2e8; box-shadow: inset 3px 0 0 #6b7487; }
+    .legend-swatch.legend-empty { background: #ffffff; border: 1px dashed var(--border-strong); }
+    .legend-swatch.cov-full { background: var(--success-solid); }
+    .legend-swatch.cov-partial { background: var(--warning-solid); }
+    .legend-swatch.cov-low { background: var(--danger-solid); }
+    .legend-swatch.pick-legend-selected { background: var(--primary-600); }
+    .legend-swatch.pick-legend-free { background: #ffffff; border-color: var(--border-strong); }
+    .legend-swatch.pick-legend-doctor { background: var(--warning-bg); border-color: var(--warning-border); }
+    .legend-swatch.pick-legend-room { background: var(--bg-subtle); border-color: var(--border-color); }
 
     /* Tổng quan tháng */
     .month-grid {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 0.4rem;
-      padding: 1rem 1.25rem;
+      gap: 6px;
+      padding: 16px;
     }
 
     .month-head {
       text-align: center;
-      font-size: 0.8rem;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 600;
       color: var(--text-muted);
-      padding-bottom: 0.25rem;
+      padding-bottom: 2px;
     }
 
     .month-cell {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.3rem;
-      min-height: 78px;
-      padding: 0.45rem 0.55rem;
-      border-radius: var(--radius-md);
+      gap: 4px;
+      min-height: 76px;
+      padding: 6px 8px;
       border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
       background: #ffffff;
+      color: var(--text-muted);
       font-family: inherit;
       text-align: left;
       cursor: pointer;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      transition: border-color 0.12s ease, background-color 0.12s ease;
     }
 
     .month-cell:hover:not(:disabled) {
-      border-color: var(--primary-400, #60a5fa);
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+      border-color: var(--primary-300);
+      background: var(--primary-50);
     }
 
     .month-cell.out-month {
       background: transparent;
-      border-style: dashed;
-      color: #cbd5e1;
+      border-color: transparent;
       cursor: default;
     }
 
-    .month-cell.is-today { box-shadow: 0 0 0 2px var(--primary-500, #3b82f6); }
+    .month-cell.out-month .month-day { color: var(--text-light); }
 
-    .month-day { font-weight: 800; font-size: 0.95rem; color: var(--text-main); }
-    .month-count { font-size: 0.75rem; font-weight: 700; }
+    .month-cell.is-today { border-color: var(--primary-600); }
+    .month-cell.is-today .month-day { color: var(--primary-700); }
+
+    .month-day { font-weight: 600; font-size: 14px; color: var(--text-main); }
+    .month-count { font-size: 12px; }
 
     .month-bar {
       width: 100%;
-      height: 5px;
-      background: #e2e8f0;
-      border-radius: var(--radius-full);
-      overflow: hidden;
+      height: 4px;
       margin-top: auto;
+      background: var(--bg-subtle);
+      border-radius: 2px;
+      overflow: hidden;
     }
 
-    .month-bar span { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+    .month-bar span { display: block; height: 100%; background: currentColor; }
 
-    .month-cell.cov-full { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
-    .month-cell.cov-partial { background: #fffbeb; border-color: #fde68a; color: #b45309; }
-    .month-cell.cov-low { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
-    .month-cell.cov-past { background: #f8fafc; color: #94a3b8; }
+    .month-cell.cov-full { color: var(--success-text); }
+    .month-cell.cov-partial { color: var(--warning-text); }
+    .month-cell.cov-low { color: var(--danger-text); }
+    .month-cell.cov-past { background: #fafbfc; color: var(--text-light); }
+    .month-cell.cov-past .month-day { color: var(--text-muted); }
 
-    .legend-dot.cov-full { background: #a7f3d0; }
-    .legend-dot.cov-partial { background: #fde68a; }
-    .legend-dot.cov-low { background: #fecaca; }
+    /* Danh sách */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
 
-    /* Form sửa ca & chọn nhanh khoảng ngày */
-    .edit-info-box {
+    .stat-card {
       display: flex;
-      gap: 0.6rem;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      border-radius: var(--radius-md);
-      padding: 0.7rem 0.9rem;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
     }
 
-    /* Chọn ngày trên lịch tháng của bác sĩ */
+    .stat-label { font-size: 13px; color: var(--text-muted); }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: var(--text-main);
+    }
+
+    .stat-value.is-success { color: var(--success-text); }
+    .stat-value.is-warning { color: var(--warning-text); }
+
+    .inline-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .filter-input {
+      height: 34px;
+      padding: 0 8px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #ffffff;
+      outline: none;
+    }
+
+    .filter-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
+    }
+
+    .filter-select { min-width: 170px; max-width: 260px; }
+
+    .btn-reset-filters {
+      height: 34px;
+      padding: 0 8px;
+      border: none;
+      background: none;
+      color: var(--primary-600);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-reset-filters:hover { text-decoration: underline; }
+
+    .table-responsive { overflow-x: auto; }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.4;
+    }
+
+    .stack .strong { font-weight: 500; }
+    td.text-muted { color: var(--text-muted); }
+    .sub { font-size: 12px; color: var(--text-muted); }
+
+    .row-cancelled td { color: var(--text-muted); }
+    .row-cancelled .strong { text-decoration: line-through; }
+
+    .shift-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .shift-tag::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: #6b7487;
+    }
+
+    .shift-tag.badge-shift-morning::before { background: #4a7fc6; }
+    .shift-tag.badge-shift-afternoon::before { background: #c8962b; }
+    .shift-tag.badge-shift-evening::before { background: #6b7487; }
+
+    .capacity {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 2px 10px;
+      font-size: 13px;
+    }
+
+    .capacity .sub { grid-column: 1 / -1; }
+
+    .capacity-bar {
+      height: 4px;
+      min-width: 60px;
+      background: var(--bg-subtle);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .capacity-fill { height: 100%; }
+    .cap-green { background: var(--success-solid); }
+    .cap-orange { background: var(--warning-solid); }
+    .cap-red { background: var(--danger-solid); }
+
+    .status.badge-status-available { background: var(--success-bg); color: var(--success-text); }
+    .status.badge-status-full { background: var(--warning-bg); color: var(--warning-text); }
+    .status.badge-status-cancelled { background: var(--bg-subtle); color: var(--text-muted); }
+
+    .row-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 2px;
+    }
+
+    .icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .loading-state,
+    .empty-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state h3 {
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    /* Phân trang */
+    .pagination-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .pagination-info,
+    .page-size-selector,
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pagination-info { gap: 16px; }
+    .pagination-controls { gap: 4px; }
+
+    .form-select-sm {
+      height: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 6px;
+      background: #ffffff;
+    }
+
+    .btn-page {
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-page.active {
+      background: var(--primary-600);
+      border-color: var(--primary-600);
+      color: #ffffff;
+    }
+
+    /* Modal */
+    .modal-lg { max-width: 760px; width: 100%; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 16px;
+    }
+
+    .form-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .form-control:disabled {
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+    }
+
+    .note-box {
+      margin-bottom: 16px;
+      padding: 8px 12px;
+      border: 1px solid;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .note-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
+    .note-warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+
+    .form-section {
+      margin-bottom: 16px;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+    }
+
+    .form-section-title {
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .section-loading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .spinner-dark {
+      border-color: var(--border-color);
+      border-top-color: var(--primary-600);
+    }
+
+    .availability-chips {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .avail-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+      font-family: inherit;
+      font-size: 12px;
+      text-align: left;
+      color: var(--text-muted);
+      transition: background-color 0.12s ease, border-color 0.12s ease;
+    }
+
+    .avail-chip strong {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    .avail-free { cursor: pointer; }
+    .avail-free:hover:not(:disabled) { background: var(--bg-hover); }
+
+    .avail-free.selected {
+      background: var(--primary-50);
+      border-color: var(--primary-600);
+      box-shadow: inset 0 0 0 1px var(--primary-600);
+    }
+
+    .avail-free.selected strong { color: var(--primary-700); }
+
+    .avail-room,
+    .avail-doctor {
+      background: var(--bg-subtle);
+      border-color: var(--border-color);
+      cursor: not-allowed;
+    }
+
+    .avail-room strong,
+    .avail-doctor strong { color: var(--text-muted); }
+
+    .avail-doctor > span { color: var(--warning-text); }
+
     .month-picker-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
+      gap: 8px;
+      margin-bottom: 10px;
     }
+
+    .days-shortcuts {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .btn-shortcut {
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .btn-shortcut:hover { background: var(--bg-hover); color: var(--text-main); }
 
     .pick-grid {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 0.3rem;
+      gap: 4px;
     }
 
     .pick-cell {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.1rem;
-      min-height: 50px;
-      padding: 0.3rem 0.4rem;
-      border-radius: 6px;
+      gap: 1px;
+      min-height: 46px;
+      padding: 4px 6px;
       border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
       background: #ffffff;
       font-family: inherit;
-      font-size: 0.7rem;
+      font-size: 11px;
       text-align: left;
+      color: var(--text-muted);
       overflow: hidden;
     }
 
-    .pick-day { font-size: 0.85rem; font-weight: 800; }
+    .pick-day { font-size: 13px; font-weight: 500; color: var(--text-main); }
 
     .pick-note {
       width: 100%;
@@ -1485,542 +1463,80 @@ function lastOfMonth(date: Date): Date {
     }
 
     .pick-out { border: none; background: transparent; }
-    .pick-past { background: #f8fafc; color: #cbd5e1; }
+
+    .pick-past { background: #fafbfc; }
+    .pick-past .pick-day { color: var(--text-light); }
 
     .pick-free {
-      color: #047857;
-      border-color: #a7f3d0;
+      border-color: var(--border-strong);
       cursor: pointer;
     }
 
-    .pick-free:hover { background: #ecfdf5; }
+    .pick-free:hover { background: var(--primary-50); border-color: var(--primary-300); }
 
     .pick-free.selected {
-      background: #10b981;
-      border-color: #059669;
-      color: #ffffff;
-    }
-
-    .pick-doctor { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
-    .pick-room { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
-
-    .pick-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-top: 0.6rem;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .pick-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
-    .legend-dot.pick-legend-selected { background: #10b981; }
-    .legend-dot.pick-legend-free { background: #ffffff; border: 1px solid #a7f3d0; }
-    .legend-dot.pick-legend-doctor { background: #fed7aa; }
-    .legend-dot.pick-legend-room { background: #e2e8f0; }
-
-    /* Tình trạng ca trong form */
-    .availability-box {
-      border: 1px solid var(--border-color);
-      background: #f8fafc;
-      border-radius: var(--radius-md);
-      padding: 0.85rem 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .availability-title {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin-bottom: 0.65rem;
-    }
-
-    .availability-loading {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .availability-chips {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.5rem;
-    }
-
-    .avail-chip {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.15rem;
-      padding: 0.5rem 0.7rem;
-      border-radius: var(--radius-md);
-      border: 1px solid;
-      font-family: inherit;
-      font-size: 0.8rem;
-      text-align: left;
-    }
-
-    .avail-free {
-      background: #ecfdf5;
-      border-color: #a7f3d0;
-      color: #047857;
-      cursor: pointer;
-    }
-
-    .avail-free:hover { border-color: #10b981; }
-
-    .avail-free.selected {
-      border-color: #059669;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35);
-    }
-
-    .avail-room,
-    .avail-doctor {
-      background: #f1f5f9;
-      border-color: #e2e8f0;
-      color: #64748b;
-      cursor: not-allowed;
-    }
-
-    .avail-doctor { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
-
-    .slot-warning {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: #fffbeb;
-      color: #b45309;
-      border: 1px solid #fde68a;
-      border-radius: var(--radius-md);
-      padding: 0.6rem 0.85rem;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-    }
-
-    /* ==================== PAGINATION BAR ==================== */
-    .pagination-footer {
-      padding: 0.95rem 1.35rem;
-      background: #ffffff;
-      border-top: 1.5px solid #f1f5f9;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .pagination-info {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      font-size: 0.88rem;
-      color: #475569;
-    }
-
-    .pagination-info strong {
-      color: #0f172a;
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-    }
-
-    .form-select-sm {
-      padding: 0.35rem 0.65rem;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 6px;
-      color: #0f172a;
-      font-weight: 700;
-      background: #ffffff;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .btn-page {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 0.5rem;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #334155;
-      font-weight: 700;
-      font-size: 0.85rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
-
-    .btn-page:hover:not(:disabled) {
-      background: #f0f9ff;
-      border-color: #0284c7;
-      color: #0284c7;
-    }
-
-    .btn-page.active {
-      background: #0284c7;
-      border-color: #0284c7;
-      color: #ffffff;
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-    }
-
-    .btn-page:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      background: #f8fafc;
-      border-color: #e2e8f0;
-    }
-
-    .btn-page-nav {
-      gap: 0.25rem;
-      padding: 0 0.75rem;
-    }
-
-    .page-numbers-group {
-      display: flex;
-      gap: 0.3rem;
-    }
-
-    /* Modal */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1050;
-      padding: 1rem;
-    }
-
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      width: 100%;
-      max-width: 650px;
-      overflow: hidden;
-      animation: modalFadeIn 0.2s ease-out;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .modal-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-main);
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .modal-close-btn {
-      background: none;
-      border: none;
-      font-size: 1.75rem;
-      line-height: 1;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-
-    .modal-footer {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
-    }
-
-    .form-row {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .flex-1 { flex: 1; }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .form-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 0.4rem;
-    }
-
-    .form-label.required::after {
-      content: ' *';
-      color: var(--rose-600);
-    }
-
-    .form-control {
-      padding: 0.65rem 0.85rem;
-      font-size: 0.95rem;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-md);
-    }
-
-    .form-control:focus {
-      outline: none;
+      background: var(--primary-600);
       border-color: var(--primary-600);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+      color: #ffffff;
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-    }
+    .pick-free.selected .pick-day { color: #ffffff; }
 
-    .empty-state i {
-      font-size: 3rem;
+    .pick-doctor { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+    .pick-room { background: var(--bg-subtle); border-color: var(--border-color); }
+
+    .helper-text {
+      margin-top: 8px;
+      font-size: 12px;
       color: var(--text-muted);
     }
 
-    /* Mode Switcher Tabs */
-    .mode-tabs {
-      display: flex;
-      gap: 0.5rem;
-      background: #f1f5f9;
-      padding: 0.35rem;
-      border-radius: var(--radius-lg);
-      margin-bottom: 1.25rem;
-    }
-
-    .mode-tab-btn {
-      flex: 1;
-      padding: 0.65rem 1rem;
-      border-radius: var(--radius-md);
-      border: none;
-      background: transparent;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: #64748b;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .mode-tab-btn:hover:not(.active) {
-      color: #0f172a;
-      background: rgba(255, 255, 255, 0.5);
-    }
-
-    .mode-tab-btn.active {
-      background: #ffffff;
-      color: var(--primary-700);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .days-shortcuts {
-      display: flex;
-      gap: 0.4rem;
-      flex-wrap: wrap;
-    }
-
-    .btn-shortcut {
-      font-size: 0.78rem;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #475569;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn-shortcut:hover {
-      border-color: #0284c7;
-      color: #0284c7;
-      background: #f0f9ff;
-    }
-
-    .days-helper-text {
-      font-size: 0.8rem;
-      color: #64748b;
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    /* Batch Result Summary View */
-    .batch-result-header {
-      text-align: center;
-      margin-bottom: 1.5rem;
-    }
-
-    .result-icon {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      margin: 0 auto 0.75rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-    }
-
-    .icon-success {
-      background: #ecfdf5;
-      color: #059669;
-    }
-
-    .icon-warning {
-      background: #fffbeb;
-      color: #d97706;
-    }
-
-    .result-title {
-      font-size: 1.35rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 0.25rem;
-    }
+    .form-row + .helper-text { margin-top: -8px; }
 
     .result-desc {
-      font-size: 0.9rem;
-      color: #64748b;
-      margin: 0;
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
     }
 
     .result-stats-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
-    .result-stat-box {
+    .conflict-list {
+      padding: 12px;
+      border: 1px solid var(--warning-border);
       border-radius: var(--radius-md);
-      padding: 1rem;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .stat-box-green {
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-    }
-
-    .stat-box-green .result-number {
-      color: #059669;
-    }
-
-    .stat-box-amber {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-    }
-
-    .stat-box-amber .result-number {
-      color: #d97706;
-    }
-
-    .result-number {
-      font-size: 2rem;
-      font-weight: 800;
-      line-height: 1;
-    }
-
-    .result-label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #475569;
-    }
-
-    .conflict-list-container {
-      background: #fafaf9;
-      border: 1px solid #e7e5e4;
-      border-radius: var(--radius-md);
-      padding: 1rem;
-      max-height: 200px;
-      overflow-y: auto;
+      background: var(--warning-bg);
+      font-size: 13px;
+      color: var(--warning-text);
     }
 
     .conflict-list-title {
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: #b45309;
-      margin: 0 0 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
     }
 
-    .conflict-ul {
+    .conflict-list ul {
       margin: 0;
-      padding-left: 1rem;
-      font-size: 0.82rem;
-      color: #44403c;
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
+      padding-left: 18px;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.6;
     }
-
-    .text-amber {
-      color: #d97706;
-    }
-
-    /* Phòng cận lâm sàng: thêm KTV vào ca đã có người */
-    .slot-more {
-      width: 100%;
-      margin-bottom: 0.35rem;
-      padding: 0.2rem 0.45rem;
-      border: 1px dashed #94a3b8;
-      border-radius: 6px;
-      background: #ffffff;
-      color: #475569;
-      font-size: 0.7rem;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-    }
-
-    .slot-more:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
-    .slot-more:disabled { cursor: wait; opacity: 0.6; }
 
     .footer-left { margin-right: auto; }
+
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: 1fr; }
+      .form-row,
+      .form-row-3,
+      .availability-chips { grid-template-columns: 1fr; }
+    }
   `]
 })
 

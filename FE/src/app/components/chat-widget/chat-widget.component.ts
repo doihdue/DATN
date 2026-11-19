@@ -35,9 +35,8 @@ const MAX_MESSAGE_LENGTH = 1000;
           (keydown.escape)="close()"
         >
           <header class="chat-header">
-            <span class="chat-avatar" aria-hidden="true"><i class="bi bi-heart-pulse-fill"></i></span>
             <div class="chat-heading">
-              <h2>Trợ lý tư vấn AI</h2>
+              <h2>Trợ lý tư vấn</h2>
               <p>Gợi ý chuyên khoa theo triệu chứng</p>
             </div>
             <button
@@ -56,7 +55,6 @@ const MAX_MESSAGE_LENGTH = 1000;
           </header>
 
           <div class="chat-notice">
-            <i class="bi bi-info-circle" aria-hidden="true"></i>
             <span>Thông tin chỉ mang tính tham khảo, không thay thế chẩn đoán của bác sĩ.</span>
             @if (isFallbackMode()) {
               <span class="mock-badge" title="Trợ lý AI tạm thời không khả dụng, đang gợi ý theo từ khóa">Chế độ dự phòng</span>
@@ -66,9 +64,8 @@ const MAX_MESSAGE_LENGTH = 1000;
           <div #messageList class="chat-messages" role="log" aria-live="polite" aria-label="Nội dung trò chuyện">
             @if (messages().length === 0) {
               <div class="chat-welcome">
-                <span class="welcome-icon" aria-hidden="true"><i class="bi bi-chat-heart"></i></span>
-                <h3>Xin chào, bạn đang gặp vấn đề gì?</h3>
-                <p>Hãy mô tả triệu chứng, tôi sẽ gợi ý chuyên khoa nên đăng ký khám.</p>
+                <h3>Mô tả triệu chứng của bạn</h3>
+                <p>Trợ lý sẽ gợi ý chuyên khoa phù hợp để đăng ký khám.</p>
                 <div class="suggestions">
                   @for (question of suggestedQuestions; track question) {
                     <button type="button" class="suggestion" (click)="send(question)">{{ question }}</button>
@@ -87,13 +84,10 @@ const MAX_MESSAGE_LENGTH = 1000;
                 </div>
               } @else {
                 <div class="message-row">
-                  <span class="message-avatar" aria-hidden="true"><i class="bi bi-heart-pulse-fill"></i></span>
                   <div class="message-group">
                     @if (message.isEmergency) {
                       <div class="emergency-card" role="alert">
-                        <div class="emergency-title">
-                          <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> Cần cấp cứu ngay
-                        </div>
+                        <div class="emergency-title">Cần cấp cứu ngay</div>
                         <p>{{ message.content }}</p>
                         <a href="tel:115" class="emergency-call"><i class="bi bi-telephone-fill" aria-hidden="true"></i> Gọi 115</a>
                       </div>
@@ -104,11 +98,9 @@ const MAX_MESSAGE_LENGTH = 1000;
                     @for (specialty of message.suggestedSpecialties; track specialty.name) {
                       <div class="specialty-card">
                         <div class="specialty-label">Chuyên khoa gợi ý</div>
-                        <div class="specialty-name"><i class="bi bi-hospital" aria-hidden="true"></i> {{ specialty.name }}</div>
+                        <div class="specialty-name">{{ specialty.name }}</div>
                         <p>{{ specialty.reason }}</p>
-                        <a routerLink="/booking" class="specialty-action" (click)="close()">
-                          <i class="bi bi-calendar-plus" aria-hidden="true"></i> Đặt lịch khám
-                        </a>
+                        <a routerLink="/booking" class="specialty-action" (click)="close()">Đặt lịch khám</a>
                       </div>
                     }
                     <time class="message-time">{{ message.createdAt | date: 'HH:mm' }}</time>
@@ -119,7 +111,6 @@ const MAX_MESSAGE_LENGTH = 1000;
 
             @if (isSending()) {
               <div class="message-row">
-                <span class="message-avatar" aria-hidden="true"><i class="bi bi-heart-pulse-fill"></i></span>
                 <div class="bubble bubble-ai typing" role="status" aria-label="Trợ lý đang trả lời">
                   <span></span><span></span><span></span>
                 </div>
@@ -128,7 +119,7 @@ const MAX_MESSAGE_LENGTH = 1000;
 
             @if (hasError()) {
               <div class="chat-error" role="alert">
-                <span><i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ errorText() }}</span>
+                <span>{{ errorText() }}</span>
                 @if (canRetry()) {
                   <button type="button" (click)="retry()">Thử lại</button>
                 } @else {
@@ -143,7 +134,7 @@ const MAX_MESSAGE_LENGTH = 1000;
               <textarea
                 #composer
                 rows="1"
-                placeholder="Nhập triệu chứng của bạn..."
+                placeholder="Nhập triệu chứng"
                 aria-label="Nội dung tin nhắn"
                 [attr.maxlength]="maxLength"
                 [value]="draft()"
@@ -156,7 +147,7 @@ const MAX_MESSAGE_LENGTH = 1000;
             </div>
             <div class="composer-hint">
               <span>Enter để gửi, Shift + Enter để xuống dòng</span>
-              <span>{{ draft().length }}/{{ maxLength }}</span>
+              <span class="mono">{{ draft().length }}/{{ maxLength }}</span>
             </div>
           </form>
         </section>
@@ -171,9 +162,9 @@ const MAX_MESSAGE_LENGTH = 1000;
         [attr.aria-label]="isOpen() ? 'Đóng khung chat' : 'Mở trợ lý tư vấn'"
         (click)="toggle()"
       >
-        <i class="bi" [class.bi-chat-dots-fill]="!isOpen()" [class.bi-chevron-down]="isOpen()" aria-hidden="true"></i>
+        <i class="bi" [class.bi-chat-left-text]="!isOpen()" [class.bi-chevron-down]="isOpen()" aria-hidden="true"></i>
         @if (!isOpen()) {
-          <span>Tư vấn AI</span>
+          <span>Trợ lý tư vấn</span>
         }
       </button>
     }
@@ -187,114 +178,97 @@ const MAX_MESSAGE_LENGTH = 1000;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
-      min-height: 56px;
-      min-width: 56px;
-      padding: 0 1.25rem;
-      border: none;
-      border-radius: var(--radius-full);
-      background: var(--primary-700);
-      color: #ffffff;
+      gap: 8px;
+      height: 40px;
+      min-width: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      background: #ffffff;
+      color: var(--text-main);
       font-family: inherit;
-      font-size: 0.95rem;
-      font-weight: 700;
-      box-shadow: 0 10px 24px -6px rgba(3, 105, 161, 0.55);
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
       cursor: pointer;
-      transition: background 0.15s ease, transform 0.15s ease;
+      transition: background-color 0.12s ease;
 
-      i { font-size: 1.25rem; line-height: 1; }
-      &:hover { background: var(--primary-800); transform: translateY(-2px); }
+      i { font-size: 16px; line-height: 1; color: var(--primary-600); }
+      &:hover { background: var(--bg-hover); }
       &.is-open { padding: 0; }
     }
 
     .chat-panel {
       position: fixed;
       right: 24px;
-      bottom: 92px;
+      bottom: 76px;
       z-index: 1040;
       display: flex;
       flex-direction: column;
-      width: 400px;
+      width: 380px;
       max-width: calc(100vw - 32px);
-      height: min(640px, calc(100vh - 116px));
+      height: min(600px, calc(100vh - 100px));
       overflow: hidden;
       border: 1px solid var(--border-color);
-      border-radius: var(--radius-xl);
+      border-radius: var(--radius-lg);
       background: var(--bg-card);
-      box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.28);
-      animation: panel-in 0.18s ease-out;
-    }
-
-    @keyframes panel-in {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
+      box-shadow: var(--shadow-lg);
     }
 
     .chat-header {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      padding: 0.85rem 0.75rem 0.85rem 1rem;
-      background: var(--primary-800);
-      color: #ffffff;
-    }
-
-    .chat-avatar {
-      display: grid;
-      flex-shrink: 0;
-      place-items: center;
-      width: 38px;
-      height: 38px;
-      border-radius: var(--radius-full);
-      background: rgba(255, 255, 255, 0.16);
-      font-size: 1.1rem;
+      gap: 4px;
+      padding: 10px 8px 10px 16px;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .chat-heading {
       flex: 1;
       min-width: 0;
 
-      h2 { color: #ffffff; font-size: 1rem; font-weight: 700; }
-      p { color: var(--primary-100); font-size: 0.75rem; }
+      h2 { color: var(--text-main); font-size: 15px; font-weight: 600; margin: 0; }
+      p { color: var(--text-muted); font-size: 12px; margin: 0; }
     }
 
     .icon-button {
       display: grid;
       flex-shrink: 0;
       place-items: center;
-      width: 34px;
-      height: 34px;
+      width: 30px;
+      height: 30px;
       border: none;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-md);
       background: transparent;
-      color: #ffffff;
+      color: var(--text-muted);
       cursor: pointer;
+      transition: background-color 0.12s ease, color 0.12s ease;
 
-      &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+      &:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-main); }
       &:disabled { opacity: 0.45; cursor: not-allowed; }
     }
 
     .chat-notice {
       display: flex;
       align-items: flex-start;
-      gap: 0.4rem;
-      padding: 0.5rem 1rem;
-      border-bottom: 1px solid var(--warning-border);
-      background: var(--warning-bg);
-      color: var(--warning-text);
-      font-size: 0.72rem;
+      gap: 8px;
+      padding: 6px 16px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 12px;
       line-height: 1.4;
 
-      i { margin-top: 1px; }
       span:first-of-type { flex: 1; }
     }
 
     .mock-badge {
       flex-shrink: 0;
-      padding: 0.05rem 0.4rem;
-      border: 1px solid var(--warning-text);
-      border-radius: var(--radius-xs);
-      font-weight: 700;
+      padding: 0 6px;
+      border-radius: var(--radius-sm);
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      font-weight: 500;
       white-space: nowrap;
     }
 
@@ -302,204 +276,176 @@ const MAX_MESSAGE_LENGTH = 1000;
       display: flex;
       flex: 1;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 12px;
       min-height: 0;
-      padding: 1rem;
+      padding: 16px;
       overflow-y: auto;
       background: var(--bg-main);
     }
 
     .chat-welcome {
       margin: auto 0;
-      text-align: center;
 
-      h3 { font-size: 1.05rem; }
-      p { margin: 0.3rem 0 1rem; color: var(--text-muted); font-size: 0.85rem; }
+      h3 { font-size: 15px; font-weight: 600; margin: 0; }
+      p { margin: 4px 0 12px; color: var(--text-muted); font-size: 13px; }
     }
 
-    .welcome-icon {
-      display: inline-grid;
-      place-items: center;
-      width: 52px;
-      height: 52px;
-      margin-bottom: 0.65rem;
-      border-radius: var(--radius-full);
-      background: var(--primary-100);
-      color: var(--primary-700);
-      font-size: 1.5rem;
-    }
-
-    .suggestions { display: flex; flex-direction: column; gap: 0.5rem; }
+    .suggestions { display: flex; flex-direction: column; gap: 6px; }
 
     .suggestion {
-      padding: 0.6rem 0.8rem;
-      border: 1px solid var(--primary-200);
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       background: var(--bg-card);
-      color: var(--primary-800);
+      color: var(--text-secondary);
       font-family: inherit;
-      font-size: 0.83rem;
-      font-weight: 600;
+      font-size: 13px;
       text-align: left;
       cursor: pointer;
+      transition: background-color 0.12s ease, border-color 0.12s ease;
 
-      &:hover { border-color: var(--primary-500); background: var(--primary-50); }
+      &:hover { border-color: var(--border-strong); background: var(--bg-hover); color: var(--text-main); }
     }
 
     .message-row {
       display: flex;
       align-items: flex-start;
-      gap: 0.5rem;
 
       &.is-user { justify-content: flex-end; }
       &.is-user .message-group { align-items: flex-end; }
-    }
-
-    .message-avatar {
-      display: grid;
-      flex-shrink: 0;
-      place-items: center;
-      width: 28px;
-      height: 28px;
-      border-radius: var(--radius-full);
-      background: var(--primary-100);
-      color: var(--primary-700);
-      font-size: 0.8rem;
     }
 
     .message-group {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.4rem;
-      max-width: 84%;
+      gap: 6px;
+      max-width: 88%;
       min-width: 0;
     }
 
     .bubble {
-      padding: 0.6rem 0.85rem;
-      font-size: 0.88rem;
+      padding: 8px 12px;
+      border-radius: var(--radius-lg);
+      font-size: 14px;
       line-height: 1.5;
       white-space: pre-line;
       overflow-wrap: anywhere;
     }
 
     .bubble-user {
-      border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
-      background: var(--primary-700);
+      background: var(--primary-600);
       color: #ffffff;
     }
 
     .bubble-ai {
       border: 1px solid var(--border-color);
-      border-radius: var(--radius-xs) var(--radius-lg) var(--radius-lg) var(--radius-lg);
       background: var(--bg-card);
       color: var(--text-main);
     }
 
-    .message-time { color: var(--text-muted); font-size: 0.68rem; }
+    .message-time { color: var(--text-light); font-size: 11px; }
 
     .specialty-card, .emergency-card {
       width: 100%;
-      padding: 0.75rem 0.85rem;
+      padding: 10px 12px;
       border-radius: var(--radius-md);
-      font-size: 0.82rem;
+      font-size: 13px;
 
-      p { margin: 0.25rem 0 0.6rem; }
+      p { margin: 4px 0 8px; }
     }
 
     .specialty-card {
-      border: 1px solid var(--primary-200);
-      background: var(--primary-50);
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
 
       p { color: var(--text-secondary); }
     }
 
-    .specialty-label {
-      color: var(--text-muted);
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
+    .specialty-label { color: var(--text-muted); font-size: 12px; }
 
-    .specialty-name { margin-top: 0.15rem; color: var(--primary-900); font-size: 0.92rem; font-weight: 700; }
+    .specialty-name { margin-top: 2px; color: var(--text-main); font-size: 14px; font-weight: 600; }
 
     .specialty-action, .emergency-call {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      padding: 0.4rem 0.75rem;
-      border-radius: var(--radius-sm);
-      color: #ffffff;
-      font-weight: 700;
+      gap: 6px;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background-color 0.12s ease;
     }
 
     .specialty-action {
-      background: var(--primary-700);
-      &:hover { background: var(--primary-800); color: #ffffff; }
+      border: 1px solid var(--border-strong);
+      background: #ffffff;
+      color: var(--primary-700);
+      &:hover { background: var(--bg-hover); color: var(--primary-700); }
     }
 
     .emergency-card {
       border: 1px solid var(--danger-border);
-      border-left: 4px solid var(--danger-solid);
       background: var(--danger-bg);
       color: var(--danger-text);
     }
 
-    .emergency-title { font-size: 0.92rem; font-weight: 800; }
+    .emergency-title { font-size: 14px; font-weight: 600; }
 
     .emergency-call {
       background: var(--danger-solid);
+      color: #ffffff;
       &:hover { background: var(--danger-text); color: #ffffff; }
     }
 
     .typing {
       display: inline-flex;
-      gap: 0.3rem;
-      padding: 0.8rem 0.9rem;
+      gap: 4px;
+      padding: 12px;
 
       span {
-        width: 7px;
-        height: 7px;
-        border-radius: var(--radius-full);
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
         background: var(--text-light);
-        animation: typing-dot 1.1s infinite ease-in-out;
+        animation: typing-dot 1.2s infinite ease-in-out;
       }
-      span:nth-child(2) { animation-delay: 0.15s; }
-      span:nth-child(3) { animation-delay: 0.3s; }
+      span:nth-child(2) { animation-delay: 0.2s; }
+      span:nth-child(3) { animation-delay: 0.4s; }
     }
 
     @keyframes typing-dot {
-      0%, 60%, 100% { opacity: 0.4; transform: translateY(0); }
-      30% { opacity: 1; transform: translateY(-4px); }
+      0%, 60%, 100% { opacity: 0.35; }
+      30% { opacity: 1; }
     }
 
     .chat-error {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.5rem 0.75rem;
+      gap: 8px;
+      padding: 8px 12px;
       border: 1px solid var(--danger-border);
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-md);
       background: var(--danger-bg);
       color: var(--danger-text);
-      font-size: 0.8rem;
+      font-size: 13px;
 
       button {
         border: none;
         background: transparent;
         color: inherit;
         font-family: inherit;
-        font-weight: 700;
+        font-weight: 500;
         text-decoration: underline;
         cursor: pointer;
       }
     }
 
     .chat-composer {
-      padding: 0.65rem 0.85rem 0.5rem;
+      padding: 10px 12px 8px;
       border-top: 1px solid var(--border-color);
       background: var(--bg-card);
     }
@@ -507,55 +453,56 @@ const MAX_MESSAGE_LENGTH = 1000;
     .composer-box {
       display: flex;
       align-items: flex-end;
-      gap: 0.4rem;
-      padding: 0.3rem 0.3rem 0.3rem 0.75rem;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-lg);
+      gap: 6px;
+      padding: 4px 4px 4px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
       background: var(--bg-card);
 
-      &:focus-within { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--primary-100); }
+      &:focus-within { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15); }
     }
 
     textarea {
       flex: 1;
       min-width: 0;
       max-height: 110px;
-      padding: 0.4rem 0;
+      padding: 5px 0;
       border: none;
       outline: none;
       background: transparent;
       color: var(--text-main);
       font-family: inherit;
-      font-size: 0.88rem;
+      font-size: 14px;
       line-height: 1.45;
       resize: none;
 
-      &::placeholder { color: var(--text-muted); }
+      &::placeholder { color: var(--text-light); }
     }
 
     .send-button {
       display: grid;
       flex-shrink: 0;
       place-items: center;
-      width: 36px;
-      height: 36px;
+      width: 32px;
+      height: 32px;
       border: none;
       border-radius: var(--radius-md);
-      background: var(--primary-700);
+      background: var(--primary-600);
       color: #ffffff;
       cursor: pointer;
+      transition: background-color 0.12s ease;
 
-      &:hover:not(:disabled) { background: var(--primary-800); }
+      &:hover:not(:disabled) { background: var(--primary-700); }
       &:disabled { background: var(--bg-subtle); color: var(--text-light); cursor: not-allowed; }
     }
 
     .composer-hint {
       display: flex;
       justify-content: space-between;
-      gap: 0.5rem;
-      margin-top: 0.3rem;
-      color: var(--text-muted);
-      font-size: 0.68rem;
+      gap: 8px;
+      margin-top: 4px;
+      color: var(--text-light);
+      font-size: 11px;
     }
 
     @media (max-width: 576px) {
@@ -580,7 +527,7 @@ const MAX_MESSAGE_LENGTH = 1000;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .chat-panel, .typing span { animation: none; }
+      .typing span { animation: none; }
       .chat-launcher { transition: none; }
     }
   `]

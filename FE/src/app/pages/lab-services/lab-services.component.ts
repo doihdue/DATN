@@ -11,160 +11,136 @@ import { ApiResponse } from '../../models/auth.models';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="lab-services-page">
-      <!-- Toast Alert Notification -->
+    <div class="page">
       @if (toastMessage()) {
-        <div class="toast-floating" [class.toast-success]="toastType() === 'success'" [class.toast-error]="toastType() === 'error'">
-          <i class="bi" [class.bi-check-circle-fill]="toastType() === 'success'" [class.bi-exclamation-triangle-fill]="toastType() === 'error'"></i>
-          <span>{{ toastMessage() }}</span>
+        <div class="toast-floating-container">
+          <div class="toast-card" [ngClass]="toastType() === 'success' ? 'toast-success' : 'toast-danger'" role="alert">
+            <div class="toast-content">
+              <div class="toast-title">{{ toastType() === 'success' ? 'Thành công' : 'Thông báo' }}</div>
+              <div class="toast-message">{{ toastMessage() }}</div>
+            </div>
+            <button type="button" class="btn-close-toast" (click)="toastMessage.set(null)" aria-label="Đóng">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       }
 
-      <!-- Header Banner -->
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <i class="bi bi-journal-medical"></i> Danh Mục Kỹ Thuật Y Khoa
-          </div>
-          <h1 class="page-title">Danh Mục Xét Nghiệm &amp; Cận Lâm Sàng</h1>
-          <p class="page-subtitle">
-            Bảng quy chuẩn chỉ số tham chiếu sinh học, ngưỡng cảnh báo an toàn và bảng giá kỹ thuật cận lâm sàng
-          </p>
+        <div>
+          <h1 class="page-title">Dịch vụ xét nghiệm</h1>
+          <p class="page-subtitle">{{ services().length }} dịch vụ, {{ categories().length }} loại</p>
         </div>
-
-        <div class="header-actions">
-          <button type="button" class="btn btn-outline" (click)="loadServices()">
-            <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i> Làm mới danh mục
+        <div class="page-actions">
+          <button type="button" class="btn btn-secondary" (click)="loadServices()">
+            <i class="bi bi-arrow-clockwise" [class.spin-active]="loading()"></i> Làm mới
           </button>
           @if (isAdmin()) {
             <button type="button" class="btn btn-primary" (click)="openCreateModal()">
-              <i class="bi bi-plus-circle-fill"></i> Thêm Kỹ Thuật Xét Nghiệm
+              <i class="bi bi-plus-lg"></i> Thêm dịch vụ
             </button>
           }
         </div>
       </div>
 
-      <!-- Quick Category Statistics Pills -->
-      <div class="category-pills">
-        <button
-          type="button"
-          class="pill-btn"
-          [class.active]="selectedCategory() === 'ALL'"
-          (click)="selectCategory('ALL')">
-          <i class="bi bi-grid-fill"></i> Tất cả
-          <span class="pill-count">{{ services().length }}</span>
-        </button>
-        @for (cat of categories(); track cat) {
-          <button
-            type="button"
-            class="pill-btn"
-            [class.active]="selectedCategory() === cat"
-            (click)="selectCategory(cat)">
-            <i class="bi" [ngClass]="getCategoryIcon(cat)"></i> {{ cat }}
-            <span class="pill-count">{{ getCategoryCount(cat) }}</span>
-          </button>
-        }
-      </div>
-
-      <!-- Search & Filters Bar -->
-      <div class="search-bar-card">
-        <div class="search-box">
-          <i class="bi bi-search search-icon"></i>
-          <input
-            type="text"
-            class="search-input"
-            [ngModel]="searchQuery()"
-            (ngModelChange)="onSearchChange($event)"
-            placeholder="Tìm theo mã dịch vụ (XN-HEM...), tên kỹ thuật hoặc chỉ số tham chiếu..."
-          />
-          @if (searchQuery()) {
-            <button type="button" class="btn-clear" (click)="onSearchChange('')" aria-label="Xoá từ khoá">
-              <i class="bi bi-x-circle-fill"></i>
+      <div class="panel">
+        <div class="toolbar">
+          <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              class="search-input"
+              [ngModel]="searchQuery()"
+              (ngModelChange)="onSearchChange($event)"
+              placeholder="Tìm theo mã, tên dịch vụ hoặc khoảng tham chiếu"
+            />
+            @if (searchQuery()) {
+              <button type="button" class="btn-clear" (click)="onSearchChange('')" aria-label="Xoá từ khoá">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            }
+          </div>
+          <div class="category-pills" role="tablist" aria-label="Lọc theo loại xét nghiệm">
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="selectedCategory() === 'ALL'"
+              (click)="selectCategory('ALL')">
+              Tất cả <span class="pill-count">{{ services().length }}</span>
             </button>
-          }
+            @for (cat of categories(); track cat) {
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="selectedCategory() === cat"
+                (click)="selectCategory(cat)">
+                {{ cat }} <span class="pill-count">{{ getCategoryCount(cat) }}</span>
+              </button>
+            }
+          </div>
         </div>
-      </div>
 
-      <!-- Data Table Card -->
-      <div class="table-card">
         @if (loading()) {
-          <div class="state-container">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p>Đang tải danh mục xét nghiệm y khoa...</p>
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Đang tải danh mục xét nghiệm...</p>
           </div>
         } @else if (filteredServices().length === 0) {
-          <div class="state-container">
-            <i class="bi bi-inbox empty-icon"></i>
-            <h3>Không tìm thấy dịch vụ cận lâm sàng nào</h3>
-            <p>Vui lòng thay đổi từ khóa tìm kiếm hoặc chọn nhóm xét nghiệm khác.</p>
+          <div class="empty-state">
+            <h3>Không có dịch vụ phù hợp</h3>
+            <p>Thử đổi từ khoá hoặc chọn loại xét nghiệm khác.</p>
           </div>
         } @else {
           <div class="table-responsive">
-            <table class="services-table">
+            <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 120px;">Mã Dịch Vụ</th>
-                  <th style="min-width: 250px;">Tên Dịch Vụ Xét Nghiệm</th>
-                  <th style="width: 140px;">Phân Nhóm</th>
-                  <th style="width: 210px;">Khoảng Tham Chiếu Chuẩn</th>
-                  <th style="width: 90px;">Đơn Vị</th>
-                  <th style="width: 130px; text-align: right;">Đơn Giá (VNĐ)</th>
-                  <th style="min-width: 200px;">Mô Tả &amp; Yêu Cầu Kỹ Thuật</th>
-                  <th [style.width]="isAdmin() ? '190px' : '100px'" style="text-align: center;">Thao Tác</th>
+                  <th style="width: 120px;">Mã</th>
+                  <th style="min-width: 240px;">Tên dịch vụ</th>
+                  <th style="width: 150px;">Loại</th>
+                  <th style="width: 200px;">Khoảng tham chiếu</th>
+                  <th style="width: 90px;">Đơn vị</th>
+                  <th style="width: 120px; text-align: right;">Đơn giá (đ)</th>
+                  <th style="min-width: 200px;">Mô tả</th>
+                  <th [style.width]="isAdmin() ? '110px' : '50px'"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (svc of pagedServices(); track svc.id) {
                   <tr>
+                    <td class="mono text-muted code-cell">{{ svc.serviceCode }}</td>
+                    <td><span class="name-text">{{ svc.serviceName }}</span></td>
+                    <td>{{ svc.category || 'Xét nghiệm chung' }}</td>
                     <td>
-                      <span class="code-badge">{{ svc.serviceCode }}</span>
+                      @if (svc.referenceRange) {
+                        <span>{{ svc.referenceRange }}</span>
+                      } @else {
+                        <span class="text-muted">Chưa quy định</span>
+                      }
+                      @if (svc.lowerLimit !== undefined || svc.upperLimit !== undefined) {
+                        <div class="limits-mini mono">
+                          Ngưỡng {{ svc.lowerLimit ?? 0 }} – {{ svc.upperLimit ?? '∞' }}
+                        </div>
+                      }
                     </td>
-                    <td>
-                      <div class="service-name-box">
-                        <strong class="name-text">{{ svc.serviceName }}</strong>
-                      </div>
-                    </td>
-                    <td>
-                      <span class="category-tag" [ngClass]="getCategoryBadgeClass(svc.category)">
-                        {{ svc.category || 'Xét nghiệm chung' }}
-                      </span>
-                    </td>
-                    <td>
-                      <div class="ref-range-box">
-                        @if (svc.referenceRange) {
-                          <span class="range-text">{{ svc.referenceRange }}</span>
-                        } @else {
-                          <span class="text-muted">Chưa quy định</span>
-                        }
-                        @if (svc.lowerLimit !== undefined || svc.upperLimit !== undefined) {
-                          <div class="limits-mini">
-                            Ngưỡng: [{{ svc.lowerLimit ?? 0 }} - {{ svc.upperLimit ?? '∞' }}]
-                          </div>
-                        }
-                      </div>
-                    </td>
-                    <td>
-                      <span class="unit-badge">{{ svc.unit || '-' }}</span>
-                    </td>
-                    <td style="text-align: right;">
-                      <span class="price-val">{{ (svc.price || 0) | number:'1.0-0' }} đ</span>
-                    </td>
+                    <td class="text-muted">{{ svc.unit || '—' }}</td>
+                    <td class="mono" style="text-align: right;">{{ (svc.price || 0) | number:'1.0-0' }}</td>
                     <td>
                       <div class="desc-text" [title]="svc.description || ''">
-                        {{ svc.description || 'Không có mô tả thêm' }}
+                        {{ svc.description || '—' }}
                       </div>
                     </td>
-                    <td style="text-align: center;">
-                      <div class="action-buttons-group">
-                        <button type="button" class="btn-detail-sm" (click)="selectedServiceDetail.set(svc)" title="Xem chi tiết">
-                          <i class="bi bi-info-circle"></i>
+                    <td>
+                      <div class="row-actions">
+                        <button type="button" class="icon-btn" (click)="selectedServiceDetail.set(svc)" title="Xem chi tiết" aria-label="Xem chi tiết">
+                          <i class="bi bi-eye"></i>
                         </button>
                         @if (isAdmin()) {
-                          <button type="button" class="btn-action-edit" (click)="openEditModal(svc)" title="Chỉnh sửa dịch vụ">
-                            <i class="bi bi-pencil-square"></i> Sửa
+                          <button type="button" class="icon-btn" (click)="openEditModal(svc)" title="Chỉnh sửa" aria-label="Chỉnh sửa">
+                            <i class="bi bi-pencil"></i>
                           </button>
-                          <button type="button" class="btn-action-delete" (click)="openDeleteConfirm(svc)" title="Xóa dịch vụ">
-                            <i class="bi bi-trash3-fill"></i>
+                          <button type="button" class="icon-btn danger" (click)="openDeleteConfirm(svc)" title="Xóa" aria-label="Xóa">
+                            <i class="bi bi-trash3"></i>
                           </button>
                         }
                       </div>
@@ -175,74 +151,43 @@ import { ApiResponse } from '../../models/auth.models';
             </table>
           </div>
 
-          <!-- Phân Trang Rõ Ràng (Pagination Bar) -->
-          <div class="pagination-container">
+          <div class="pagination-footer">
             <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ startItemIndex() }}</strong> – <strong>{{ endItemIndex() }}</strong>
-                trên tổng số <strong>{{ totalItems() }}</strong> dịch vụ xét nghiệm
-              </span>
+              <span>{{ startItemIndex() }}–{{ endItemIndex() }} / {{ totalItems() }}</span>
               <div class="page-size-selector">
-                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <label for="pageSizeSelect">Số dòng</label>
                 <select
                   id="pageSizeSelect"
+                  class="form-select-sm"
                   [value]="pageSize()"
                   (change)="onPageSizeChange($event)">
                   @for (opt of pageSizeOptions; track opt) {
-                    <option [value]="opt">{{ opt }} dòng</option>
+                    <option [value]="opt">{{ opt }}</option>
                   }
                 </select>
               </div>
             </div>
 
             <div class="pagination-controls">
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="goToPage(1)"
-                title="Về trang đầu">
+              <button type="button" class="btn-page" [disabled]="currentPage() === 1" (click)="goToPage(1)" title="Trang đầu">
                 <i class="bi bi-chevron-double-left"></i>
               </button>
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === 1"
-                (click)="prevPage()"
-                title="Trang trước">
+              <button type="button" class="btn-page" [disabled]="currentPage() === 1" (click)="prevPage()" title="Trang trước">
                 <i class="bi bi-chevron-left"></i>
               </button>
-
-              <div class="page-numbers">
-                @for (p of pagesList(); track $index) {
-                  @if (p === '...') {
-                    <span class="page-ellipsis">…</span>
-                  } @else {
-                    <button
-                      type="button"
-                      class="btn-page-number"
-                      [class.active]="currentPage() === p"
-                      (click)="goToPage(+p)">
-                      {{ p }}
-                    </button>
-                  }
+              @for (p of pagesList(); track $index) {
+                @if (p === '...') {
+                  <span class="page-ellipsis">…</span>
+                } @else {
+                  <button type="button" class="btn-page" [class.active]="currentPage() === p" (click)="goToPage(+p)">
+                    {{ p }}
+                  </button>
                 }
-              </div>
-
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="nextPage()"
-                title="Trang sau">
+              }
+              <button type="button" class="btn-page" [disabled]="currentPage() === totalPages()" (click)="nextPage()" title="Trang sau">
                 <i class="bi bi-chevron-right"></i>
               </button>
-              <button
-                type="button"
-                class="btn-page-nav"
-                [disabled]="currentPage() === totalPages()"
-                (click)="goToPage(totalPages())"
-                title="Đến trang cuối">
+              <button type="button" class="btn-page" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Trang cuối">
                 <i class="bi bi-chevron-double-right"></i>
               </button>
             </div>
@@ -250,99 +195,66 @@ import { ApiResponse } from '../../models/auth.models';
         }
       </div>
 
-      <!-- Detail Modal -->
+      <!-- Chi tiết dịch vụ -->
       @if (selectedServiceDetail()) {
-        <div class="modal-backdrop-custom" (click)="selectedServiceDetail.set(null)">
-          <div class="modal-dialog-custom" (click)="$event.stopPropagation()">
-            <div class="modal-header-custom">
-              <div class="m-title-box">
-                <span class="code-badge m-code">{{ selectedServiceDetail()?.serviceCode }}</span>
-                <h3 class="m-title">{{ selectedServiceDetail()?.serviceName }}</h3>
+        <div class="modal-backdrop" (click)="selectedServiceDetail.set(null)">
+          <div class="modal-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h2 class="modal-title">{{ selectedServiceDetail()?.serviceName }}</h2>
+                <span class="mono text-muted modal-code">{{ selectedServiceDetail()?.serviceCode }}</span>
               </div>
-              <button type="button" class="btn-close-custom" (click)="selectedServiceDetail.set(null)">
-                <i class="bi bi-x-lg"></i>
-              </button>
+              <button type="button" class="modal-close-btn" (click)="selectedServiceDetail.set(null)" aria-label="Đóng">×</button>
             </div>
-            <div class="modal-body-custom">
-              <div class="detail-grid">
-                <div class="detail-item">
-                  <span class="detail-label">Loại Xét Nghiệm:</span>
-                  <span class="detail-val font-semibold">{{ selectedServiceDetail()?.category }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Khoa Thực Hiện:</span>
-                  <span class="detail-val">{{ departmentLabel(selectedServiceDetail()?.department) }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Đơn Giá Kỹ Thuật:</span>
-                  <span class="detail-val price-highlight">{{ (selectedServiceDetail()?.price || 0) | number:'1.0-0' }} VNĐ</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Đơn Vị Đo Lường:</span>
-                  <span class="detail-val">{{ selectedServiceDetail()?.unit || 'N/A' }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Khoảng Tham Chiếu Bình Thường:</span>
-                  <span class="detail-val ref-highlight">{{ selectedServiceDetail()?.referenceRange || 'Bình thường' }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Giới Hạn Ngưỡng Dưới (Min):</span>
-                  <span class="detail-val">{{ selectedServiceDetail()?.lowerLimit ?? 'Không quy định' }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Giới Hạn Ngưỡng Trên (Max):</span>
-                  <span class="detail-val">{{ selectedServiceDetail()?.upperLimit ?? 'Không quy định' }}</span>
-                </div>
-                <div class="detail-item full-width">
-                  <span class="detail-label">Mô Tả &amp; Hướng Dẫn Kỹ Thuật Chuẩn Bị Mẫu:</span>
-                  <p class="desc-full">{{ selectedServiceDetail()?.description || 'Tiến hành theo quy trình kỹ thuật chuẩn của Bộ Y Tế.' }}</p>
-                </div>
+            <div class="modal-body">
+              <dl class="detail-grid">
+                <dt>Loại xét nghiệm</dt><dd>{{ selectedServiceDetail()?.category || '—' }}</dd>
+                <dt>Khoa thực hiện</dt><dd>{{ departmentLabel(selectedServiceDetail()?.department) }}</dd>
+                <dt>Đơn giá</dt><dd class="mono">{{ (selectedServiceDetail()?.price || 0) | number:'1.0-0' }} đ</dd>
+                <dt>Đơn vị đo</dt><dd>{{ selectedServiceDetail()?.unit || '—' }}</dd>
+                <dt>Khoảng tham chiếu</dt><dd>{{ selectedServiceDetail()?.referenceRange || 'Bình thường' }}</dd>
+                <dt>Ngưỡng dưới (min)</dt><dd class="mono">{{ selectedServiceDetail()?.lowerLimit ?? 'Không quy định' }}</dd>
+                <dt>Ngưỡng trên (max)</dt><dd class="mono">{{ selectedServiceDetail()?.upperLimit ?? 'Không quy định' }}</dd>
+              </dl>
+              <div class="detail-desc">
+                <strong>Mô tả, hướng dẫn lấy mẫu</strong>
+                <p>{{ selectedServiceDetail()?.description || 'Tiến hành theo quy trình kỹ thuật chuẩn của Bộ Y Tế.' }}</p>
               </div>
             </div>
-            <div class="modal-footer-custom">
-              <button type="button" class="btn btn-outline" (click)="selectedServiceDetail.set(null)">
-                Đóng
-              </button>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="selectedServiceDetail.set(null)">Đóng</button>
             </div>
           </div>
         </div>
       }
 
-      <!-- Create / Edit Modal (Admin CRUD) -->
+      <!-- Thêm / sửa dịch vụ (Admin) -->
       @if (showFormModal()) {
-        <div class="modal-backdrop-custom" (click)="closeFormModal()">
-          <div class="modal-dialog-custom modal-form-lg" (click)="$event.stopPropagation()">
-            <div class="modal-header-custom">
-              <div class="m-title-box">
-                <h3 class="m-title">
-                  <i class="bi" [class.bi-plus-circle-fill]="!isEditMode()" [class.bi-pencil-square]="isEditMode()"></i>
-                  {{ isEditMode() ? 'Cập Nhật Kỹ Thuật Xét Nghiệm' : 'Thêm Mới Kỹ Thuật Xét Nghiệm' }}
-                </h3>
-                <p class="m-subtitle">Quy định mã kỹ thuật, đơn vị đo, khoảng tham chiếu sinh học và bảng giá</p>
-              </div>
-              <button type="button" class="btn-close-custom" (click)="closeFormModal()">
-                <i class="bi bi-x-lg"></i>
-              </button>
+        <div class="modal-backdrop" (click)="closeFormModal()">
+          <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title">{{ isEditMode() ? 'Sửa dịch vụ xét nghiệm' : 'Thêm dịch vụ xét nghiệm' }}</h2>
+              <button type="button" class="modal-close-btn" (click)="closeFormModal()" aria-label="Đóng">×</button>
             </div>
 
             <form (ngSubmit)="saveService()">
-              <div class="modal-body-custom">
+              <div class="modal-body">
                 <div class="form-grid">
                   <div class="form-group">
-                    <label class="form-label">Mã Dịch Vụ <span class="required">*</span></label>
+                    <label class="form-label required">Mã dịch vụ</label>
                     <input
                       type="text"
                       class="form-control"
                       [(ngModel)]="formData.serviceCode"
                       name="serviceCode"
-                      placeholder="VD: XN-HEM-02"
+                      placeholder="vd: XN-HEM-02"
                       required
                       [disabled]="isEditMode()"
                     />
                   </div>
 
                   <div class="form-group">
-                    <label class="form-label">Loại Xét Nghiệm <span class="required">*</span></label>
+                    <label class="form-label required">Loại xét nghiệm</label>
                     <select class="form-control" [(ngModel)]="formData.categoryId" name="categoryId" required>
                       <option [ngValue]="null" disabled>-- Chọn loại xét nghiệm --</option>
                       @for (c of labCategories(); track c.id) {
@@ -350,8 +262,7 @@ import { ApiResponse } from '../../models/auth.models';
                       }
                     </select>
                     <button type="button" class="btn-link-add" (click)="toggleNewCategory()">
-                      <i class="bi" [ngClass]="showNewCategory() ? 'bi-dash-circle' : 'bi-plus-circle'"></i>
-                      {{ showNewCategory() ? 'Đóng' : 'Thêm loại mới' }}
+                      {{ showNewCategory() ? 'Đóng' : '+ Thêm loại mới' }}
                     </button>
                   </div>
 
@@ -360,12 +271,12 @@ import { ApiResponse } from '../../models/auth.models';
                       <label class="form-label">Loại xét nghiệm mới</label>
                       <div class="new-category-row">
                         <input type="text" class="form-control" [(ngModel)]="newCategory.name"
-                               name="newCategoryName" placeholder="VD: Vi sinh" />
+                               name="newCategoryName" placeholder="vd: Vi sinh" />
                         <select class="form-control" [(ngModel)]="newCategory.department" name="newCategoryDept">
                           <option value="XET_NGHIEM">Khoa Xét nghiệm</option>
                           <option value="CHAN_DOAN_HINH_ANH">Khoa Chẩn đoán hình ảnh</option>
                         </select>
-                        <button type="button" class="btn btn-primary" [disabled]="savingCategory()" (click)="saveNewCategory()">
+                        <button type="button" class="btn btn-secondary" [disabled]="savingCategory()" (click)="saveNewCategory()">
                           {{ savingCategory() ? 'Đang lưu...' : 'Lưu loại' }}
                         </button>
                       </div>
@@ -373,19 +284,19 @@ import { ApiResponse } from '../../models/auth.models';
                   }
 
                   <div class="form-group full-width">
-                    <label class="form-label">Tên Dịch Vụ Xét Nghiệm <span class="required">*</span></label>
+                    <label class="form-label required">Tên dịch vụ</label>
                     <input
                       type="text"
                       class="form-control"
                       [(ngModel)]="formData.serviceName"
                       name="serviceName"
-                      placeholder="VD: Định lượng Ferritin huyết thanh..."
+                      placeholder="vd: Định lượng Ferritin huyết thanh"
                       required
                     />
                   </div>
 
                   <div class="form-group">
-                    <label class="form-label">Đơn Giá Kỹ Thuật (VNĐ) <span class="required">*</span></label>
+                    <label class="form-label required">Đơn giá (đ)</label>
                     <input
                       type="number"
                       class="form-control"
@@ -398,29 +309,29 @@ import { ApiResponse } from '../../models/auth.models';
                   </div>
 
                   <div class="form-group">
-                    <label class="form-label">Đơn Vị Đo Lường</label>
+                    <label class="form-label">Đơn vị đo</label>
                     <input
                       type="text"
                       class="form-control"
                       [(ngModel)]="formData.unit"
                       name="unit"
-                      placeholder="VD: G/L, mmol/L, U/L, ng/mL..."
+                      placeholder="vd: G/L, mmol/L, U/L, ng/mL"
                     />
                   </div>
 
                   <div class="form-group full-width">
-                    <label class="form-label">Khoảng Tham Chiếu Bình Thường</label>
+                    <label class="form-label">Khoảng tham chiếu</label>
                     <input
                       type="text"
                       class="form-control"
                       [(ngModel)]="formData.referenceRange"
                       name="referenceRange"
-                      placeholder="VD: 30 - 400 ng/mL hoặc Âm tính (Negative)"
+                      placeholder="vd: 30 - 400 ng/mL hoặc Âm tính"
                     />
                   </div>
 
                   <div class="form-group">
-                    <label class="form-label">Giới Hạn Ngưỡng Dưới (Min)</label>
+                    <label class="form-label">Ngưỡng dưới (min)</label>
                     <input
                       type="number"
                       class="form-control"
@@ -432,7 +343,7 @@ import { ApiResponse } from '../../models/auth.models';
                   </div>
 
                   <div class="form-group">
-                    <label class="form-label">Giới Hạn Ngưỡng Trên (Max)</label>
+                    <label class="form-label">Ngưỡng trên (max)</label>
                     <input
                       type="number"
                       class="form-control"
@@ -444,27 +355,25 @@ import { ApiResponse } from '../../models/auth.models';
                   </div>
 
                   <div class="form-group full-width">
-                    <label class="form-label">Mô Tả &amp; Hướng Dẫn Kỹ Thuật Lấy Mẫu</label>
+                    <label class="form-label">Mô tả, hướng dẫn lấy mẫu</label>
                     <textarea
                       class="form-control"
                       rows="3"
                       [(ngModel)]="formData.description"
                       name="description"
-                      placeholder="Ghi chú quy trình thực hiện, lưu ý khi lấy mẫu máu/bệnh phẩm..."
+                      placeholder="Quy trình thực hiện, lưu ý khi lấy mẫu"
                     ></textarea>
                   </div>
                 </div>
               </div>
 
-              <div class="modal-footer-custom">
-                <button type="button" class="btn btn-outline" (click)="closeFormModal()">
-                  Hủy Bỏ
-                </button>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" (click)="closeFormModal()">Hủy</button>
                 <button type="submit" class="btn btn-primary" [disabled]="submitting()">
                   @if (submitting()) {
-                    <span class="spinner-border spinner-border-sm"></span> Đang lưu...
+                    <span class="spinner-sm"></span> Đang lưu...
                   } @else {
-                    <i class="bi bi-check2-circle"></i> {{ isEditMode() ? 'Lưu Thay Đổi' : 'Tạo Dịch Vụ Mới' }}
+                    {{ isEditMode() ? 'Lưu thay đổi' : 'Thêm dịch vụ' }}
                   }
                 </button>
               </div>
@@ -473,35 +382,32 @@ import { ApiResponse } from '../../models/auth.models';
         </div>
       }
 
-      <!-- Delete Confirmation Modal -->
+      <!-- Xác nhận xóa -->
       @if (showDeleteModal()) {
-        <div class="modal-backdrop-custom" (click)="closeDeleteModal()">
-          <div class="modal-dialog-custom modal-confirm-card" (click)="$event.stopPropagation()">
-            <div class="confirm-content">
-              <div class="confirm-icon-box">
-                <i class="bi bi-trash3-fill"></i>
-              </div>
-              <h3 class="confirm-title">Xác Nhận Xóa Dịch Vụ</h3>
+        <div class="modal-backdrop" (click)="closeDeleteModal()">
+          <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title">Xóa dịch vụ</h2>
+              <button type="button" class="modal-close-btn" (click)="closeDeleteModal()" aria-label="Đóng">×</button>
+            </div>
+            <div class="modal-body">
               <p class="confirm-desc">
-                Bạn có chắc chắn muốn xóa dịch vụ xét nghiệm
-                <strong>{{ serviceToDelete()?.serviceName }}</strong>
-                (Mã: <code>{{ serviceToDelete()?.serviceCode }}</code>)?
+                Xóa dịch vụ <strong>{{ serviceToDelete()?.serviceName }}</strong>
+                (<span class="mono">{{ serviceToDelete()?.serviceCode }}</span>)?
               </p>
               <p class="confirm-subnote">
-                Dịch vụ sẽ được chuyển sang trạng thái ngừng hoạt động và không còn hiển thị cho Bác sĩ chỉ định.
+                Dịch vụ sẽ chuyển sang ngừng hoạt động và không còn hiển thị khi bác sĩ chỉ định.
               </p>
-              <div class="confirm-actions">
-                <button type="button" class="btn btn-outline" (click)="closeDeleteModal()">
-                  Hủy Bỏ
-                </button>
-                <button type="button" class="btn btn-danger" [disabled]="deleting()" (click)="confirmDelete()">
-                  @if (deleting()) {
-                    <span class="spinner-border spinner-border-sm"></span> Đang xóa...
-                  } @else {
-                    <i class="bi bi-trash3-fill"></i> Xác Nhận Xóa
-                  }
-                </button>
-              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="closeDeleteModal()">Hủy</button>
+              <button type="button" class="btn btn-danger" [disabled]="deleting()" (click)="confirmDelete()">
+                @if (deleting()) {
+                  <span class="spinner-sm"></span> Đang xóa...
+                } @else {
+                  Xóa
+                }
+              </button>
             </div>
           </div>
         </div>
@@ -509,721 +415,260 @@ import { ApiResponse } from '../../models/auth.models';
     </div>
   `,
   styles: [`
-    .lab-services-page {
-      padding: 1.5rem;
-      max-width: 1400px;
-      margin: 0 auto;
-      min-height: calc(100vh - 70px);
-      background-color: #f8fafc;
+    .toolbar .search-box {
       position: relative;
+      flex: 1 1 280px;
+      max-width: 380px;
     }
 
-    /* Floating Toast Notification */
-    .toast-floating {
-      position: fixed;
-      top: 85px;
-      right: 25px;
-      z-index: 2000;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.85rem 1.25rem;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
-      animation: slideInToast 0.25s ease-out;
+    .search-box > i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 14px;
     }
 
-    .toast-success {
-      background: #065f46;
-      color: #ffffff;
-      border: 1px solid #059669;
-    }
-
-    .toast-error {
-      background: #991b1b;
-      color: #ffffff;
-      border: 1px solid #dc2626;
-    }
-
-    @keyframes slideInToast {
-      from { transform: translateX(50px); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #0284c7;
-      background: #e0f2fe;
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-
-    .page-title {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 0.35rem 0;
-    }
-
-    .page-subtitle {
-      font-size: 0.925rem;
-      color: #64748b;
-      margin: 0;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.6rem 1.1rem;
-      font-size: 0.875rem;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: all 0.15s ease;
-    }
-
-    .btn-outline {
+    .search-input {
+      width: 100%;
+      height: 34px;
+      padding: 0 30px 0 32px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
       background: #ffffff;
-      border-color: #cbd5e1;
-      color: #334155;
+      outline: none;
     }
 
-    .btn-outline:hover {
-      background: #f1f5f9;
-      border-color: #94a3b8;
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
-    .btn-primary {
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      color: #ffffff;
-      border-color: #0284c7;
-      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+    .btn-clear {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: none;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px;
     }
 
-    .btn-primary:hover {
-      background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
-    }
+    .btn-clear:hover { color: var(--text-main); }
 
-    .btn-danger {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
+    .spin-active { animation: spin 0.8s linear infinite; display: inline-block; }
 
-    .btn-danger:hover {
-      background: #b91c1c;
-      border-color: #b91c1c;
-    }
-
-    .spin-active {
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    /* Category Pills */
+    /* Bộ lọc theo loại */
     .category-pills {
       display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
-      overflow-x: auto;
-      padding-bottom: 0.4rem;
+      flex: 1 1 100%;
+      gap: 4px;
+      flex-wrap: wrap;
     }
 
     .pill-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.5rem 1rem;
-      border-radius: 999px;
-      border: 1px solid #e2e8f0;
+      gap: 6px;
+      height: 30px;
+      padding: 0 10px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
       background: #ffffff;
-      color: #475569;
-      font-size: 0.85rem;
-      font-weight: 600;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
       white-space: nowrap;
-      transition: all 0.15s ease;
+      transition: background-color 0.12s ease, border-color 0.12s ease;
     }
 
-    .pill-btn:hover {
-      background: #f0fdf4;
-      border-color: #86efac;
-      color: #166534;
-    }
+    .pill-btn:hover { background: var(--bg-hover); }
 
     .pill-btn.active {
-      background: #0284c7;
-      border-color: #0284c7;
-      color: #ffffff;
-      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+      background: var(--primary-50);
+      border-color: var(--primary-200);
+      color: var(--primary-700);
+      font-weight: 500;
     }
 
     .pill-count {
-      display: inline-block;
-      padding: 0.1rem 0.45rem;
-      border-radius: 999px;
-      font-size: 0.725rem;
-      font-weight: 700;
-      background: #f1f5f9;
-      color: #334155;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
     }
 
-    .pill-btn.active .pill-count {
-      background: rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-    }
+    .pill-btn.active .pill-count { color: var(--primary-700); }
 
-    /* Search Bar */
-    .search-bar-card {
-      background: #ffffff;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      padding: 0.85rem 1.25rem;
-      margin-bottom: 1.25rem;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
+    .table-responsive { overflow-x: auto; }
 
-    .search-box {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      position: relative;
-    }
-
-    .search-icon {
-      font-size: 1.1rem;
-      color: #94a3b8;
-    }
-
-    .search-input {
-      flex: 1;
-      border: none;
-      outline: none;
-      font-size: 0.95rem;
-      color: #0f172a;
-      background: transparent;
-    }
-
-    .btn-clear {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      cursor: pointer;
-      font-size: 1.1rem;
-    }
-
-    /* Table Card */
-    .table-card {
-      background: #ffffff;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
-    }
-
-    .table-responsive {
-      overflow-x: auto;
-    }
-
-    .services-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
-
-    .services-table th {
-      background: #f8fafc;
-      padding: 0.85rem 1rem;
-      text-align: left;
-      font-weight: 700;
-      color: #475569;
-      border-bottom: 1px solid #e2e8f0;
-      white-space: nowrap;
-    }
-
-    .services-table td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
-      vertical-align: middle;
-    }
-
-    .services-table tr:hover {
-      background: #f8fafc;
-    }
-
-    .code-badge {
-      display: inline-block;
-      font-family: monospace;
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 0.2rem 0.5rem;
-      background: #f1f5f9;
-      color: #0369a1;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-    }
-
-    .name-text {
-      color: #0f172a;
-      font-size: 0.9rem;
-    }
-
-    .category-tag {
-      display: inline-block;
-      font-size: 0.775rem;
-      font-weight: 600;
-      padding: 0.2rem 0.55rem;
-      border-radius: 6px;
-      background: #f1f5f9;
-      color: #475569;
-    }
-
-    .tag-blood { background: #fee2e2; color: #b91c1c; }
-    .tag-bio { background: #fef3c7; color: #b45309; }
-    .tag-liver { background: #ffedd5; color: #c2410c; }
-    .tag-image { background: #e0e7ff; color: #4338ca; }
-    .tag-ecg { background: #fce7f3; color: #be185d; }
-
-    .ref-range-box {
-      font-size: 0.85rem;
-    }
-
-    .range-text {
-      font-weight: 600;
-      color: #0f172a;
-    }
+    .code-cell { font-size: 13px; white-space: nowrap; }
+    td.text-muted { color: var(--text-muted); }
+    .name-text { font-weight: 500; }
 
     .limits-mini {
-      font-size: 0.725rem;
-      color: #64748b;
-      margin-top: 0.15rem;
-    }
-
-    .unit-badge {
-      display: inline-block;
-      padding: 0.15rem 0.45rem;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #475569;
-    }
-
-    .price-val {
-      font-weight: 700;
-      color: #0284c7;
-      font-size: 0.9rem;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     .desc-text {
-      max-width: 250px;
+      max-width: 260px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: #64748b;
-      font-size: 0.825rem;
+      color: var(--text-muted);
+      font-size: 13px;
     }
 
-    .action-buttons-group {
+    .row-actions {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
+      justify-content: flex-end;
+      gap: 2px;
     }
 
-    .btn-detail-sm {
-      padding: 0.35rem 0.55rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      background: #ffffff;
-      color: #0284c7;
-      font-size: 0.85rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s ease;
-    }
-
-    .btn-detail-sm:hover {
-      background: #f0f9ff;
-      border-color: #0284c7;
-    }
-
-    .btn-action-edit {
-      padding: 0.35rem 0.65rem;
-      border: 1px solid #bae6fd;
-      border-radius: 6px;
-      background: #f0f9ff;
-      color: #0284c7;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      transition: all 0.15s ease;
-    }
-
-    .btn-action-edit:hover {
-      background: #0284c7;
-      color: #ffffff;
-      border-color: #0284c7;
-    }
-
-    .btn-action-delete {
-      padding: 0.35rem 0.55rem;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      background: #fef2f2;
-      color: #dc2626;
-      font-size: 0.85rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s ease;
-    }
-
-    .btn-action-delete:hover {
-      background: #dc2626;
-      color: #ffffff;
-      border-color: #dc2626;
-    }
-
-    .state-container {
-      padding: 3.5rem 1rem;
+    .loading-state,
+    .empty-state {
+      padding: 48px 16px;
       text-align: center;
-      color: #64748b;
+      color: var(--text-muted);
     }
 
-    .empty-icon {
-      font-size: 3rem;
-      color: #cbd5e1;
-      margin-bottom: 0.75rem;
-      display: block;
+    .empty-state h3 {
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
     }
 
-    /* Phân Trang Rõ Ràng (Pagination Bar) */
-    .pagination-container {
+    /* Phân trang */
+    .pagination-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       flex-wrap: wrap;
-      gap: 1rem;
-      padding: 1rem 1.25rem;
-      background: #ffffff;
-      border-top: 1px solid #e2e8f0;
-      border-radius: 0 0 16px 16px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .pagination-info {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      color: #64748b;
-      font-size: 0.875rem;
-
-      strong {
-        color: #0f172a;
-        font-weight: 700;
-      }
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-
-      label {
-        color: #64748b;
-        margin: 0;
-      }
-
-      select {
-        padding: 0.25rem 0.6rem;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #0f172a;
-        font-weight: 600;
-        font-size: 0.85rem;
-        cursor: pointer;
-        outline: none;
-        transition: border-color 0.15s;
-
-        &:focus {
-          border-color: #0284c7;
-          box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
-        }
-      }
-    }
-
+    .pagination-info,
+    .page-size-selector,
     .pagination-controls {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 8px;
     }
 
-    .btn-page-nav {
-      width: 34px;
-      height: 34px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .pagination-info { gap: 16px; }
+    .pagination-controls { gap: 4px; }
+
+    .form-select-sm {
+      height: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 6px;
       background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      color: #475569;
-      font-size: 0.85rem;
+    }
+
+    .btn-page {
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
-      transition: all 0.15s ease;
-
-      &:hover:not(:disabled) {
-        background: #f0f9ff;
-        border-color: #0284c7;
-        color: #0284c7;
-      }
-
-      &:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-        background: #f8fafc;
-        border-color: #e2e8f0;
-      }
     }
 
-    .page-numbers {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-      margin: 0 0.25rem;
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-page.active {
+      background: var(--primary-600);
+      border-color: var(--primary-600);
+      color: #ffffff;
     }
 
-    .btn-page-number {
-      min-width: 34px;
-      height: 34px;
-      padding: 0 0.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      color: #334155;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
+    .page-ellipsis { padding: 0 4px; color: var(--text-light); }
 
-      &:hover:not(.active) {
-        background: #f0f9ff;
-        border-color: #0284c7;
-        color: #0284c7;
-      }
+    /* Modal */
+    .modal-lg { max-width: 720px; }
+    .modal-sm { max-width: 460px; }
 
-      &.active {
-        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-        border-color: #0284c7;
-        color: #ffffff;
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-      }
-    }
-
-    .page-ellipsis {
-      padding: 0 0.35rem;
-      color: #94a3b8;
-      font-weight: 700;
-    }
-
-    .modal-backdrop-custom {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      z-index: 1050;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-      overflow-y: auto;
-    }
-
-    .modal-dialog-custom {
-      background: #ffffff;
-      border-radius: 16px;
-      width: 100%;
-      max-width: 650px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
-      overflow: hidden;
-      animation: modalFadeIn 0.2s ease-out;
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      margin: auto;
-    }
-
-    .modal-form-lg {
-      max-width: 720px;
-    }
-
-    .modal-dialog-custom form {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .modal-header-custom {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-      flex-shrink: 0;
-    }
-
-    .modal-body-custom {
-      padding: 1.5rem;
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-      max-height: calc(90vh - 145px);
-    }
-
-    .modal-body-custom::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .modal-body-custom::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
+    .modal-code { font-size: 13px; }
 
     .detail-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    .detail-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .detail-item.full-width {
-      grid-column: 1 / -1;
-      margin-top: 0.5rem;
-    }
-
-    .detail-label {
-      font-size: 0.775rem;
-      color: #64748b;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .detail-val {
-      font-size: 0.95rem;
-      color: #0f172a;
-    }
-
-    .price-highlight {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: #0284c7;
-    }
-
-    .ref-highlight {
-      font-weight: 700;
-      color: #047857;
-    }
-
-    .desc-full {
-      font-size: 0.9rem;
-      color: #334155;
-      line-height: 1.5;
-      background: #f8fafc;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;
+      grid-template-columns: 150px 1fr;
+      gap: 8px 16px;
+      font-size: 14px;
       margin: 0;
     }
 
-    /* Form Grid */
+    .detail-grid dt { color: var(--text-muted); }
+    .detail-grid dd { margin: 0; }
+
+    .detail-desc {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+      font-size: 14px;
+    }
+
+    .detail-desc p {
+      margin-top: 4px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
     .form-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.1rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 16px;
     }
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
+    .form-group.full-width { grid-column: 1 / -1; }
+
+    .form-control:disabled {
+      background: var(--bg-subtle);
+      color: var(--text-muted);
     }
+
+    textarea.form-control { resize: vertical; min-height: 72px; }
 
     .btn-link-add {
-      background: none;
-      border: none;
-      padding: 4px 0 0;
-      color: #2563eb;
-      font-size: 0.82rem;
-      cursor: pointer;
       align-self: flex-start;
+      margin-top: 6px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--primary-600);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
     }
 
+    .btn-link-add:hover { text-decoration: underline; }
+
     .new-category-box {
-      background: #f8fafc;
-      border: 1px dashed #cbd5e1;
-      border-radius: 10px;
       padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: var(--bg-subtle);
     }
 
     .new-category-row {
@@ -1232,117 +677,23 @@ import { ApiResponse } from '../../models/auth.models';
       flex-wrap: wrap;
     }
 
-    .new-category-row .form-control {
-      flex: 1 1 180px;
-    }
-
-    .form-group.full-width {
-      grid-column: 1 / -1;
-    }
-
-    .form-label {
-      font-size: 0.825rem;
-      font-weight: 700;
-      color: #334155;
-      margin: 0;
-    }
-
-    .required {
-      color: #ef4444;
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 0.6rem 0.85rem;
-      font-size: 0.875rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      color: #0f172a;
-      background: #ffffff;
-      outline: none;
-      transition: all 0.15s ease;
-
-      &:focus {
-        border-color: #0284c7;
-        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-      }
-
-      &:disabled {
-        background: #f1f5f9;
-        color: #94a3b8;
-        cursor: not-allowed;
-      }
-    }
-
-    textarea.form-control {
-      resize: vertical;
-      min-height: 75px;
-    }
-
-    .modal-footer-custom {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
-      flex-shrink: 0;
-    }
-
-    /* Delete Confirm Card */
-    .modal-confirm-card {
-      max-width: 480px;
-    }
-
-    .confirm-content {
-      padding: 2rem 1.5rem;
-      text-align: center;
-    }
-
-    .confirm-icon-box {
-      width: 60px;
-      height: 60px;
-      margin: 0 auto 1.25rem auto;
-      border-radius: 50%;
-      background: #fee2e2;
-      color: #dc2626;
-      font-size: 1.8rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .confirm-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 0.5rem 0;
-    }
+    .new-category-row .form-control { flex: 1 1 180px; }
 
     .confirm-desc {
-      font-size: 0.925rem;
-      color: #475569;
+      font-size: 14px;
+      color: var(--text-main);
       line-height: 1.5;
-      margin: 0 0 0.5rem 0;
-
-      code {
-        background: #f1f5f9;
-        padding: 0.1rem 0.35rem;
-        border-radius: 4px;
-        color: #0369a1;
-      }
+      margin-bottom: 6px;
     }
 
     .confirm-subnote {
-      font-size: 0.8rem;
-      color: #94a3b8;
-      margin: 0 0 1.5rem 0;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .confirm-actions {
-      display: flex;
-      justify-content: center;
-      gap: 0.75rem;
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 120px 1fr; }
     }
   `]
 })

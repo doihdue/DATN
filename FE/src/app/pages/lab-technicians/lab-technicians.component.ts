@@ -9,65 +9,59 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="ktv-page">
-      <!-- Header Banner -->
+    <div class="page">
       <div class="page-header">
-        <div class="header-left">
-          <div class="header-badge">
-            <i class="bi bi-eyedropper"></i> Nhân Sự Cận Lâm Sàng & Xét Nghiệm
-          </div>
-          <h1 class="page-title">Quản Lý Kỹ Thuật Viên</h1>
-          <p class="page-subtitle">
-            Quản lý đội ngũ KTV xét nghiệm & chẩn đoán hình ảnh, phân công chuyên môn, cấp tài khoản và điều phối phân quyền
-          </p>
+        <div>
+          <h1 class="page-title">Kỹ thuật viên</h1>
+          <p class="page-subtitle">{{ technicianList().length }} kỹ thuật viên, {{ activeCount() }} đang hoạt động</p>
         </div>
-        <div class="header-actions">
+        <div class="page-actions">
           <button class="btn btn-primary" (click)="openAddModal()">
-            <i class="bi bi-person-plus-fill"></i> Thêm Kỹ Thuật Viên Mới
+            <i class="bi bi-plus-lg"></i> Thêm kỹ thuật viên
           </button>
         </div>
       </div>
 
-      <!-- Filter & Search Bar -->
-      <div class="search-filter-card">
+      <div class="panel">
+      <div class="toolbar">
         <div class="search-box">
           <i class="bi bi-search"></i>
           <input
             type="text"
             [(ngModel)]="searchKeyword"
             (ngModelChange)="applyFilters()"
-            placeholder="Tìm theo tên KTV, mã nhân viên, tài khoản, email, số điện thoại..."
+            placeholder="Tìm theo tên, mã, tài khoản, email, số điện thoại"
             class="search-input"
           />
           @if (searchKeyword) {
-            <button type="button" class="btn-clear-search" (click)="clearSearch()" title="Xóa từ khóa tìm kiếm">
-              <i class="bi bi-x-circle-fill"></i>
+            <button type="button" class="btn-clear-search" (click)="clearSearch()" title="Xóa từ khóa" aria-label="Xóa từ khóa">
+              <i class="bi bi-x-lg"></i>
             </button>
           }
         </div>
-        <select class="filter-select" [(ngModel)]="filterDepartment" (ngModelChange)="applyFilters()" aria-label="Lọc theo bộ phận chuyên môn">
-          <option value="">Tất cả chuyên khoa cận lâm sàng</option>
-          <option value="XET_NGHIEM">🧪 Khoa Xét Nghiệm</option>
-          <option value="CHAN_DOAN_HINH_ANH">📷 Khoa Chẩn Đoán Hình Ảnh</option>
+        <select class="filter-select" [(ngModel)]="filterDepartment" (ngModelChange)="applyFilters()" aria-label="Lọc theo bộ phận">
+          <option value="">Tất cả bộ phận</option>
+          <option value="XET_NGHIEM">Xét nghiệm</option>
+          <option value="CHAN_DOAN_HINH_ANH">Chẩn đoán hình ảnh</option>
         </select>
-        <select class="filter-select" [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()" aria-label="Lọc theo trạng thái tài khoản">
+        <select class="filter-select" [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()" aria-label="Lọc theo trạng thái">
           <option value="">Tất cả trạng thái</option>
           <option value="ACTIVE">Đang hoạt động</option>
           <option value="LOCKED">Đã khóa</option>
         </select>
-        <div class="stats-summary">
-          <span class="stat-pill stat-pill-clickable" (click)="setQuickFilter('', '')" title="Xem tất cả KTV">
-            Tổng cộng: <strong>{{ technicianList().length }}</strong> KTV
-          </span>
-          <span class="stat-pill stat-pill-lab stat-pill-clickable" [class.pill-active]="filterDepartment === 'XET_NGHIEM'" (click)="setQuickFilter('XET_NGHIEM', filterStatus)" title="Lọc Khoa Xét Nghiệm">
-            Xét nghiệm: <strong>{{ labCount() }}</strong>
-          </span>
-          <span class="stat-pill stat-pill-imaging stat-pill-clickable" [class.pill-active]="filterDepartment === 'CHAN_DOAN_HINH_ANH'" (click)="setQuickFilter('CHAN_DOAN_HINH_ANH', filterStatus)" title="Lọc Khoa Chẩn Đoán Hình Ảnh">
-            CĐHA: <strong>{{ imagingCount() }}</strong>
-          </span>
-          <span class="stat-pill stat-pill-highlight stat-pill-clickable" [class.pill-active]="filterStatus === 'ACTIVE'" (click)="setQuickFilter(filterDepartment, 'ACTIVE')" title="Lọc KTV Đang hoạt động">
-            Hoạt động: <strong>{{ activeCount() }}</strong>
-          </span>
+        <div class="quick-filters">
+          <button type="button" class="quick-filter" [class.active]="!filterDepartment && !filterStatus" (click)="setQuickFilter('', '')">
+            Tất cả <span class="mono">{{ technicianList().length }}</span>
+          </button>
+          <button type="button" class="quick-filter" [class.active]="filterDepartment === 'XET_NGHIEM'" (click)="setQuickFilter('XET_NGHIEM', filterStatus)">
+            Xét nghiệm <span class="mono">{{ labCount() }}</span>
+          </button>
+          <button type="button" class="quick-filter" [class.active]="filterDepartment === 'CHAN_DOAN_HINH_ANH'" (click)="setQuickFilter('CHAN_DOAN_HINH_ANH', filterStatus)">
+            CĐHA <span class="mono">{{ imagingCount() }}</span>
+          </button>
+          <button type="button" class="quick-filter" [class.active]="filterStatus === 'ACTIVE'" (click)="setQuickFilter(filterDepartment, 'ACTIVE')">
+            Hoạt động <span class="mono">{{ activeCount() }}</span>
+          </button>
         </div>
       </div>
 
@@ -89,8 +83,7 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
         </div>
       }
 
-      <!-- Table List of Lab Technicians & Pagination -->
-      <div class="table-card">
+      <div>
         @if (loading()) {
           <div class="loading-state">
             <div class="spinner"></div>
@@ -98,91 +91,68 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
           </div>
         } @else if (filteredTechnicians().length === 0) {
           <div class="empty-state">
-            <i class="bi bi-person-x-fill"></i>
-            <h3>Không tìm thấy kỹ thuật viên nào</h3>
-            <p>Thử thay đổi bộ lọc hoặc nhấn "Thêm Kỹ Thuật Viên Mới" để tạo hồ sơ.</p>
+            <h3>Không có kỹ thuật viên phù hợp</h3>
+            <p>Thử đổi từ khoá hoặc bộ lọc.</p>
           </div>
         } @else {
           <div class="table-responsive">
-            <table class="clinical-table">
+            <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 110px; text-align: center;">Mã KTV</th>
-                  <th style="min-width: 250px;">Kỹ thuật viên</th>
-                  <th style="min-width: 200px;">Bộ phận chuyên môn</th>
-                  <th style="min-width: 200px;">Chức vụ</th>
-                  <th style="min-width: 210px;">Liên hệ</th>
-                  <th style="width: 120px; text-align: center;">Ngày vào làm</th>
-                  <th style="width: 140px; text-align: center;">Trạng thái</th>
-                  <th style="width: 170px; text-align: center;">Thao tác</th>
+                  <th style="width: 90px;">Mã</th>
+                  <th style="min-width: 240px;">Kỹ thuật viên</th>
+                  <th style="min-width: 150px;">Bộ phận</th>
+                  <th style="min-width: 180px;">Chức vụ</th>
+                  <th style="min-width: 200px;">Liên hệ</th>
+                  <th style="width: 120px;">Ngày vào làm</th>
+                  <th style="width: 120px;">Trạng thái</th>
+                  <th style="width: 140px;"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (item of paginatedTechnicians(); track item.id) {
-                  <tr class="table-row">
-                    <td style="text-align: center;">
-                      <span class="code-badge">{{ item.employeeCode || ('KTV' + item.id) }}</span>
-                    </td>
+                  <tr>
+                    <td class="mono text-muted">{{ item.employeeCode || ('KTV' + item.id) }}</td>
                     <td>
-                      <div class="ktv-cell">
-                        <div class="ktv-avatar" [class.avatar-imaging]="item.department === 'CHAN_DOAN_HINH_ANH'">
-                          {{ initials(item.fullName) }}
-                        </div>
-                        <div class="ktv-meta">
-                          <strong class="ktv-name">{{ item.fullName }}</strong>
-                          <span class="ktv-sub">{{ '@' + (item.username || '—') }}</span>
+                      <div class="person-cell">
+                        <div class="avatar">{{ initials(item.fullName) }}</div>
+                        <div class="person-meta">
+                          <strong class="person-name">{{ item.fullName }}</strong>
+                          <span class="person-sub">{{ item.username || '—' }}</span>
                         </div>
                       </div>
                     </td>
-                    <td>
-                      @if (item.department === 'CHAN_DOAN_HINH_ANH') {
-                        <span class="dept-badge dept-imaging">
-                          <i class="bi bi-camera-reels-fill"></i> Chẩn Đoán Hình Ảnh
-                        </span>
-                      } @else {
-                        <span class="dept-badge dept-lab">
-                          <i class="bi bi-eyedropper"></i> Xét Nghiệm
-                        </span>
-                      }
-                    </td>
-                    <td>
-                      <span class="badge-position">
-                        <i class="bi bi-person-workspace"></i> {{ item.position || (item.department === 'CHAN_DOAN_HINH_ANH' ? 'KTV Chẩn đoán hình ảnh' : 'KTV Xét nghiệm') }}
-                      </span>
-                    </td>
+                    <td>{{ item.department === 'CHAN_DOAN_HINH_ANH' ? 'Chẩn đoán hình ảnh' : 'Xét nghiệm' }}</td>
+                    <td>{{ item.position || (item.department === 'CHAN_DOAN_HINH_ANH' ? 'KTV chẩn đoán hình ảnh' : 'KTV xét nghiệm') }}</td>
                     <td>
                       <div class="contact-cell">
-                        <span><i class="bi bi-envelope"></i> {{ item.email || '—' }}</span>
-                        <span><i class="bi bi-telephone"></i> {{ item.phoneNumber || '—' }}</span>
+                        <span>{{ item.email || '—' }}</span>
+                        <span class="text-muted">{{ item.phoneNumber || '—' }}</span>
                       </div>
                     </td>
-                    <td style="text-align: center;">{{ item.hireDate ? (item.hireDate | date:'dd/MM/yyyy') : '—' }}</td>
-                    <td style="text-align: center;">
+                    <td class="mono">{{ item.hireDate ? (item.hireDate | date:'dd/MM/yyyy') : '—' }}</td>
+                    <td>
                       @if (item.status === 'LOCKED') {
-                        <span class="status-badge status-locked"><i class="bi bi-lock-fill"></i> Đã khóa</span>
+                        <span class="status danger">Đã khóa</span>
                       } @else {
-                        <span class="status-badge status-active"><i class="bi bi-check-circle-fill"></i> Hoạt động</span>
+                        <span class="status success">Hoạt động</span>
                       }
                     </td>
-                    <td style="text-align: center;">
-                      <div class="action-buttons-cell">
-                        <button class="btn-action btn-action-view" (click)="viewDetail(item)" title="Xem hồ sơ chi tiết" aria-label="Xem hồ sơ">
-                          <i class="bi bi-eye-fill"></i>
+                    <td>
+                      <div class="row-actions">
+                        <button class="icon-btn" (click)="viewDetail(item)" title="Xem hồ sơ" aria-label="Xem hồ sơ">
+                          <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn-action btn-action-edit" (click)="openEditModal(item)" title="Chỉnh sửa thông tin" aria-label="Chỉnh sửa">
-                          <i class="bi bi-pencil-fill"></i>
+                        <button class="icon-btn" (click)="openEditModal(item)" title="Chỉnh sửa" aria-label="Chỉnh sửa">
+                          <i class="bi bi-pencil"></i>
                         </button>
-                        @if (item.status === 'LOCKED') {
-                          <button class="btn-action btn-action-unlock" (click)="toggleStatus(item)" title="Mở khóa tài khoản" aria-label="Mở khóa">
-                            <i class="bi bi-unlock-fill"></i>
-                          </button>
-                        } @else {
-                          <button class="btn-action btn-action-lock" (click)="toggleStatus(item)" title="Khóa tài khoản" aria-label="Khóa">
-                            <i class="bi bi-lock-fill"></i>
-                          </button>
-                        }
-                        <button class="btn-action btn-action-delete" (click)="confirmDelete(item)" title="Xóa kỹ thuật viên" aria-label="Xóa">
-                          <i class="bi bi-trash3-fill"></i>
+                        <button class="icon-btn" (click)="toggleStatus(item)"
+                                [title]="item.status === 'LOCKED' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'"
+                                [attr.aria-label]="item.status === 'LOCKED' ? 'Mở khóa' : 'Khóa'">
+                          <i class="bi" [ngClass]="item.status === 'LOCKED' ? 'bi-unlock' : 'bi-lock'"></i>
+                        </button>
+                        <button class="icon-btn danger" (click)="confirmDelete(item)" title="Xóa" aria-label="Xóa">
+                          <i class="bi bi-trash3"></i>
                         </button>
                       </div>
                     </td>
@@ -195,11 +165,9 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
           <!-- Pagination Bar -->
           <div class="pagination-footer">
             <div class="pagination-info">
-              <span>
-                Hiển thị <strong>{{ startIndex() }} - {{ endIndex() }}</strong> trên tổng số <strong>{{ filteredTechnicians().length }}</strong> KTV
-              </span>
+              <span>{{ startIndex() }}–{{ endIndex() }} / {{ filteredTechnicians().length }}</span>
               <div class="page-size-selector">
-                <label for="pageSizeSelect">Số dòng/trang:</label>
+                <label for="pageSizeSelect">Số dòng</label>
                 <select
                   id="pageSizeSelect"
                   [ngModel]="pageSize()"
@@ -218,7 +186,7 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
                 <i class="bi bi-chevron-double-left"></i>
               </button>
               <button class="btn-page btn-page-nav" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)" title="Trang trước">
-                <i class="bi bi-chevron-left"></i> Trước
+                <i class="bi bi-chevron-left"></i>
               </button>
               <div class="page-numbers-group">
                 @for (p of pagesList(); track p) {
@@ -228,7 +196,7 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
                 }
               </div>
               <button class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)" title="Trang sau">
-                Sau <i class="bi bi-chevron-right"></i>
+                <i class="bi bi-chevron-right"></i>
               </button>
               <button class="btn-page btn-page-nav" [disabled]="currentPage() === totalPages()" (click)="goToPage(totalPages())" title="Đến trang cuối cùng">
                 <i class="bi bi-chevron-double-right"></i>
@@ -238,35 +206,34 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
         }
       </div>
 
-      <!-- Modal Thêm / Chỉnh Sửa Kỹ Thuật Viên -->
+      </div>
+
+      <!-- Modal thêm / sửa kỹ thuật viên -->
       @if (showModal()) {
         <div class="modal-backdrop" (click)="closeModal()">
           <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">
-                <i class="bi" [ngClass]="isEditing() ? 'bi-pencil-square' : 'bi-person-plus-fill'"></i>
-                {{ isEditing() ? 'Cập Nhật Hồ Sơ Kỹ Thuật Viên' : 'Thêm Kỹ Thuật Viên Mới' }}
-              </h2>
+              <h2 class="modal-title">{{ isEditing() ? 'Sửa thông tin kỹ thuật viên' : 'Thêm kỹ thuật viên' }}</h2>
               <button class="modal-close-btn" (click)="closeModal()" aria-label="Đóng">×</button>
             </div>
             <div class="modal-body">
               @if (formError()) {
-                <div class="form-error"><i class="bi bi-exclamation-circle-fill"></i> {{ formError() }}</div>
+                <div class="form-error">{{ formError() }}</div>
               }
 
-              <!-- 1. Tài khoản đăng nhập -->
-              <h3 class="form-section-title"><i class="bi bi-shield-lock"></i> Tài khoản đăng nhập (Quyền: ROLE_LAB_TECH)</h3>
+              <!-- Tài khoản đăng nhập -->
+              <h3 class="form-section-title">Tài khoản đăng nhập</h3>
               <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label" [class.required]="!isEditing()">Tên đăng nhập</label>
-                  <input type="text" [(ngModel)]="formData.username" class="form-control" placeholder="vd: ktv_lan, ktv_minh" [disabled]="isEditing()" autocomplete="off" />
+                  <input type="text" [(ngModel)]="formData.username" class="form-control" placeholder="vd: ktv_lan" [disabled]="isEditing()" autocomplete="off" />
                   @if (isEditing()) {
                     <small class="form-hint">Không thể thay đổi tên đăng nhập.</small>
                   }
                 </div>
                 <div class="form-group">
                   <label class="form-label" [class.required]="!isEditing()">{{ isEditing() ? 'Đặt lại mật khẩu' : 'Mật khẩu' }}</label>
-                  <input type="password" [(ngModel)]="formData.password" class="form-control" [placeholder]="isEditing() ? 'Để trống nếu giữ nguyên mật khẩu cũ' : 'Tối thiểu 6 ký tự'" autocomplete="new-password" />
+                  <input type="password" [(ngModel)]="formData.password" class="form-control" [placeholder]="isEditing() ? 'Để trống nếu giữ nguyên' : 'Tối thiểu 6 ký tự'" autocomplete="new-password" />
                 </div>
                 <div class="form-group">
                   <label class="form-label required">Email</label>
@@ -278,23 +245,23 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
                 </div>
               </div>
 
-              <!-- 2. Chuyên môn & Nhân sự -->
-              <h3 class="form-section-title"><i class="bi bi-mortarboard-fill"></i> Chuyên môn &amp; Bộ phận công tác</h3>
+              <!-- Chuyên môn & nhân sự -->
+              <h3 class="form-section-title">Chuyên môn</h3>
               <div class="form-grid">
                 <div class="form-group">
-                  <label class="form-label required">Khoa / Bộ phận cận lâm sàng</label>
-                  <select [(ngModel)]="formData.department" class="form-select" (ngModelChange)="onDepartmentChange($event)">
-                    <option value="XET_NGHIEM">🧪 Khoa Xét Nghiệm</option>
-                    <option value="CHAN_DOAN_HINH_ANH">📷 Khoa Chẩn Đoán Hình Ảnh (X-Quang, Siêu âm, CT)</option>
+                  <label class="form-label required">Bộ phận</label>
+                  <select [(ngModel)]="formData.department" class="form-control" (ngModelChange)="onDepartmentChange($event)">
+                    <option value="XET_NGHIEM">Xét nghiệm</option>
+                    <option value="CHAN_DOAN_HINH_ANH">Chẩn đoán hình ảnh (X-quang, siêu âm, CT)</option>
                   </select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Chức danh / Vị trí</label>
-                  <input type="text" [(ngModel)]="formData.position" class="form-control" placeholder="vd: Kỹ thuật viên Trưởng, KTV Xét nghiệm..." />
+                  <label class="form-label">Chức danh</label>
+                  <input type="text" [(ngModel)]="formData.position" class="form-control" placeholder="vd: KTV xét nghiệm" />
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Mã nhân viên (KTV)</label>
-                  <input type="text" [(ngModel)]="formData.employeeCode" class="form-control" placeholder="vd: KTV003 (để trống tự sinh)" />
+                  <label class="form-label">Mã nhân viên</label>
+                  <input type="text" [(ngModel)]="formData.employeeCode" class="form-control" placeholder="Để trống để tự sinh (KTVxxx)" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Ngày vào làm</label>
@@ -302,16 +269,16 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
                 </div>
               </div>
 
-              <!-- 3. Thông tin cá nhân -->
-              <h3 class="form-section-title"><i class="bi bi-person-vcard"></i> Thông tin cá nhân</h3>
+              <!-- Thông tin cá nhân -->
+              <h3 class="form-section-title">Thông tin cá nhân</h3>
               <div class="form-grid">
-                <div class="form-group full-width">
+                <div class="form-group form-group-full">
                   <label class="form-label required">Họ và tên</label>
                   <input type="text" [(ngModel)]="formData.fullName" class="form-control" placeholder="vd: Nguyễn Thị Mai" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Giới tính</label>
-                  <select [(ngModel)]="formData.gender" class="form-select">
+                  <select [(ngModel)]="formData.gender" class="form-control">
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                     <option value="Khác">Khác</option>
@@ -322,15 +289,15 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
                   <input type="date" [(ngModel)]="formData.dateOfBirth" class="form-control" />
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Số CCCD / CMND</label>
+                  <label class="form-label">Số CCCD/CMND</label>
                   <input type="text" [(ngModel)]="formData.nationalId" class="form-control" placeholder="12 chữ số" />
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Link ảnh đại diện (URL)</label>
+                  <label class="form-label">Ảnh đại diện (URL)</label>
                   <input type="text" [(ngModel)]="formData.avatarUrl" class="form-control" placeholder="https://..." />
                 </div>
-                <div class="form-group full-width">
-                  <label class="form-label">Địa chỉ liên hệ</label>
+                <div class="form-group form-group-full">
+                  <label class="form-label">Địa chỉ</label>
                   <input type="text" [(ngModel)]="formData.address" class="form-control" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành phố" />
                 </div>
               </div>
@@ -341,7 +308,7 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
                 @if (submitting()) {
                   <span class="spinner-sm"></span> Đang lưu...
                 } @else {
-                  <i class="bi bi-check-lg"></i> {{ isEditing() ? 'Cập Nhật Hồ Sơ' : 'Lưu Kỹ Thuật Viên' }}
+                  {{ isEditing() ? 'Lưu thay đổi' : 'Thêm kỹ thuật viên' }}
                 }
               </button>
             </div>
@@ -349,110 +316,74 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
         </div>
       }
 
-      <!-- Modal Xem Chi Tiết KTV -->
+      <!-- Modal hồ sơ KTV -->
       @if (showDetailModal() && selectedKtv()) {
         <div class="modal-backdrop" (click)="closeDetailModal()">
-          <div class="modal-dialog modal-md" (click)="$event.stopPropagation()">
+          <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title"><i class="bi bi-person-badge-fill"></i> Hồ Sơ Chi Tiết Kỹ Thuật Viên</h2>
+              <h2 class="modal-title">Hồ sơ kỹ thuật viên</h2>
               <button class="modal-close-btn" (click)="closeDetailModal()" aria-label="Đóng">×</button>
             </div>
-            <div class="modal-body profile-body">
-              <div class="profile-header">
-                <div class="profile-avatar" [class.avatar-imaging]="selectedKtv()!.department === 'CHAN_DOAN_HINH_ANH'">
-                  {{ initials(selectedKtv()!.fullName) }}
-                </div>
-                <div class="profile-title">
-                  <h3>{{ selectedKtv()!.fullName }}</h3>
-                  <div class="profile-badges">
-                    <span class="code-badge">{{ selectedKtv()!.employeeCode || ('KTV' + selectedKtv()!.id) }}</span>
-                    @if (selectedKtv()!.department === 'CHAN_DOAN_HINH_ANH') {
-                      <span class="dept-badge dept-imaging"><i class="bi bi-camera-reels-fill"></i> Chẩn Đoán Hình Ảnh</span>
-                    } @else {
-                      <span class="dept-badge dept-lab"><i class="bi bi-eyedropper"></i> Khoa Xét Nghiệm</span>
-                    }
+            <div class="modal-body">
+              <div class="detail-head">
+                <div class="avatar avatar-lg">{{ initials(selectedKtv()!.fullName) }}</div>
+                <div>
+                  <h3 class="detail-name">{{ selectedKtv()!.fullName }}</h3>
+                  <div class="detail-tags">
+                    <span class="mono text-muted">{{ selectedKtv()!.employeeCode || ('KTV' + selectedKtv()!.id) }}</span>
+                    <span>{{ selectedKtv()!.department === 'CHAN_DOAN_HINH_ANH' ? 'Chẩn đoán hình ảnh' : 'Xét nghiệm' }}</span>
                     @if (selectedKtv()!.status === 'LOCKED') {
-                      <span class="status-badge status-locked">Đã khóa</span>
+                      <span class="status danger">Đã khóa</span>
                     } @else {
-                      <span class="status-badge status-active">Hoạt động</span>
+                      <span class="status success">Hoạt động</span>
                     }
                   </div>
                 </div>
               </div>
-
-              <div class="profile-details-grid">
-                <div class="profile-item">
-                  <span class="profile-label">Tài khoản</span>
-                  <span class="profile-val"><strong>{{ selectedKtv()!.username || '—' }}</strong></span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">Chức vụ</span>
-                  <span class="profile-val">{{ selectedKtv()!.position || '—' }}</span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">Email</span>
-                  <span class="profile-val">{{ selectedKtv()!.email || '—' }}</span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">Điện thoại</span>
-                  <span class="profile-val">{{ selectedKtv()!.phoneNumber || '—' }}</span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">Giới tính</span>
-                  <span class="profile-val">{{ selectedKtv()!.gender || '—' }}</span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">Ngày sinh</span>
-                  <span class="profile-val">{{ selectedKtv()!.dateOfBirth ? (selectedKtv()!.dateOfBirth | date:'dd/MM/yyyy') : '—' }}</span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">CCCD/CMND</span>
-                  <span class="profile-val">{{ selectedKtv()!.nationalId || '—' }}</span>
-                </div>
-                <div class="profile-item">
-                  <span class="profile-label">Ngày vào làm</span>
-                  <span class="profile-val">{{ selectedKtv()!.hireDate ? (selectedKtv()!.hireDate | date:'dd/MM/yyyy') : '—' }}</span>
-                </div>
-                <div class="profile-item full-width">
-                  <span class="profile-label">Địa chỉ</span>
-                  <span class="profile-val">{{ selectedKtv()!.address || '—' }}</span>
-                </div>
-              </div>
+              <dl class="detail-grid">
+                <dt>Tên đăng nhập</dt><dd>{{ selectedKtv()!.username || '—' }}</dd>
+                <dt>Chức vụ</dt><dd>{{ selectedKtv()!.position || '—' }}</dd>
+                <dt>Email</dt><dd>{{ selectedKtv()!.email || '—' }}</dd>
+                <dt>Số điện thoại</dt><dd>{{ selectedKtv()!.phoneNumber || '—' }}</dd>
+                <dt>Giới tính</dt><dd>{{ selectedKtv()!.gender || '—' }}</dd>
+                <dt>Ngày sinh</dt><dd>{{ selectedKtv()!.dateOfBirth ? (selectedKtv()!.dateOfBirth | date:'dd/MM/yyyy') : '—' }}</dd>
+                <dt>Số CCCD/CMND</dt><dd>{{ selectedKtv()!.nationalId || '—' }}</dd>
+                <dt>Ngày vào làm</dt><dd>{{ selectedKtv()!.hireDate ? (selectedKtv()!.hireDate | date:'dd/MM/yyyy') : '—' }}</dd>
+                <dt>Địa chỉ</dt><dd>{{ selectedKtv()!.address || '—' }}</dd>
+              </dl>
             </div>
             <div class="modal-footer">
               <button class="btn btn-secondary" (click)="closeDetailModal()">Đóng</button>
-              <button class="btn btn-primary" (click)="openEditModal(selectedKtv()!); closeDetailModal()">
-                <i class="bi bi-pencil-fill"></i> Chỉnh sửa
-              </button>
+              <button class="btn btn-primary" (click)="openEditModal(selectedKtv()!); closeDetailModal()">Chỉnh sửa</button>
             </div>
           </div>
         </div>
       }
 
-      <!-- Modal Xác Nhận Xóa -->
+      <!-- Modal xác nhận xóa -->
       @if (showDeleteModal() && ktvToDelete()) {
         <div class="modal-backdrop" (click)="cancelDelete()">
           <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
-            <div class="modal-header modal-header-danger">
-              <h2 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Xác Nhận Xóa KTV</h2>
+            <div class="modal-header">
+              <h2 class="modal-title">Xóa kỹ thuật viên</h2>
               <button class="modal-close-btn" (click)="cancelDelete()" aria-label="Đóng">×</button>
             </div>
-            <div class="modal-body text-center">
+            <div class="modal-body">
               <p>
-                Bạn có chắc chắn muốn xóa hồ sơ Kỹ thuật viên <strong>{{ ktvToDelete()!.fullName }}</strong>
-                (mã <code>{{ ktvToDelete()!.employeeCode || ('KTV' + ktvToDelete()!.id) }}</code>)?
+                Xóa hồ sơ kỹ thuật viên <strong>{{ ktvToDelete()!.fullName }}</strong>
+                (<span class="mono">{{ ktvToDelete()!.employeeCode || ('KTV' + ktvToDelete()!.id) }}</span>)?
               </p>
               <p class="delete-warning-note">
-                <i class="bi bi-info-circle"></i> Lưu ý: Nếu KTV này đã được phân ca trực hoặc đã từng ký kết quả xét nghiệm trong bệnh án, hệ thống sẽ ngăn chặn việc xóa để đảm bảo toàn vẹn dữ liệu y tế (bạn có thể khóa tài khoản thay thế).
+                Không thể xóa nếu KTV đã được phân ca hoặc đã ký kết quả xét nghiệm. Khi đó hãy khóa tài khoản thay vì xóa.
               </p>
             </div>
-            <div class="modal-footer justify-center">
-              <button class="btn btn-secondary" (click)="cancelDelete()" [disabled]="submitting()">Hủy bỏ</button>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="cancelDelete()" [disabled]="submitting()">Hủy</button>
               <button class="btn btn-danger" (click)="executeDelete()" [disabled]="submitting()">
                 @if (submitting()) {
                   <span class="spinner-sm"></span> Đang xóa...
                 } @else {
-                  <i class="bi bi-trash3-fill"></i> Xóa vĩnh viễn
+                  Xóa
                 }
               </button>
             </div>
@@ -462,861 +393,320 @@ import { LabTechnician, LabTechnicianRequest, LabTechnicianStatus } from '../../
     </div>
   `,
   styles: [`
-    .ktv-page {
-      padding: 1.5rem 0 3rem;
-      max-width: 1360px;
-      margin: 0 auto;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.85rem;
-      background: #e0f2fe;
-      color: #0369a1;
-      font-size: 0.8rem;
-      font-weight: 700;
-      border-radius: 9999px;
-      margin-bottom: 0.5rem;
-      border: 1px solid #bae6fd;
-    }
-
-    .page-title {
-      font-size: 2rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 0.4rem;
-      letter-spacing: -0.02em;
-    }
-
-    .page-subtitle {
-      color: #64748b;
-      margin: 0;
-      font-size: 0.95rem;
-    }
-
-    .search-filter-card {
-      background: #ffffff;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      padding: 1rem 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    }
-
-    .search-box {
-      flex: 1;
-      min-width: 280px;
+    .toolbar .search-box {
       position: relative;
-      display: flex;
-      align-items: center;
+      flex: 1 1 280px;
+      max-width: 420px;
     }
 
     .search-box i {
       position: absolute;
-      left: 0.85rem;
-      color: #94a3b8;
-      font-size: 0.95rem;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 14px;
+    }
+
+    .search-input,
+    .filter-select {
+      height: 34px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #ffffff;
+      outline: none;
     }
 
     .search-input {
       width: 100%;
-      padding: 0.65rem 0.85rem 0.65rem 2.4rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      background: #f8fafc;
-      transition: all 0.2s;
-    }
-
-    .search-input:focus {
-      background: #ffffff;
-      border-color: #0284c7;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
-
-    .btn-clear-search {
-      position: absolute;
-      right: 0.75rem;
-      background: none;
-      border: none;
-      color: #94a3b8;
-      cursor: pointer;
-      font-size: 0.95rem;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: color 0.15s;
-    }
-
-    .btn-clear-search:hover {
-      color: #475569;
-    }
-
-    .stat-pill-clickable {
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.15s;
-    }
-
-    .stat-pill-clickable:hover {
-      transform: translateY(-1px);
-      filter: brightness(0.95);
-    }
-
-    .pill-active {
-      box-shadow: 0 0 0 2px #0284c7;
-      font-weight: 800 !important;
+      padding: 0 10px 0 32px;
     }
 
     .filter-select {
-      padding: 0.65rem 1rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      background: #ffffff;
-      color: #334155;
-      font-weight: 500;
-      cursor: pointer;
+      padding: 0 8px;
+      min-width: 170px;
     }
 
+    .search-input:focus,
     .filter-select:focus {
-      border-color: #0284c7;
-      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 95, 180, 0.15);
     }
 
-    .stats-summary {
+    .table-responsive { overflow-x: auto; }
+    .data-table td.text-muted { color: var(--text-muted); }
+    .data-table td.mono { white-space: nowrap; }
+
+    .person-cell {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      margin-left: auto;
-      flex-wrap: wrap;
+      gap: 10px;
     }
 
-    .stat-pill {
-      font-size: 0.8rem;
-      padding: 0.35rem 0.75rem;
-      background: #f1f5f9;
-      color: #475569;
-      border-radius: 20px;
-    }
-
-    .stat-pill strong {
-      color: #0f172a;
-    }
-
-    .stat-pill-lab {
-      background: #ecfeff;
-      color: #0e7490;
-      border: 1px solid #cffafe;
-    }
-
-    .stat-pill-imaging {
-      background: #faf5ff;
-      color: #7e22ce;
-      border: 1px solid #f3e8ff;
-    }
-
-    .stat-pill-highlight {
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-    }
-
-    .table-card {
-      background: #ffffff;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-    }
-
-    .table-responsive {
-      overflow-x: auto;
-    }
-
-    .clinical-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-    }
-
-    .clinical-table th {
-      background: #f8fafc;
-      padding: 0.85rem 1rem;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #475569;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      border-bottom: 1px solid #e2e8f0;
-      white-space: nowrap;
-    }
-
-    .clinical-table td {
-      padding: 0.9rem 1rem;
-      border-bottom: 1px solid #f1f5f9;
-      font-size: 0.88rem;
-      color: #334155;
-      vertical-align: middle;
-    }
-
-    .table-row:hover td {
-      background: #f8fafc;
-    }
-
-    .code-badge {
-      display: inline-block;
-      font-family: Consolas, monospace;
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 0.2rem 0.55rem;
-      background: #f1f5f9;
-      color: #334155;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-    }
-
-    .ktv-cell {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .ktv-avatar {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      color: white;
-      font-weight: 800;
-      font-size: 0.85rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
-    }
-
-    .ktv-avatar.avatar-imaging {
-      background: linear-gradient(135deg, #8b5cf6, #6366f1);
-      box-shadow: 0 2px 6px rgba(139, 92, 246, 0.25);
-    }
-
-    .ktv-meta {
+    .person-meta {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      line-height: 1.35;
     }
 
-    .ktv-name {
-      font-weight: 700;
-      color: #0f172a;
-      font-size: 0.92rem;
-    }
+    .person-name { font-weight: 500; }
 
-    .ktv-sub {
-      font-size: 0.78rem;
-      color: #64748b;
-      font-family: Consolas, monospace;
-    }
-
-    .dept-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .dept-lab {
-      background: #ecfeff;
-      color: #0891b2;
-      border: 1px solid #a5f3fc;
-    }
-
-    .dept-imaging {
-      background: #faf5ff;
-      color: #7c3aed;
-      border: 1px solid #ddd6fe;
-    }
-
-    .badge-position {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      font-size: 0.82rem;
-      color: #475569;
-      background: #f8fafc;
-      padding: 0.25rem 0.55rem;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+    .person-sub {
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
     .contact-cell {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
-      font-size: 0.82rem;
-      color: #475569;
+      font-size: 13px;
+      line-height: 1.45;
     }
 
-    .contact-cell i {
-      color: #94a3b8;
-      width: 14px;
+    .row-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 2px;
     }
 
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 0.25rem 0.65rem;
-      border-radius: 9999px;
-      white-space: nowrap;
+    .loading-state,
+    .empty-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-muted);
     }
 
-    .status-active {
-      background: #dcfce7;
-      color: #15803d;
+    .empty-state h3 {
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
     }
 
-    .status-locked {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-
-    .action-buttons-cell {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .btn-action {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      color: #64748b;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
-
-    .btn-action:hover {
-      transform: translateY(-1px);
-    }
-
-    .btn-action-view:hover {
-      background: #e0f2fe;
-      color: #0284c7;
-      border-color: #bae6fd;
-    }
-
-    .btn-action-edit:hover {
-      background: #fef3c7;
-      color: #d97706;
-      border-color: #fde68a;
-    }
-
-    .btn-action-lock:hover {
-      background: #fee2e2;
-      color: #dc2626;
-      border-color: #fecaca;
-    }
-
-    .btn-action-unlock:hover {
-      background: #dcfce7;
-      color: #16a34a;
-      border-color: #bbf7d0;
-    }
-
-    .btn-action-delete:hover {
-      background: #fef2f2;
-      color: #ef4444;
-      border-color: #fca5a5;
-    }
-
-    /* Pagination */
     .pagination-footer {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
-      padding: 0.85rem 1.25rem;
-      background: #ffffff;
-      border-top: 1px solid #e2e8f0;
+      gap: 12px;
       flex-wrap: wrap;
-      gap: 1rem;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .pagination-info {
-      display: flex;
-      align-items: center;
-      gap: 1.25rem;
-      font-size: 0.85rem;
-      color: #64748b;
-    }
-
-    .page-size-selector {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .form-select-sm {
-      padding: 0.25rem 0.5rem;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-      font-size: 0.82rem;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
+    .pagination-info,
+    .page-size-selector,
+    .pagination-controls,
     .page-numbers-group {
       display: flex;
-      gap: 0.25rem;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pagination-info { gap: 16px; }
+    .pagination-controls, .page-numbers-group { gap: 4px; }
+
+    .form-select-sm {
+      height: 28px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 6px;
+      background: #ffffff;
     }
 
     .btn-page {
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
       background: #ffffff;
-      color: #334155;
-      font-size: 0.82rem;
-      font-weight: 600;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
       cursor: pointer;
-      transition: all 0.15s;
     }
 
-    .btn-page:hover:not(:disabled) {
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-    }
+    .btn-page:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-page:disabled { opacity: 0.45; cursor: not-allowed; }
 
     .btn-page.active {
-      background: #0284c7;
-      color: white;
-      border-color: #0284c7;
+      background: var(--primary-600);
+      border-color: var(--primary-600);
+      color: #ffffff;
     }
 
-    .btn-page:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    /* Buttons */
-    .btn {
-      padding: 0.65rem 1.2rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      border: none;
-      transition: all 0.2s;
-    }
-
-    .btn-primary {
-      background: #0284c7;
-      color: white;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: #0369a1;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
-    }
-
-    .btn-secondary {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: #e2e8f0;
-    }
-
-    .btn-danger {
-      background: #dc2626;
-      color: white;
-    }
-
-    .btn-danger:hover:not(:disabled) {
-      background: #b91c1c;
-      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-    }
-
-    /* Toast */
-    .toast-floating-container {
-      position: fixed;
-      top: 1.5rem;
-      right: 1.5rem;
-      z-index: 10000;
-      animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    @keyframes slideInRight {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-
-    .toast-card {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: #ffffff;
-      padding: 0.85rem 1.1rem;
-      border-radius: 10px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-      border-left: 5px solid;
-      min-width: 320px;
-      max-width: 450px;
-    }
-
-    .toast-success {
-      border-left-color: #16a34a;
-    }
-    .toast-success .toast-icon { color: #16a34a; font-size: 1.3rem; }
-
-    .toast-danger {
-      border-left-color: #dc2626;
-    }
-    .toast-danger .toast-icon { color: #dc2626; font-size: 1.3rem; }
-
-    .toast-content {
-      flex: 1;
-    }
-
-    .toast-title {
-      font-weight: 700;
-      font-size: 0.9rem;
-      color: #0f172a;
-    }
-
-    .toast-message {
-      font-size: 0.82rem;
-      color: #475569;
-    }
-
-    .btn-close-toast {
-      background: none;
-      border: none;
-      color: #94a3b8;
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-
-    /* Modals */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(4px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-
-    .modal-dialog {
-      background: #ffffff;
-      border-radius: 16px;
-      width: 100%;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      animation: modalScale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    @keyframes modalScale {
-      from { transform: scale(0.95); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-
-    .modal-lg { max-width: 780px; }
-    .modal-md { max-width: 620px; }
-    .modal-sm { max-width: 460px; }
-
-    .modal-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-header-danger {
-      background: #fef2f2;
-      border-bottom-color: #fee2e2;
-    }
-    .modal-header-danger .modal-title { color: #b91c1c; }
-
-    .modal-title {
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: #0f172a;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin: 0;
-    }
-
-    .modal-close-btn {
-      background: none;
-      border: none;
-      font-size: 1.6rem;
-      line-height: 1;
-      color: #94a3b8;
-      cursor: pointer;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-      overflow-y: auto;
-    }
-
-    .modal-footer {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      background: #f8fafc;
-      border-radius: 0 0 16px 16px;
-    }
-
-    .justify-center { justify-content: center; }
+    /* Modal */
+    .modal-lg { max-width: 760px; width: 100%; }
 
     .form-section-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #0369a1;
-      margin: 1.25rem 0 0.85rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      border-bottom: 1px dashed #cbd5e1;
-      padding-bottom: 0.4rem;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin: 20px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
     }
 
-    .form-section-title:first-of-type {
-      margin-top: 0;
-    }
+    .form-section-title:first-of-type { margin-top: 0; }
 
     .form-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 16px;
     }
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .full-width {
-      grid-column: 1 / -1;
-    }
-
-    .form-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #334155;
-    }
-
-    .form-label.required::after {
-      content: ' *';
-      color: #dc2626;
-    }
-
-    .form-control, .form-select {
-      padding: 0.6rem 0.85rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      background: #ffffff;
-      color: #0f172a;
-      transition: all 0.2s;
-    }
-
-    .form-control:focus, .form-select:focus {
-      border-color: #0284c7;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
+    .form-group-full { grid-column: 1 / -1; }
 
     .form-control:disabled {
-      background: #f1f5f9;
-      color: #64748b;
-      cursor: not-allowed;
-    }
-
-    .form-hint {
-      font-size: 0.78rem;
-      color: #64748b;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
     }
 
     .form-error {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #b91c1c;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      margin-bottom: 1rem;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--danger-border);
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+    }
+
+    .detail-head {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 14px;
+      margin-bottom: 16px;
     }
 
-    .delete-warning-note {
-      font-size: 0.82rem;
-      color: #64748b;
-      background: #f8fafc;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      margin-top: 1rem;
-      text-align: left;
-      border-left: 3px solid #0284c7;
+    .avatar-lg {
+      width: 48px;
+      height: 48px;
+      font-size: 16px;
     }
 
-    /* Profile Detail Modal */
-    .profile-header {
+    .detail-name {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .detail-tags {
       display: flex;
       align-items: center;
-      gap: 1.25rem;
-      padding-bottom: 1.25rem;
-      border-bottom: 1px solid #e2e8f0;
-      margin-bottom: 1.25rem;
+      gap: 10px;
+      font-size: 13px;
     }
 
-    .profile-avatar {
-      width: 58px;
-      height: 58px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      color: white;
-      font-weight: 800;
-      font-size: 1.3rem;
-      display: flex;
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 160px 1fr 160px 1fr;
+      gap: 8px 16px;
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .detail-grid dt { color: var(--text-muted); }
+    .detail-grid dd { margin: 0; }
+
+    .detail-bio {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+      font-size: 14px;
+    }
+
+    .detail-bio p {
+      margin-top: 4px;
+      color: var(--text-secondary);
+    }
+
+
+    .search-box .btn-clear-search {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 26px;
+      height: 26px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-light);
+      cursor: pointer;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
     }
 
-    .profile-avatar.avatar-imaging {
-      background: linear-gradient(135deg, #8b5cf6, #6366f1);
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    .search-box .btn-clear-search i {
+      position: static;
+      transform: none;
+      font-size: 12px;
+      color: inherit;
     }
 
-    .profile-title h3 {
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 0.4rem;
+    .search-box .btn-clear-search:hover {
+      background: var(--bg-hover);
+      color: var(--text-main);
     }
 
-    .profile-badges {
+    .quick-filters {
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
+      margin-left: auto;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      overflow: hidden;
     }
 
-    .profile-details-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+    .quick-filter {
+      height: 32px;
+      padding: 0 10px;
+      border: none;
+      border-left: 1px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.12s ease, color 0.12s ease;
     }
 
-    .profile-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
+    .quick-filter:first-child { border-left: none; }
+    .quick-filter:hover { background: var(--bg-hover); }
+
+    .quick-filter .mono {
+      color: var(--text-muted);
+      margin-left: 4px;
     }
 
-    .profile-label {
-      font-size: 0.78rem;
-      color: #64748b;
-      text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.03em;
+    .quick-filter.active {
+      background: var(--primary-50);
+      color: var(--primary-700);
+      font-weight: 500;
     }
 
-    .profile-val {
-      font-size: 0.92rem;
-      color: #1e293b;
+    .quick-filter.active .mono { color: var(--primary-700); }
+
+    .modal-sm { max-width: 440px; width: 100%; }
+
+    .delete-warning-note {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    /* States */
-    .loading-state, .empty-state {
-      padding: 3.5rem 1rem;
-      text-align: center;
-      color: #64748b;
-    }
-
-    .empty-state i {
-      font-size: 3rem;
-      color: #cbd5e1;
-      margin-bottom: 0.5rem;
-      display: block;
-    }
-
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid #e2e8f0;
-      border-top-color: #0284c7;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 0.75rem;
-    }
-
-    .spinner-sm {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: #ffffff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      display: inline-block;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    @media (max-width: 768px) {
+      .page { padding: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 120px 1fr; }
     }
   `]
 })
