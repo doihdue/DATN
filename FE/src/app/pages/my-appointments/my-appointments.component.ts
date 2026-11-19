@@ -272,18 +272,29 @@ export class MyAppointmentsComponent implements OnInit {
   readonly upcoming = computed(() =>
     this.appointments()
       .filter(a => a.status === 'PENDING' || a.status === 'CONFIRMED' || a.status === 'CHECKED_IN')
-      // Gần nhất (sớm nhất) ở trên -> xa nhất ở dưới
-      .sort((a, b) => this.sortKey(a).localeCompare(this.sortKey(b)))
+      // Ngày mới nhất (xa nhất) ở trên -> ngày cũ nhất ở dưới
+      .sort((a, b) => this.compareByTime(b, a))
   );
   readonly history = computed(() =>
     this.appointments()
       .filter(a => a.status === 'COMPLETED' || a.status === 'CANCELLED')
       // Gần hôm nay nhất (mới nhất) ở trên -> xa nhất (cũ nhất) ở dưới
-      .sort((a, b) => this.sortKey(b).localeCompare(this.sortKey(a)))
+      .sort((a, b) => this.compareByTime(b, a))
   );
 
-  private sortKey(a: Appointment): string {
-    return `${a.appointmentDate ?? ''}T${a.estimatedStartTime ?? a.shiftStartTime ?? ''}`;
+  /** So sánh tăng dần theo ngày khám + giờ dự kiến; cùng giờ thì theo số thứ tự đặt lịch. */
+  private compareByTime(a: Appointment, b: Appointment): number {
+    return this.timeValue(a) - this.timeValue(b)
+      || (a.bookingNumber ?? 0) - (b.bookingNumber ?? 0)
+      || a.id - b.id;
+  }
+
+  private timeValue(a: Appointment): number {
+    const [y, m, d] = (a.appointmentDate ?? '').split('-').map(Number);
+    if (!y || !m || !d) return Number.MAX_SAFE_INTEGER; // thiếu ngày -> xếp cuối
+    const [hh = 0, mm = 0, ss = 0] = (a.estimatedStartTime ?? a.shiftStartTime ?? '')
+      .split(':').map(n => Number(n) || 0);
+    return new Date(y, m - 1, d, hh, mm, ss).getTime();
   }
   readonly visibleList = computed(() => this.tab() === 'upcoming' ? this.upcoming() : this.history());
 
