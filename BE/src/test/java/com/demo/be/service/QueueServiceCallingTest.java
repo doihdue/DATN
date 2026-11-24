@@ -36,7 +36,7 @@ class QueueServiceCallingTest {
     @Mock private DoctorRepository doctorRepository;
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
-    @Mock private WorkScheduleRepository workScheduleRepository;
+    @Mock private WorkScheduleService workScheduleService;
     @Mock private SimpMessagingTemplate messagingTemplate;
 
     @Mock private com.demo.be.security.AccessGuard accessGuard;
@@ -99,8 +99,8 @@ class QueueServiceCallingTest {
                 .endTime(LocalTime.of(12, 0))
                 .status("AVAILABLE")
                 .build();
-        when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(roomId), eq(LocalDate.now())))
-                .thenReturn(List.of(shift));
+        when(workScheduleService.isDoctorOnDutyInRoom(eq(doctor.getId()), eq(roomId), eq(LocalDate.now())))
+                .thenReturn(true);
     }
 
     @Test
@@ -164,8 +164,8 @@ class QueueServiceCallingTest {
         mockCurrentDoctor();
         when(examinationRoomRepository.findById(room.getId())).thenReturn(Optional.of(room));
         // Phòng không có ca trực của bác sĩ này
-        when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(room.getId()), eq(LocalDate.now())))
-                .thenReturn(Collections.emptyList());
+        when(workScheduleService.isDoctorOnDutyInRoom(eq(doctor.getId()), eq(room.getId()), eq(LocalDate.now())))
+                .thenReturn(false);
 
         assertThatThrownBy(() -> service.callNext(room.getId()))
                 .isInstanceOf(BadRequestException.class)
@@ -310,8 +310,8 @@ class QueueServiceCallingTest {
 
         when(queueTicketRepository.findById(100L)).thenReturn(Optional.of(waitingTicket));
         when(examinationRoomRepository.findById(2L)).thenReturn(Optional.of(targetRoom));
-        when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(2L), any(LocalDate.class)))
-                .thenReturn(List.of(targetShift));
+        when(workScheduleService.findOnDutySchedule(eq(2L), any(LocalDate.class), any(LocalTime.class)))
+                .thenReturn(Optional.of(targetShift));
         when(queueTicketRepository.save(any(QueueTicket.class))).thenAnswer(inv -> inv.getArgument(0));
 
         QueueTicketResponse res = service.transferTicket(100L, 2L, "Phòng 101 quá tải");

@@ -5,9 +5,12 @@ import com.demo.be.dto.request.WorkScheduleRequest;
 import com.demo.be.dto.response.BatchWorkScheduleResponse;
 import com.demo.be.dto.response.ExaminationRoomResponse;
 import com.demo.be.dto.response.WorkScheduleResponse;
+import com.demo.be.model.WorkSchedule;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface WorkScheduleService {
 
@@ -41,4 +44,11 @@ public interface WorkScheduleService {
     void deleteSchedule(Long id);
 
     List<ExaminationRoomResponse> getAllExaminationRooms();
+
+    // Hỗ trợ phân hệ Hàng đợi (Queue) tra cứu ca trực theo chuẩn kiến trúc phân tầng
+    List<WorkSchedule> getActiveDoctorSchedulesToday(Long doctorId);
+
+    Optional<WorkSchedule> findOnDutySchedule(Long roomId, LocalDate date, LocalTime time);
+
+    boolean isDoctorOnDutyInRoom(Long doctorId, Long roomId, LocalDate date);
 }
