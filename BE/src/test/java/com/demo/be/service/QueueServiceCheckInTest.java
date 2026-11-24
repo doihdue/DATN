@@ -35,7 +35,7 @@ class QueueServiceCheckInTest {
     @Mock private DoctorRepository doctorRepository;
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
-    @Mock private WorkScheduleRepository workScheduleRepository;
+    @Mock private WorkScheduleService workScheduleService;
     @Mock private AppointmentRepository appointmentRepository;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private com.demo.be.security.AccessGuard accessGuard;
@@ -76,8 +76,8 @@ class QueueServiceCheckInTest {
         LocalTime start = now.isBefore(LocalTime.of(0, 30)) ? LocalTime.MIDNIGHT : now.minusMinutes(30);
         LocalTime end = now.isAfter(LocalTime.of(22, 29)) ? LocalTime.MAX : now.plusMinutes(90);
         when(examinationRoomRepository.findByIdForUpdate(room.getId())).thenReturn(Optional.of(room));
-        when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(room.getId()), any()))
-                .thenReturn(List.of(shift(afternoonDoctor, start, end, "AVAILABLE")));
+        when(workScheduleService.findOnDutySchedule(eq(room.getId()), any(), any()))
+                .thenReturn(Optional.of(shift(afternoonDoctor, start, end, "AVAILABLE")));
     }
 
     private void stubSaveTicket() {
@@ -95,10 +95,8 @@ class QueueServiceCheckInTest {
         assumeTrue(now.getHour() >= 4 && now.getHour() <= 21);
 
         when(examinationRoomRepository.findByIdForUpdate(room.getId())).thenReturn(Optional.of(room));
-        when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(room.getId()), any())).thenReturn(List.of(
-                shift(morningDoctor, now.minusHours(4), now.minusHours(1), "AVAILABLE"),     // ca đã kết thúc
-                shift(afternoonDoctor, now.minusMinutes(30), now.plusHours(2), "AVAILABLE") // ca đang trực
-        ));
+        when(workScheduleService.findOnDutySchedule(eq(room.getId()), any(), any()))
+                .thenReturn(Optional.of(shift(afternoonDoctor, now.minusMinutes(30), now.plusHours(2), "AVAILABLE")));
         when(patientRepository.findByPhoneNumber("0901234567")).thenReturn(List.of(patient));
         stubSaveTicket();
 
@@ -113,10 +111,8 @@ class QueueServiceCheckInTest {
         assumeTrue(now.getHour() >= 4);
 
         when(examinationRoomRepository.findByIdForUpdate(room.getId())).thenReturn(Optional.of(room));
-        when(workScheduleRepository.findByExaminationRoomIdAndWorkDate(eq(room.getId()), any())).thenReturn(List.of(
-                shift(morningDoctor, now.minusHours(4), now.minusHours(1), "AVAILABLE"),   // đã hết ca
-                shift(afternoonDoctor, now.minusHours(1), now.plusHours(3), "CANCELLED")  // ca bị huỷ
-        ));
+        when(workScheduleService.findOnDutySchedule(eq(room.getId()), any(), any()))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.checkIn(request("Nguyễn Văn Nam")))
                 .isInstanceOf(BadRequestException.class)

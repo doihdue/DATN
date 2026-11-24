@@ -8,6 +8,7 @@ import com.demo.be.model.*;
 import com.demo.be.repository.*;
 import com.demo.be.security.AccessGuard;
 import com.demo.be.service.QueueService;
+import com.demo.be.service.WorkScheduleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -43,7 +44,7 @@ public class QueueServiceImpl implements QueueService {
     private final DoctorRepository doctorRepository;
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
-    private final WorkScheduleRepository workScheduleRepository;
+    private final WorkScheduleService workScheduleService;
     private final AppointmentRepository appointmentRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final AccessGuard accessGuard;
@@ -573,11 +574,7 @@ public class QueueServiceImpl implements QueueService {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
 
-        List<WorkSchedule> todaySchedules = workScheduleRepository
-                .findDoctorSchedules(doctor.getId(), today, today).stream()
-                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
-                .filter(ws -> ws.getExaminationRoom() != null)
-                .collect(Collectors.toList());
+        List<WorkSchedule> todaySchedules = workScheduleService.getActiveDoctorSchedulesToday(doctor.getId());
         if (todaySchedules.isEmpty()) {
             throw new BadRequestException("Hôm nay bạn không có ca trực nào tại phòng khám");
         }
@@ -725,10 +722,7 @@ public class QueueServiceImpl implements QueueService {
      * nếu chưa tới ca nào thì lấy ca sắp tới gần nhất. Bỏ qua ca đã huỷ hoặc đã kết thúc.
      */
     private Optional<WorkSchedule> findOnDutySchedule(Long roomId, LocalDate date, LocalTime time) {
-        return workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, date).stream()
-                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
-                .filter(ws -> ws.getEndTime() == null || ws.getEndTime().isAfter(time))
-                .min(Comparator.comparing(WorkSchedule::getStartTime, Comparator.nullsFirst(Comparator.naturalOrder())));
+        return workScheduleService.findOnDutySchedule(roomId, date, time);
     }
 
     private Doctor getCurrentDoctor() {
@@ -750,9 +744,7 @@ public class QueueServiceImpl implements QueueService {
      */
     private void assertCurrentDoctorOnDutyInRoom(Long roomId) {
         Doctor doctor = getCurrentDoctor();
-        boolean onDuty = workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, LocalDate.now()).stream()
-                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
-                .anyMatch(ws -> ws.getDoctor() != null && doctor.getId().equals(ws.getDoctor().getId()));
+        boolean onDuty = workScheduleService.isDoctorOnDutyInRoom(doctor.getId(), roomId, LocalDate.now());
         if (!onDuty) {
             throw new BadRequestException("Bạn không có ca trực hôm nay tại phòng khám này");
         }

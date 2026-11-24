@@ -31,7 +31,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -434,5 +436,36 @@ public class WorkScheduleServiceImpl implements WorkScheduleService {
                 .roomName(room != null ? room.getRoomName() : null)
                 .floor(room != null ? room.getFloor() : null)
                 .build();
+    }
+
+    // =========================================================================
+    // Hỗ trợ phân hệ Hàng đợi (Queue) tra cứu ca trực theo chuẩn kiến trúc phân tầng
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkSchedule> getActiveDoctorSchedulesToday(Long doctorId) {
+        LocalDate today = LocalDate.now();
+        return workScheduleRepository.findDoctorSchedules(doctorId, today, today).stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .filter(ws -> ws.getExaminationRoom() != null)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<WorkSchedule> findOnDutySchedule(Long roomId, LocalDate date, LocalTime time) {
+        return workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, date).stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .filter(ws -> ws.getEndTime() == null || ws.getEndTime().isAfter(time))
+                .min(Comparator.comparing(WorkSchedule::getStartTime, Comparator.nullsFirst(Comparator.naturalOrder())));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isDoctorOnDutyInRoom(Long doctorId, Long roomId, LocalDate date) {
+        return workScheduleRepository.findByExaminationRoomIdAndWorkDate(roomId, date).stream()
+                .filter(ws -> !"CANCELLED".equals(ws.getStatus()))
+                .anyMatch(ws -> ws.getDoctor() != null && doctorId.equals(ws.getDoctor().getId()));
     }
 }
