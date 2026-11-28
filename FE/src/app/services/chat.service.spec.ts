@@ -11,6 +11,7 @@ describe('ChatService', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()]
     });
@@ -62,5 +63,29 @@ describe('ChatService', () => {
     http.expectOne(URL).flush(reply('abc', { suggestedSpecialties: null }));
 
     expect((await result).suggestedSpecialties).toEqual([]);
+  });
+
+  it('giữ mã phiên qua lần tải lại trang (sessionStorage) và lấy lại lịch sử', async () => {
+    const first = firstValueFrom(service.sendMessage('đau họng'));
+    http.expectOne(URL).flush(reply('abc'));
+    await first;
+
+    // Mô phỏng tải lại trang: service mới đọc lại mã phiên đã lưu
+    const reloaded = TestBed.runInInjectionContext(() => new ChatService());
+    expect(reloaded.hasSession()).toBe(true);
+
+    const history = firstValueFrom(reloaded.loadHistory());
+    const req = http.expectOne('http://localhost:8080/api/chat/sessions/abc/messages');
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: [{ id: 1, sender: 'USER', content: 'đau họng', createdAt: '2026-11-28T10:00:00', isEmergency: false, suggestedSpecialties: null }] });
+    expect((await history)[0].suggestedSpecialties).toEqual([]);
+
+    reloaded.resetSession();
+    expect(sessionStorage.getItem('medqueue.chat.sessionKey')).toBeNull();
+  });
+
+  it('chưa có phiên thì không gọi API lịch sử', async () => {
+    expect(service.hasSession()).toBe(false);
+    expect(await firstValueFrom(service.loadHistory())).toEqual([]);
   });
 });

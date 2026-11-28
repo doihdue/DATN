@@ -13,4 +13,6 @@ public interface AIChatMessageRepository extends JpaRepository<AIChatMessage, Lo
 
     // Lấy N tin nhắn gần nhất (mới nhất trước) để làm ngữ cảnh hội thoại cho AI
     List<AIChatMessage> findTop10BySessionIdOrderByIdDesc(Long sessionId);
+
+    List<AIChatMessage> findBySessionIdOrderByIdAsc(Long sessionId);
 }
