@@ -43,6 +43,14 @@ public class RuleBasedChatAdvisor {
             "Triệu chứng bạn mô tả có thể cần được xử trí y tế khẩn cấp. Vui lòng gọi 115 hoặc đến cơ sở cấp cứu " +
             "gần nhất ngay, không nên chờ đặt lịch khám.";
 
+    private static final Pattern BOOKING_PATTERN = Pattern.compile(
+            "dat lich|dat kham|lich kham|hen kham|dang ky kham|ca kham|con lich|con cho");
+
+    /** Dùng khi Gemini không khả dụng: nhận biết người dùng đang muốn xem lịch / đặt lịch khám. */
+    public boolean isBookingRequest(String message) {
+        return BOOKING_PATTERN.matcher(normalize(message)).find();
+    }
+
     public boolean isEmergency(String message) {
         return EMERGENCY_PATTERN.matcher(normalize(message)).find();
     }

@@ -11,20 +11,25 @@ import {
   untracked,
   viewChild
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
-import { ChatMessage, ChatReply } from '../../models/chat.model';
+import { Appointment } from '../../models/appointment.model';
+import { ChatHistoryMessage, ChatMessage, ChatReply } from '../../models/chat.model';
+import { WorkSchedule } from '../../models/schedule.model';
+import { AppointmentService } from '../../services/appointment.service';
 import { AuthService } from '../../services/auth.service';
 import { ChatService } from '../../services/chat.service';
+
+const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
 const MAX_MESSAGE_LENGTH = 1000;
 
 @Component({
   selector: 'app-chat-widget',
   standalone: true,
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, SlicePipe, RouterLink],
   template: `
     @if (isVisible()) {
       @if (isOpen()) {
@@ -64,7 +69,11 @@ const MAX_MESSAGE_LENGTH = 1000;
           </div>
 
           <div #messageList class="chat-messages" role="log" aria-live="polite" aria-label="Nội dung trò chuyện">
-            @if (messages().length === 0) {
+            @if (isLoadingHistory()) {
+              <div class="history-loading" role="status">
+                <span class="spinner" aria-hidden="true"></span> Đang tải lại cuộc trò chuyện...
+              </div>
+            } @else if (messages().length === 0) {
               <div class="chat-welcome">
                 <span class="welcome-icon" aria-hidden="true"><i class="bi bi-chat-heart"></i></span>
                 <h3>Xin chào, bạn đang gặp vấn đề gì?</h3>
@@ -97,6 +106,27 @@ const MAX_MESSAGE_LENGTH = 1000;
                         <p>{{ message.content }}</p>
                         <a href="tel:115" class="emergency-call"><i class="bi bi-telephone-fill" aria-hidden="true"></i> Gọi 115</a>
                       </div>
+                    } @else if (message.appointment; as appt) {
+                      <div class="booked-card" role="status">
+                        <div class="booked-title">
+                          <i class="bi bi-calendar-check-fill" aria-hidden="true"></i> Đặt lịch thành công
+                        </div>
+                        <dl>
+                          <dt>Mã lịch hẹn</dt><dd><strong>{{ appt.appointmentCode }}</strong></dd>
+                          <dt>Chuyên khoa</dt><dd>{{ appt.specialtyName }}</dd>
+                          <dt>Bác sĩ</dt><dd>{{ appt.academicTitle ? appt.academicTitle + ' ' : '' }}{{ appt.doctorName }}</dd>
+                          <dt>Ngày khám</dt><dd>{{ formatDay(appt.appointmentDate) }}</dd>
+                          <dt>Số thứ tự</dt><dd>{{ appt.bookingNumber }}</dd>
+                          <dt>Giờ dự kiến</dt><dd>{{ appt.estimatedStartTime | slice: 0 : 5 }}</dd>
+                          @if (appt.roomNumber) {
+                            <dt>Phòng</dt><dd>{{ appt.roomNumber }}{{ appt.floor != null ? ' · Tầng ' + appt.floor : '' }}</dd>
+                          }
+                        </dl>
+                        <p>{{ message.content }}</p>
+                        <a routerLink="/my-appointments" class="specialty-action" (click)="close()">
+                          <i class="bi bi-list-check" aria-hidden="true"></i> Xem lịch hẹn của tôi
+                        </a>
+                      </div>
                     } @else {
                       <div class="bubble bubble-ai">{{ message.content }}</div>
                     }
@@ -106,10 +136,92 @@ const MAX_MESSAGE_LENGTH = 1000;
                         <div class="specialty-label">Chuyên khoa gợi ý</div>
                         <div class="specialty-name"><i class="bi bi-hospital" aria-hidden="true"></i> {{ specialty.name }}</div>
                         <p>{{ specialty.reason }}</p>
-                        <a routerLink="/booking" class="specialty-action" (click)="close()">
-                          <i class="bi bi-calendar-plus" aria-hidden="true"></i> Đặt lịch khám
-                        </a>
+                        <button type="button" class="specialty-action" [disabled]="isSending()" (click)="askSchedules(specialty.name)">
+                          <i class="bi bi-calendar-plus" aria-hidden="true"></i> Xem lịch khám
+                        </button>
                       </div>
+                    }
+
+                    @if (message.staleBookingSpecialty; as specialtyName) {
+                      <div class="stale-schedules">
+                        <span>Danh sách ca khám có thể đã thay đổi.</span>
+                        <button type="button" class="specialty-action" [disabled]="isSending()" (click)="askSchedules(specialtyName)">
+                          <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Xem lại lịch còn trống
+                        </button>
+                      </div>
+                    }
+
+                    @if (message.availableSchedules?.length) {
+                      <div class="schedule-list" role="list" aria-label="Các ca khám còn chỗ">
+                        @for (schedule of message.availableSchedules; track schedule.id) {
+                          <div class="schedule-card" role="listitem" [class.is-selected]="isSelected(message.id, schedule.id)">
+                            <div class="schedule-main">
+                              <div class="schedule-date">{{ formatDay(schedule.workDate) }}</div>
+                              <div class="schedule-time">
+                                <i class="bi bi-clock" aria-hidden="true"></i>
+                                {{ schedule.startTime | slice: 0 : 5 }} – {{ schedule.endTime | slice: 0 : 5 }}
+                              </div>
+                              <div class="schedule-doctor">
+                                <i class="bi bi-person-badge" aria-hidden="true"></i>
+                                {{ schedule.academicTitle ? schedule.academicTitle + ' ' : '' }}{{ schedule.doctorName }}
+                              </div>
+                              <div class="schedule-meta">
+                                @if (schedule.roomNumber) {
+                                  Phòng {{ schedule.roomNumber }}{{ schedule.floor != null ? ' · Tầng ' + schedule.floor : '' }} ·
+                                }
+                                Còn {{ schedule.remainingSlots }} chỗ
+                              </div>
+                            </div>
+                            @if (bookedScheduleIds().has(schedule.id)) {
+                              <span class="schedule-booked"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Đã đặt</span>
+                            } @else if (isPatient()) {
+                              <button
+                                type="button"
+                                class="schedule-action"
+                                [disabled]="isBooking() || isSelected(message.id, schedule.id)"
+                                (click)="selectSchedule(message.id, schedule)"
+                              >Chọn</button>
+                            }
+                          </div>
+
+                          @if (isSelected(message.id, schedule.id)) {
+                            <div class="booking-confirm">
+                              <div class="confirm-title">Xác nhận đặt lịch</div>
+                              <p>
+                                {{ schedule.specialtyName }} · {{ formatDay(schedule.workDate) }} ·
+                                {{ schedule.startTime | slice: 0 : 5 }} – {{ schedule.endTime | slice: 0 : 5 }}
+                              </p>
+                              <textarea
+                                rows="2"
+                                maxlength="500"
+                                placeholder="Lý do khám / triệu chứng (không bắt buộc)"
+                                aria-label="Lý do khám"
+                                [value]="bookingReason()"
+                                (input)="onReasonInput($event)"
+                              ></textarea>
+                              @if (bookingError()) {
+                                <div class="confirm-error" role="alert">
+                                  <i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ bookingError() }}
+                                </div>
+                              }
+                              <div class="confirm-actions">
+                                <button type="button" class="btn-ghost" [disabled]="isBooking()" (click)="cancelSelection()">Huỷ</button>
+                                <button type="button" class="btn-primary" [disabled]="isBooking()" (click)="confirmBooking()">
+                                  {{ isBooking() ? 'Đang đặt...' : 'Xác nhận đặt lịch' }}
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        }
+                      </div>
+
+                      @if (!isLoggedIn()) {
+                        <a routerLink="/login" [queryParams]="{ returnUrl: currentPath() }" class="login-hint" (click)="close()">
+                          <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Đăng nhập tài khoản bệnh nhân để đặt lịch
+                        </a>
+                      } @else if (!isPatient()) {
+                        <p class="role-hint">Chỉ tài khoản bệnh nhân mới đặt lịch khám được.</p>
+                      }
                     }
                     <time class="message-time">{{ message.createdAt | date: 'HH:mm' }}</time>
                   </div>
@@ -454,6 +566,148 @@ const MAX_MESSAGE_LENGTH = 1000;
       &:hover { background: var(--danger-text); color: #ffffff; }
     }
 
+    button.specialty-action {
+      border: none;
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      &:disabled { opacity: 0.6; cursor: not-allowed; }
+    }
+
+    .schedule-list { display: flex; flex-direction: column; gap: 0.45rem; width: 100%; }
+
+    .schedule-card {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: var(--bg-card);
+      font-size: 0.8rem;
+
+      &.is-selected { border-color: var(--primary-500); box-shadow: 0 0 0 2px var(--primary-100); }
+    }
+
+    .schedule-main { flex: 1; min-width: 0; }
+    .schedule-date { color: var(--primary-900); font-weight: 700; }
+    .schedule-time, .schedule-doctor { color: var(--text-main); }
+    .schedule-time i, .schedule-doctor i { color: var(--text-muted); }
+    .schedule-meta { color: var(--text-muted); font-size: 0.72rem; }
+
+    .schedule-action, .btn-primary, .btn-ghost {
+      flex-shrink: 0;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      &:disabled { opacity: 0.55; cursor: not-allowed; }
+    }
+
+    .schedule-action, .btn-primary {
+      border: none;
+      background: var(--primary-700);
+      color: #ffffff;
+      &:hover:not(:disabled) { background: var(--primary-800); }
+    }
+
+    .btn-ghost {
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      &:hover:not(:disabled) { background: var(--bg-subtle); }
+    }
+
+    .schedule-booked { flex-shrink: 0; color: var(--success-text, #15803d); font-weight: 700; }
+
+    .booking-confirm {
+      padding: 0.7rem 0.8rem;
+      border: 1px solid var(--primary-200);
+      border-radius: var(--radius-md);
+      background: var(--primary-50);
+      font-size: 0.8rem;
+
+      p { margin: 0.2rem 0 0.5rem; color: var(--text-secondary); }
+      textarea {
+        width: 100%;
+        max-height: none;
+        padding: 0.4rem 0.55rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
+        font-size: 0.8rem;
+      }
+    }
+
+    .confirm-title { color: var(--primary-900); font-weight: 800; }
+    .confirm-error { margin-top: 0.4rem; color: var(--danger-text); }
+    .confirm-actions { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.5rem; }
+
+    .login-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--primary-700);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .role-hint { color: var(--text-muted); font-size: 0.75rem; }
+
+    .stale-schedules {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.4rem;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    .history-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: auto 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--primary-100);
+      border-top-color: var(--primary-700);
+      border-radius: var(--radius-full);
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .booked-card {
+      width: 100%;
+      padding: 0.75rem 0.85rem;
+      border: 1px solid var(--success-border, #86efac);
+      border-left: 4px solid var(--success-solid, #16a34a);
+      border-radius: var(--radius-md);
+      background: var(--success-bg, #f0fdf4);
+      font-size: 0.82rem;
+
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.15rem 0.6rem;
+        margin: 0.45rem 0;
+      }
+      dt { color: var(--text-muted); font-weight: 600; }
+      dd { margin: 0; color: var(--text-main); }
+      p { margin: 0 0 0.6rem; color: var(--text-secondary); }
+    }
+
+    .booked-title { color: var(--success-text, #15803d); font-size: 0.92rem; font-weight: 800; }
+
     .typing {
       display: inline-flex;
       gap: 0.3rem;
@@ -580,7 +834,7 @@ const MAX_MESSAGE_LENGTH = 1000;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .chat-panel, .typing span { animation: none; }
+      .chat-panel, .typing span, .spinner { animation: none; }
       .chat-launcher { transition: none; }
     }
   `]
@@ -588,6 +842,7 @@ const MAX_MESSAGE_LENGTH = 1000;
 export class ChatWidgetComponent implements OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly chatService = inject(ChatService);
+  private readonly appointmentService = inject(AppointmentService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
 
@@ -598,6 +853,10 @@ export class ChatWidgetComponent implements OnDestroy {
   private readonly currentUrl = signal(this.router.url);
   private readonly routerSubscription: Subscription;
   private requestSubscription?: Subscription;
+  private bookingSubscription?: Subscription;
+  private historySubscription?: Subscription;
+  // Chỉ tải lịch sử một lần, ở lần mở khung chat đầu tiên sau khi tải trang
+  private historyRequested = false;
   private nextMessageId = 1;
   private lastUsername: string | null;
   private failedMessage: string | null = null;
@@ -617,6 +876,17 @@ export class ChatWidgetComponent implements OnDestroy {
   readonly canRetry = signal(true);
   readonly draft = signal('');
   readonly messages = signal<ChatMessage[]>([]);
+  readonly isLoadingHistory = signal(false);
+
+  // ===== Đặt lịch ngay trong khung chat =====
+  readonly isLoggedIn = this.authService.isAuthenticated;
+  readonly isPatient = computed(() => this.authService.isAuthenticated() && this.authService.hasRole('PATIENT'));
+  readonly selected = signal<{ messageId: number; schedule: WorkSchedule } | null>(null);
+  readonly bookingReason = signal('');
+  readonly isBooking = signal(false);
+  readonly bookingError = signal<string | null>(null);
+  readonly bookedScheduleIds = signal<ReadonlySet<number>>(new Set());
+  readonly currentPath = computed(() => this.currentUrl().split(/[?#]/)[0] || '/');
 
   // Hiện nhãn "Chế độ dự phòng" khi câu trả lời gần nhất không đến từ Gemini
   readonly isFallbackMode = computed(() => {
@@ -626,7 +896,7 @@ export class ChatWidgetComponent implements OnDestroy {
 
   // Bảng gọi số /queue chiếu trên TV sảnh chờ nên không hiển thị widget.
   readonly isVisible = computed(() => this.currentUrl().split(/[?#]/)[0] !== '/queue');
-  readonly canSend = computed(() => this.draft().trim().length > 0 && !this.isSending());
+  readonly canSend = computed(() => this.draft().trim().length > 0 && !this.isSending() && !this.isLoadingHistory());
 
   constructor() {
     this.lastUsername = this.authService.currentUser()?.username ?? null;
@@ -648,6 +918,86 @@ export class ChatWidgetComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.routerSubscription.unsubscribe();
     this.requestSubscription?.unsubscribe();
+    this.bookingSubscription?.unsubscribe();
+    this.historySubscription?.unsubscribe();
+  }
+
+  /** Nút "Xem lịch khám" trên thẻ gợi ý chuyên khoa: hỏi trợ lý lịch còn trống của khoa đó. */
+  askSchedules(specialtyName: string): void {
+    this.send(`Tôi muốn đặt lịch khám ${specialtyName}`);
+  }
+
+  isSelected(messageId: number, scheduleId: number): boolean {
+    const current = this.selected();
+    return current !== null && current.messageId === messageId && current.schedule.id === scheduleId;
+  }
+
+  selectSchedule(messageId: number, schedule: WorkSchedule): void {
+    if (this.isBooking()) {
+      return;
+    }
+    this.selected.set({ messageId, schedule });
+    this.bookingError.set(null);
+    this.scrollAfterRender();
+  }
+
+  cancelSelection(): void {
+    this.selected.set(null);
+    this.bookingError.set(null);
+    this.bookingReason.set('');
+  }
+
+  onReasonInput(event: Event): void {
+    this.bookingReason.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  confirmBooking(): void {
+    const current = this.selected();
+    if (!current || this.isBooking()) {
+      return;
+    }
+    this.isBooking.set(true);
+    this.bookingError.set(null);
+
+    const reason = this.bookingReason().trim();
+    this.bookingSubscription = this.appointmentService
+      .bookAppointment({ workScheduleId: current.schedule.id, reasonForVisit: reason || undefined })
+      .subscribe({
+        next: res => this.handleBooked(current.schedule, res.data),
+        error: (err: HttpErrorResponse) => {
+          this.isBooking.set(false);
+          // Lỗi nghiệp vụ từ server (trùng lịch, ca đã kín, quá hạn...) hiển thị nguyên văn cho bệnh nhân
+          this.bookingError.set(err.error?.message || 'Không đặt được lịch, vui lòng thử lại.');
+        }
+      });
+  }
+
+  formatDay(date: string | null | undefined): string {
+    if (!date) {
+      return '';
+    }
+    const [year, month, day] = date.split('-').map(Number);
+    const weekday = WEEKDAYS[new Date(year, month - 1, day).getDay()];
+    return `${weekday}, ${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+  }
+
+  private handleBooked(schedule: WorkSchedule, appointment: Appointment): void {
+    this.isBooking.set(false);
+    this.selected.set(null);
+    this.bookingReason.set('');
+    this.bookedScheduleIds.update(ids => new Set(ids).add(schedule.id));
+    // Cập nhật số chỗ còn lại của ca vừa đặt ở mọi tin nhắn đang hiển thị ca đó
+    this.messages.update(list => list.map(message => ({
+      ...message,
+      availableSchedules: message.availableSchedules?.map(s =>
+        s.id === schedule.id ? { ...s, remainingSlots: Math.max(0, s.remainingSlots - 1) } : s)
+    })));
+    this.appendMessage({
+      sender: 'AI',
+      content: 'Lịch hẹn đang chờ phòng khám xác nhận. Bạn nhớ đến trước giờ dự kiến khoảng 15 phút để làm thủ tục nhé.',
+      appointment
+    });
+    this.scrollAfterRender();
   }
 
   toggle(): void {
@@ -656,6 +1006,7 @@ export class ChatWidgetComponent implements OnDestroy {
       return;
     }
     this.isOpen.set(true);
+    this.restoreHistory();
     this.afterRender(() => {
       this.scrollToBottom();
       this.resizeComposer();
@@ -685,7 +1036,7 @@ export class ChatWidgetComponent implements OnDestroy {
 
   send(text: string = this.draft()): void {
     const content = text.trim();
-    if (!content || this.isSending()) {
+    if (!content || this.isSending() || this.isLoadingHistory()) {
       return;
     }
 
@@ -702,10 +1053,17 @@ export class ChatWidgetComponent implements OnDestroy {
   }
 
   resetConversation(): void {
+    this.historySubscription?.unsubscribe();
+    this.isLoadingHistory.set(false);
+    this.historyRequested = true; // Cuộc trò chuyện mới: không còn gì để tải lại
     this.requestSubscription?.unsubscribe();
     this.isSending.set(false);
     this.hasError.set(false);
     this.failedMessage = null;
+    this.bookingSubscription?.unsubscribe();
+    this.isBooking.set(false);
+    this.cancelSelection();
+    this.bookedScheduleIds.set(new Set());
     this.chatService.resetSession();
     this.messages.set([]);
     this.draft.set('');
@@ -715,6 +1073,46 @@ export class ChatWidgetComponent implements OnDestroy {
         this.composer()?.nativeElement.focus();
       });
     }
+  }
+
+  /** Sau khi tải lại trang: hiện lại cuộc trò chuyện của phiên đang lưu (nếu có). */
+  private restoreHistory(): void {
+    if (this.historyRequested) {
+      return;
+    }
+    this.historyRequested = true;
+    if (!this.chatService.hasSession() || this.messages().length > 0) {
+      return;
+    }
+
+    this.isLoadingHistory.set(true);
+    this.historySubscription = this.chatService.loadHistory().subscribe({
+      next: history => {
+        this.isLoadingHistory.set(false);
+        this.messages.set(history.map(message => this.fromHistory(message)));
+        this.scrollAfterRender();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.isLoadingHistory.set(false);
+        // Phiên không còn hoặc không thuộc người dùng hiện tại: bỏ mã phiên, bắt đầu cuộc trò chuyện mới
+        if (err.status === 404 || err.status === 401 || err.status === 403) {
+          this.chatService.resetSession();
+        }
+      }
+    });
+  }
+
+  private fromHistory(message: ChatHistoryMessage): ChatMessage {
+    return {
+      id: this.nextMessageId++,
+      sender: message.sender,
+      content: message.content,
+      createdAt: new Date(message.createdAt),
+      isEmergency: message.isEmergency,
+      suggestedSpecialties: message.suggestedSpecialties,
+      source: message.source ?? undefined,
+      staleBookingSpecialty: message.bookingSpecialty ?? undefined
+    };
   }
 
   private requestReply(content: string): void {
@@ -745,7 +1143,8 @@ export class ChatWidgetComponent implements OnDestroy {
       content: reply.content,
       isEmergency: reply.isEmergency,
       suggestedSpecialties: reply.suggestedSpecialties,
-      source: reply.source
+      source: reply.source,
+      availableSchedules: reply.availableSchedules ?? []
     });
     this.scrollAfterRender();
   }

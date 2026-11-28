@@ -27,6 +27,13 @@ public class ChatReplyResponse {
     // Model Gemini thực sự đã trả lời (có thể là model dự phòng); null nếu không dùng AI
     private String model;
 
+    // Đặt lịch qua chat: khoa đã tra cứu (null nếu tin nhắn không phải yêu cầu đặt lịch)
+    private Long bookingSpecialtyId;
+    private String bookingSpecialty;
+    // Các ca khám còn chỗ lấy từ DB, bệnh nhân bấm chọn để đặt lịch ngay trong khung chat
+    @Builder.Default
+    private List<WorkScheduleResponse> availableSchedules = new ArrayList<>();
+
     @Getter
     @Setter
     @NoArgsConstructor
